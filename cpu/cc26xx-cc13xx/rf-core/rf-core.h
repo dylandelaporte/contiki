@@ -103,6 +103,29 @@
 #define RF_CORE_PROP_BIAS_MODE RF_CORE_BIAS_MODE_EXTERNAL
 #endif
 /*---------------------------------------------------------------------------*/
+/*
+ * RF Front-End IRQ polling mode setup
+ * \value Not Defined - polling mode enabled by driver.set_value(RADIO_PARAM_RX_MODE)
+ * \value 0           - only ISR mode use.
+ * \value 1           - only Poling mode use.
+ */
+#ifdef RF_CORE_CONF_POLL_MODE
+#define RF_CORE_POLL_MODE RF_CORE_CONF_POLL_MODE
+#endif
+/*---------------------------------------------------------------------------*/
+/* RF-Front End RAT resyncing strategy provides mechanisms for RAT sync monitoring
+ *  and resyncing
+ *  \value 0    - resync only on rf-core propety setup
+ *  \value 1    - validate RF-timestamp in window of current operation, and resync if violate
+ * */
+#define RF_CORE_RAT_SYNC_PROP      0
+#define RF_CORE_RAT_SYNC_AGRESSIVE 1
+#ifdef RF_CORE_CONF_RAT_SYNC_STYLE
+#define PROP_MODE_RAT_SYNC_STYLE    RF_CORE_CONF_RAT_SYNC_STYLE
+#else
+#define PROP_MODE_RAT_SYNC_STYLE    RF_CORE_RAT_SYNC_PROP
+#endif
+/*---------------------------------------------------------------------------*/
 #define RF_CORE_CMD_ERROR                     0
 #define RF_CORE_CMD_OK                        1
 /*---------------------------------------------------------------------------*/
