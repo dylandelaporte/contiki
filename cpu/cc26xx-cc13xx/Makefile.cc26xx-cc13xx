@@ -59,7 +59,11 @@ endif
 ifeq ($(SMALL),1)
   CFLAGS += -Os
 else
+ifeq ([$(DEBUG)],[off])
   CFLAGS += -O2
+else
+  CFLAGS += -O1
+endif
 endif
 
 ### If the user-specified a Node ID, pass a define
