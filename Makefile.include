@@ -106,12 +106,6 @@ CONTIKI_SOURCEFILES += $(CONTIKIFILES)
 CONTIKIDIRS += ${addprefix $(CONTIKI)/core/,dev lib net net/llsec net/mac net/rime \
                  net/rpl sys cfs ctk lib/ctk loader . }
 
-oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
-
-CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
-
-PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
-
 CONTIKI_LIB = $(BUILDDIR)/contiki-$(TARGET).a
 
 $(BUILDDIR):
@@ -120,6 +114,12 @@ $(BUILDDIR):
 # Provide way to create $(OBJECTDIR) if it has been removed by make clean
 $(OBJECTDIR): | $(BUILDDIR)
 	mkdir $@
+
+oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
+
+#	CONTIKI_OBJECTFILES used by target makefiles custom rules
+CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
+PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
 
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
@@ -217,8 +217,8 @@ CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
 ### Automatic dependency generation
 
 ifneq ($(MAKECMDGOALS),clean)
--include ${addprefix $(OBJECTDIR)/,$(CONTIKI_SOURCEFILES:.c=.d) \
-                                   $(PROJECT_SOURCEFILES:.c=.d)}
+-include ${addprefix $(OBJECTDIR)/,$(CONTIKI_OBJECTFILES:.o=.d) \
+                                   $(PROJECT_OBJECTFILES:.o=.d)}
 endif
 
 ### See http://make.paulandlesley.org/autodep.html#advanced
