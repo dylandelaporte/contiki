@@ -115,6 +115,7 @@ $(BUILDDIR):
 $(OBJECTDIR): | $(BUILDDIR)
 	mkdir $@
 
+oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 ### Include application makefiles
@@ -208,7 +209,7 @@ CFLAGS_CPU ?=
 CPPFLAGS := ${CPPFLAGS} ${CFLAGS}
 CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
 
-oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
+
 
 CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
 
