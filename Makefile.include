@@ -116,6 +116,11 @@ $(OBJECTDIR): | $(BUILDDIR)
 	mkdir $@
 
 oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
+
+#	CONTIKI_OBJECTFILES used by target makefiles custom rules
+CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
+PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
+
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 ### Include application makefiles
@@ -208,12 +213,6 @@ endif
 CFLAGS_CPU ?=
 CPPFLAGS := ${CPPFLAGS} ${CFLAGS}
 CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
-
-
-
-CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
-
-PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
 
 ### Automatic dependency generation
 
