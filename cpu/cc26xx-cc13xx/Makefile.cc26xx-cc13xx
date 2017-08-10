@@ -42,6 +42,9 @@ ifeq ([$(DEBUG)],[off])
 CFLAGS += -fomit-frame-pointer 
 else
 CFLAGS += -g3 -save-temps=obj
+ifeq ([$(filter -DDEBUG% -DDEBUG,${CFLAGS})],[])
+  CFLAGS += -DDEBUG=$(DEBUG)
+endif
 endif
 
 LDFLAGS += -mcpu=cortex-m3 -mthumb -mlittle-endian -nostartfiles
