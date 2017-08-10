@@ -218,9 +218,10 @@ CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
 ### Automatic dependency generation
 
 ifneq ($(MAKECMDGOALS),clean)
-DEPS = $(CONTIKI_OBJECTFILES:.o=.d) \
-       $(PROJECT_OBJECTFILES:.o=.d) \
-       $(TARGET_STARTFILES:.o=.d)
+OEXT = $(call oname, .c)
+DEPS = $(CONTIKI_OBJECTFILES:${OEXT}=.d) \
+       $(PROJECT_OBJECTFILES:${OEXT}=.d) \
+       $(TARGET_STARTFILES:${OEXT}=.d)
 
 #$(info deps: ${DEPS})
 -include ${DEPS}
