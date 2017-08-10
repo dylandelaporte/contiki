@@ -202,6 +202,10 @@ tsch_set_eb_period(uint32_t period)
 static void
 tsch_reset(void)
 {
+  tsch_is_associated = 0;
+#ifdef TSCH_CALLBACK_LEAVING_NETWORK
+  TSCH_CALLBACK_LEAVING_NETWORK();
+#endif
   int i;
   frame802154_set_pan_id(0xffff);
   /* First make sure pending packet callbacks are sent etc */
@@ -221,9 +225,6 @@ tsch_reset(void)
     tsch_timing_us[i] = tsch_default_timing_us[i];
     tsch_timing[i] = US_TO_RTIMERTICKS(tsch_timing_us[i]);
   }
-#ifdef TSCH_CALLBACK_LEAVING_NETWORK
-  TSCH_CALLBACK_LEAVING_NETWORK();
-#endif
   linkaddr_copy(&last_eb_nbr_addr, &linkaddr_null);
 #if TSCH_AUTOSELECT_TIME_SOURCE
   struct nbr_sync_stat *stat;
@@ -561,6 +562,10 @@ tsch_start_coordinator(void)
   LOG_INFO("starting as coordinator, PAN ID %x, asn-%x.%lx\n",
       frame802154_get_pan_id(), tsch_current_asn.ms1b, tsch_current_asn.ls4b);
 
+#ifdef TSCH_CALLBACK_JOINING_NETWORK
+      TSCH_CALLBACK_JOINING_NETWORK();
+#endif
+
   /* Start slot operation */
   tsch_slot_operation_sync(RTIMER_NOW(), &tsch_current_asn);
 }
@@ -573,6 +578,9 @@ tsch_disassociate(void)
     tsch_is_associated = 0;
     tsch_adaptive_timesync_reset();
     process_poll(&tsch_process);
+#ifdef TSCH_CALLBACK_LEAVING_NETWORK
+      TSCH_CALLBACK_LEAVING_NETWORK();
+#endif
   }
 }
 /*---------------------------------------------------------------------------*/
