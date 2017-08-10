@@ -57,6 +57,7 @@ static clock_time_t next_expiration;
 
 PROCESS(etimer_process, "Event timer");
 
+#undef DEBUG
 #define DEBUG 0
 
 #if defined(DEBUG) && (DEBUG)

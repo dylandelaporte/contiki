@@ -47,6 +47,7 @@
 #include "contiki.h"
 
 #include <stdio.h>
+#undef DEBUG
 
 #define DEBUG 0
 #if DEBUG
