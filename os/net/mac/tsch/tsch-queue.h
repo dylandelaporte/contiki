@@ -70,7 +70,11 @@ struct tsch_neighbor *tsch_queue_get_nbr(const linkaddr_t *addr);
  * \brief Get the TSCH time source (we currently assume there is only one)
  * \return The neighbor queue associated to the time source
  */
-struct tsch_neighbor *tsch_queue_get_time_source(void);
+static inline
+struct tsch_neighbor *tsch_queue_get_time_source(void){
+    extern struct tsch_neighbor *n_time_source;
+    return n_time_source;
+}
 /**
  * \brief Get the address of a neighbor.
  * \return The link-layer address of the neighbor.
