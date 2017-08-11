@@ -81,12 +81,24 @@ struct tsch_log_t {
   enum { tsch_log_tx,
          tsch_log_rx,
          tsch_log_rx_drift,
+         tsch_log_change_timesrc,
+         tsch_log_packet,       //< post packet[index] info
+         tsch_log_packet_verbose,  //< post locked packet[index]->quebuf neibohour info
+         tsch_log_text,         //< post static const string
+         tsch_log_fmt,          //< post static const string
          tsch_log_message
   } type;
   struct tsch_asn_t asn;
   struct tsch_link *link;
   union {
     char message[48];
+    const char* text;
+    struct {
+        const char* text;
+        int         arg1;
+        int         arg2;
+        int         arg3;
+    } fmt;
     struct {
       int mac_tx_status;
       int dest;
@@ -112,6 +124,18 @@ struct tsch_log_t {
         uint32_t    start_us;
         uint32_t    expect_us;
     } rx_drift;
+    struct {
+        linkaddr_t  was;
+        linkaddr_t  now;
+    } timesrc_change;
+    struct {
+        const char* fmt;
+        struct tsch_packet *p;
+        int                 index;
+        struct tsch_neighbor *n;
+        struct queuebuf      *qb;
+        int                 locked;
+    } packet;
   };
 };
 
