@@ -1,3 +1,6 @@
+#ifndef CPU_RF_CORE_RF_RAT_H_
+#define CPU_RF_CORE_RF_RAT_H_
+
 /*
  * rfcore-rat.h
  *
@@ -9,27 +12,23 @@
  * \addtogroup rf-core
  * @{
  *
- * \defgroup rf-core-prop CC13xx Prop mode driver
- *
+ * \defgroup rf-core-rat CC26xx/CC13xx RAT synchronisation monitor
+ * \brief it provides monitor for RAT oveflow monitoring, and RAT timeStamps evaluate
  * @{
  *
  * \file
- * Header file for the CC13xx RAT timer handling.
- * it provides monitor for RAT oveflow monitoring, and RAT timeStamps evaluate
+ * Header file for the CC26xx/CC13xx RAT timer handling.
  */
-
-#ifndef CPU_RF_CORE_RF_RAT_H_
-#define CPU_RF_CORE_RF_RAT_H_
 
 #include <stdint.h>
 #include <stdbool.h>
 
 /*---------------------------------------------------------------------------*/
-/*
- * FR RAT Front-End usage selection
- * \value 0           - time stamps not implements, it just retrieved as is
- * \value 1 (Default) - fully implements RAT timestamps at RTTimer domain
- * \value Not Defined - same
+/**
+ * RF RAT Front-End usage selection
+ * 0:           time stamps not implements, it just retrieved as is
+ * 1 (Default): fully implements RAT timestamps at RTTimer domain
+ * Not Defined: same
  */
 #ifdef RF_RAT_CONF_STYLE
 #define RF_RAT_STYLE RF_RAT_CONF_STYLE
@@ -56,7 +55,7 @@ uint_fast8_t rf_rat_check_overflow(bool first_time);
 
 /**
  * \brief Initates and start RAT timer overflow monitor
- * \param rf_rat_controler - provide an interface for RFcore enabling/disabling
+ * \param rf       - provide an interface for RFcore enabling/disabling
  *  MUST call with powered RF - core
  */
 void rf_rat_monitor_init(const struct rf_rat_controler* rf);
@@ -98,5 +97,10 @@ uint32_t rf_rat_calc_last_rttime(void){
 
 #endif
 
+/*---------------------------------------------------------------------------*/
+/**
+ * @}
+ * @}
+ */
 
 #endif /* CPU_RF_CORE_RF_RAT_H_ */
