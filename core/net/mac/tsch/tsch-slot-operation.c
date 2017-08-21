@@ -496,7 +496,7 @@ bool tsch_next_timeslot_far(void){
     if (tsch_timing[tsch_ts_rfon_prepslot_guard] <= 0)
         return true;
 
-    unsigned tsch_next_timeslot_diff = 0;
+    tsch_slot_offset_t tsch_next_timeslot_diff = 0;
     struct tsch_link * next_link;
     tsch_next_timeslot_diff = 0;
     next_link = tsch_schedule_get_next_active_link(&tsch_current_asn
@@ -518,7 +518,7 @@ bool tsch_next_timeslot_far(void){
     const rtimer_clock_t time_gap = tsch_timing[tsch_ts_rfon_prepslot_guard]*2;
     if (timeout <= time_gap){
         TSCH_LOG_ADD(tsch_log_fmt,
-            log->fmt.text = "TSCH: supress radio off, since next slot close %ldus\n";
+            log->fmt.text = "TSCH: supress rf off, next slot %ldus\n";
             log->fmt.arg1 = timeout;
         );
     }
