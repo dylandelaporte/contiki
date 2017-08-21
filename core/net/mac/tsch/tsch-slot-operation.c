@@ -249,10 +249,17 @@ tsch_release_lock(void)
 
 /* Return channel from ASN and channel offset */
 uint8_t
-tsch_calculate_channel(struct tsch_asn_t *asn, uint8_t channel_offset)
+tsch_calculate_channel(struct tsch_asn_t *asn, int_fast8_t channel_offset)
 {
-  uint16_t index_of_0 = TSCH_ASN_MOD(*asn, tsch_hopping_sequence_length);
-  uint16_t index_of_offset = (index_of_0 + channel_offset) % tsch_hopping_sequence_length.val;
+    if (tsch_hopping_sequence_length.val <= 1){
+        return tsch_hopping_sequence[0];
+    }
+  uint_fast8_t index_of_0 = TSCH_ASN_MOD(*asn, tsch_hopping_sequence_length);
+  int_fast8_t index_of_offset = (index_of_0 + channel_offset);
+  if (index_of_offset > tsch_hopping_sequence_length.val)
+      index_of_offset -= tsch_hopping_sequence_length.val;
+  else if (index_of_offset < 0)
+      index_of_offset += tsch_hopping_sequence_length.val;
   return tsch_hopping_sequence[index_of_offset];
 }
 
@@ -968,11 +975,11 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 
           /* Poll process for processing of pending input and logs */
           process_poll(&tsch_pending_events_process);
-        }
-      }
+        }//if(frame_valid)
+      }//if(NETSTACK_RADIO.pending_packet())
 
       tsch_radio_off(TSCH_RADIO_CMD_OFF_END_OF_TIMESLOT);
-    }
+    }//else(!packet_seen)
 
     if(input_queue_drop != 0) {
       TSCH_LOG_ADD(tsch_log_message,
@@ -1066,15 +1073,16 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
     } else {
       /* backup of drift correction for printing debug messages */
       /* int32_t drift_correction_backup = drift_correction; */
-      uint16_t timeslot_diff = 0;
+      tsch_slot_offset_t timeslot_diff = 0;
       rtimer_clock_t prev_slot_start;
       /* Time to next wake up */
       rtimer_clock_t time_to_next_active_slot;
       /* Schedule next wakeup skipping slots if missed deadline */
       do {
         if(current_link != NULL
-            && current_link->link_options & LINK_OPTION_TX
-            && current_link->link_options & LINK_OPTION_SHARED) {
+            && (current_link->link_options & LINK_OPTION_TX)
+            && (current_link->link_options & LINK_OPTION_SHARED) )
+        {
           /* Decrement the backoff window for all neighbors able to transmit over
            * this Tx, Shared link. */
           tsch_queue_update_all_backoff_windows(&current_link->addr);
@@ -1120,7 +1128,7 @@ tsch_slot_operation_start(void)
   rtimer_clock_t prev_slot_start;
   TSCH_DEBUG_INIT();
   do {
-    uint16_t timeslot_diff;
+    tsch_slot_offset_t timeslot_diff;
     /* Get next active link */
     current_link = tsch_schedule_get_next_active_link(&tsch_current_asn, &timeslot_diff, &backup_link);
     if(current_link == NULL) {
