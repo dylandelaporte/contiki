@@ -347,7 +347,7 @@ eb_input(struct input_packet *current_input)
 #if TSCH_AUTOSELECT_TIME_SOURCE
         /* Update join priority */
         if(tsch_join_priority != eb_ies.ie_join_priority + 1) {
-          PRINTF("TSCH: update JP from EB %u -> %u\n",
+            TSCH_PRINTF("TSCH: update JP from EB %u -> %u\n",
                  tsch_join_priority, eb_ies.ie_join_priority + 1);
           tsch_join_priority = eb_ies.ie_join_priority + 1;
         }
@@ -663,9 +663,9 @@ PT_THREAD(tsch_scan(struct pt *pt))
           random_rand() % sizeof(TSCH_JOIN_HOPPING_SEQUENCE)];
         NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel);
         current_channel = scan_channel;
+        TSCH_PRINTF("TSCH: scanning on channel %u\n", scan_channel);
       current_channel_since = now_time;
-        PRINTF("TSCH: scanning on channel %u\n", scan_channel);
-      }
+    }
 
     /* Turn radio on and wait for EB */
     NETSTACK_RADIO.on();
@@ -690,7 +690,8 @@ PT_THREAD(tsch_scan(struct pt *pt))
       NETSTACK_RADIO.get_object(RADIO_PARAM_LAST_PACKET_TIMESTAMP, &t0, sizeof(rtimer_clock_t));
 
       /* Parse EB and attempt to associate */
-      PRINTF("TSCH: association: received packet (%u bytes) on channel %u\n", input_eb.len, current_channel);
+      TSCH_PRINTF("TSCH: association: received packet (%u bytes) on channel %u\n"
+              , input_eb.len, current_channel);
 
       tsch_associate(&input_eb, t0);
     }
@@ -998,7 +999,7 @@ packet_input(void)
   frame_parsed = NETSTACK_FRAMER.parse();
 
   if(frame_parsed < 0) {
-    PRINTF("TSCH:! failed to parse %u\n", packetbuf_datalen());
+      TSCH_PRINTF("TSCH:! failed to parse %u\n", packetbuf_datalen());
   } else {
     int duplicate = 0;
 
@@ -1008,7 +1009,7 @@ packet_input(void)
       duplicate = mac_sequence_is_duplicate();
       if(duplicate) {
         /* Drop the packet. */
-        PRINTF("TSCH:! drop dup ll from %u seqno %u\n",
+          TSCH_PRINTF("TSCH:! drop dup ll from %u seqno %u\n",
                TSCH_LOG_ID_FROM_LINKADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER)),
                packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO));
       } else {
@@ -1017,7 +1018,7 @@ packet_input(void)
     }
 
     if(!duplicate) {
-      PRINTF("TSCH: received from %u with seqno %u\n",
+        TSCH_PRINTF("TSCH: received from %u with seqno %u\n",
              TSCH_LOG_ID_FROM_LINKADDR(packetbuf_addr(PACKETBUF_ADDR_SENDER)),
              packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO));
       NETSTACK_LLSEC.input();
