@@ -456,7 +456,7 @@ tsch_associate(const struct input_packet *input_eb, rtimer_clock_t timestamp)
   (void)i;
 
   if(input_eb == NULL){
-      PRINTF("TSCH:! failed EB - looks stack damaged\n");
+      TSCH_PUTS("TSCH:! failed EB - looks stack damaged\n");
       return 0;
   }
   if(tsch_packet_parse_eb(input_eb->payload, input_eb->len,
