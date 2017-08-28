@@ -517,10 +517,7 @@ bool tsch_next_timeslot_far(void){
     // use tsch_ts_rfon_prepslot_guard to predict rf off+on time
     const rtimer_clock_t time_gap = tsch_timing[tsch_ts_rfon_prepslot_guard]*2;
     if (timeout <= time_gap){
-        TSCH_LOG_ADD(tsch_log_fmt,
-            log->fmt.text = "TSCH: supress rf off, next slot %ldus\n";
-            log->fmt.arg1 = timeout;
-        );
+        TSCH_PRINTF("TSCH: supress rf off, next slot %ldus\n", timeout);
     }
     return (timeout > time_gap);
 }
@@ -1184,5 +1181,8 @@ tsch_slot_operation_sync(rtimer_clock_t next_slot_start,
   tsch_current_asn = *next_slot_asn;
   last_sync_asn = tsch_current_asn;
   current_link = NULL;
+  TSCH_PRINTF("TSCH: sync at %x.%lx[asn] - %lu[rtc]\n"
+          , tsch_current_asn.ms1b , tsch_current_asn.ls4b
+          , current_slot_start);
 }
 /*---------------------------------------------------------------------------*/
