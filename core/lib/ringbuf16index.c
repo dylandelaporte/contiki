@@ -88,7 +88,7 @@ unsigned ringbuf16index_put_free(const struct ringbuf16index *r){
 /**
  * \brief Put one element to the ring buffer
  * \param r Pointer to ringbuf16index
- * \param n amount of placed items
+ * \param size amount of placed items
  * \retval amount of free solid space at put, \sa ringbuf16index_put_len
  */
 int ringbuf16index_putn(struct ringbuf16index *r, uint16_t size){
@@ -160,9 +160,13 @@ ringbuf16index_full(const struct ringbuf16index *r)
   return ((r->put_ptr - r->get_ptr) & r->mask) == r->mask;
 }
 
-/**
- * \brief Check solid space size to put an element.
- * \param r Pinter to ringbuf16index
- * \retval size of solid space at put position, avail for fill
- */
-unsigned ringbuf16index_put_len(const struct ringbuf16index *r);
+#if !LIB_INLINES
+int ringbuf16index_size(const struct ringbuf16index *r)
+{
+  return r->mask + 1;
+}
+
+int ringbuf16index_empty(const struct ringbuf16index *r){
+    return r->get_ptr == r->put_ptr;
+}
+#endif
