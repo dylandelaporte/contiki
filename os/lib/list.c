@@ -52,55 +52,7 @@
 struct list {
   struct list *next;
 };
-/*---------------------------------------------------------------------------*/
-/**
- * Initialize a list.
- *
- * This function initalizes a list. The list will be empty after this
- * function has been called.
- *
- * \param list The list to be initialized.
- */
-void
-list_init(list_t list)
-{
-  *list = NULL;
-}
-/*---------------------------------------------------------------------------*/
-/**
- * Get a pointer to the first element of a list.
- *
- * This function returns a pointer to the first element of the
- * list. The element will \b not be removed from the list.
- *
- * \param list The list.
- * \return A pointer to the first element on the list.
- *
- * \sa list_tail()
- */
-void *
-list_head(list_t list)
-{
-  return *list;
-}
-/*---------------------------------------------------------------------------*/
-/**
- * Duplicate a list.
- *
- * This function duplicates a list by copying the list reference, but
- * not the elements.
- *
- * \note This function does \b not copy the elements of the list, but
- * merely duplicates the pointer to the first element of the list.
- *
- * \param dest The destination list.
- * \param src The source list.
- */
-void
-list_copy(list_t dest, list_t src)
-{
-  *dest = *src;
-}
+
 /*---------------------------------------------------------------------------*/
 /**
  * Get the tail of a list.
@@ -306,22 +258,6 @@ list_insert(list_t list, void *previtem, void *newitem)
     ((struct list *)newitem)->next = ((struct list *)previtem)->next;
     ((struct list *)previtem)->next = newitem;
   }
-}
-/*---------------------------------------------------------------------------*/
-/**
- * \brief      Get the next item following this item
- * \param item A list item
- * \returns    A next item on the list
- *
- *             This function takes a list item and returns the next
- *             item on the list, or NULL if there are no more items on
- *             the list. This function is used when iterating through
- *             lists.
- */
-void *
-list_item_next(void *item)
-{
-  return item == NULL ? NULL : ((struct list *)item)->next;
 }
 /*---------------------------------------------------------------------------*/
 /**
