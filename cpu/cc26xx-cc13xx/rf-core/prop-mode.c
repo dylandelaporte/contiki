@@ -29,11 +29,11 @@
  */
 /*---------------------------------------------------------------------------*/
 /**
- * \addtogroup rf-core-prop
+ * \addtogroup rf-core-prop CC13xx Prop mode driver
  * @{
  *
  * \file
- * Implementation of the CC13xx prop mode NETSTACK_RADIO driver
+ * Implementation of the CC26xx/CC13xx prop mode NETSTACK_RADIO driver
  */
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
@@ -80,7 +80,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 /*---------------------------------------------------------------------------*/
-#define DEBUG 1
+#undef DEBUG
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #else
@@ -977,7 +978,7 @@ pending_packet(void)
   do {
     if(entry->status == DATA_ENTRY_STATUS_FINISHED) {
       rv += 1;
-      if(poll_mode){
+      if(!poll_mode){
       process_poll(&rf_core_process);
     }
     }
@@ -1395,7 +1396,7 @@ rtimer_clock_t rat_sync_check(rtimer_clock_t stamp){
     }
     int32_t rat_miss = rat_sync_miss();
     if (rat_miss == 0){
-        PRINTF("rat_sync_check: failed sync\n");
+        PRINTF("rat_sync_check: sync ok, unckown stamp fail\n");
         rf_rat_debug_dump();
         return stamp;
     }

@@ -63,6 +63,7 @@ static uint8_t hdrlen;
 static uint32_t packetbuf_aligned[(PACKETBUF_SIZE + 3) / 4];
 static uint8_t *packetbuf = (uint8_t *)packetbuf_aligned;
 
+#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -198,6 +199,10 @@ packetbuf_attr_clear(void)
   for(i = 0; i < PACKETBUF_NUM_ADDRS; ++i) {
     linkaddr_copy(&packetbuf_addrs[i].addr, &linkaddr_null);
   }
+#if TSCH_WITH_LINK_SELECTOR
+  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME, (packetbuf_attr_t)~0);
+  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT, (packetbuf_attr_t)~0);
+#endif
 }
 /*---------------------------------------------------------------------------*/
 void

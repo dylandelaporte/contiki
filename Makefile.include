@@ -218,9 +218,17 @@ CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
 ### Automatic dependency generation
 
 ifneq ($(MAKECMDGOALS),clean)
--include ${addprefix $(OBJECTDIR)/,$(CONTIKI_OBJECTFILES:.o=.d) \
-                                   $(PROJECT_OBJECTFILES:.o=.d)}
+OEXT = $(call oname, .c)
+DEPS = $(CONTIKI_OBJECTFILES:${OEXT}=.d) \
+       $(PROJECT_OBJECTFILES:${OEXT}=.d) \
+       $(TARGET_STARTFILES:${OEXT}=.d)
+
+#$(info deps: ${DEPS})
+-include ${DEPS}
 endif
+
+# prevent delete project objects that have deps but not included in contiki lib  
+.SECONDARY : $(PROJECT_OBJECTFILES) $(TARGET_STARTFILES)
 
 ### See http://make.paulandlesley.org/autodep.html#advanced
 
@@ -318,7 +326,7 @@ ifndef LD
 endif
 
 ifndef CUSTOM_RULE_LINK
-%.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_LIB)
+%.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(TARGET_STARTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_LIB)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(TARGET_LIBFILES) -o $@

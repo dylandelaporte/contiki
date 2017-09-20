@@ -12,12 +12,11 @@
  * \addtogroup rf-core
  * @{
  *
- * \defgroup rf-core-ieee CC13xx/CC26xx IEEE mode driver
- *
+ * \addtogroup rf-core-rat
  * @{
  *
  * \file
- * Implementation of the CC13xx/CC26xx IEEE mode NETSTACK_RADIO driver
+ * Implementation of the CC13xx/CC26xx RAT sync monitor for NETSTACK_RADIO driver
  */
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
@@ -139,8 +138,8 @@ handle_rat_overflow(void *unused)
 {
   if(rf_core_is_accessible()) {
       //* if RF is powerdown, nothing to check
-      WHEN_ANNOTATE(uint_fast8_t success = )
-          rf_rat_check_overflow(false);
+      uint_fast8_t success = rf_rat_check_overflow(false);
+      (void) success;
 
   ANNOTATE("RF RAT overflow check %d : overs=%d at %lu\n"
           , success
@@ -208,3 +207,7 @@ void rf_rat_debug_dump(void){
 rf_rat_time_t rf_rat_last_timestamp;
 #endif
 
+/**
+ * @}
+ * @}
+ */
