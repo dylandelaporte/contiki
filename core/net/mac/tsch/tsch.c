@@ -971,21 +971,21 @@ send_packet(mac_callback_t sent, void *ptr)
 #endif
 
   if((hdr_len = NETSTACK_FRAMER.create()) < 0) {
-    PRINTF("TSCH:! can't send packet due to framer error\n");
+    TSCH_PRINTF("TSCH:! can't send packet due to framer error\n");
     ret = MAC_TX_ERR;
   } else {
     struct tsch_packet *p;
     /* Enqueue packet */
     p = tsch_queue_add_packet(addr, sent, ptr);
     if(p == NULL) {
-      PRINTF("TSCH:! can't send packet to %u with seqno %u, queue %u %u\n",
+        TSCH_PRINTF8("TSCH:! can't send packet to %u with seqno %u, queue %u %u\n",
           TSCH_LOG_ID_FROM_LINKADDR(addr), tsch_packet_seqno,
           packet_count_before,
           tsch_queue_packet_count(addr));
       ret = MAC_TX_ERR;
     } else {
       p->header_len = hdr_len;
-      PRINTF("TSCH: send packet to %u with seqno %u, queue %u %u, len %u %u\n",
+      TSCH_PRINTF8("TSCH: send packet to %u with seqno %u, queue %u %u, len %u %u\n",
              TSCH_LOG_ID_FROM_LINKADDR(addr), tsch_packet_seqno,
              packet_count_before,
              tsch_queue_packet_count(addr),
