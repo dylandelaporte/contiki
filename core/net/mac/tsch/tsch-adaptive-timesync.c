@@ -99,9 +99,7 @@ timesync_learn_drift_ticks(uint32_t time_delta_asn, int32_t drift_ticks)
 
   drift_ppm = timesync_entry_add(last_drift_ppm, time_delta_ticks);
 
-  TSCH_LOG_ADD(tsch_log_message,
-      snprintf(log->message, sizeof(log->message),
-          "drift %ld", drift_ppm / 256));
+  TSCH_LOGF("drift %ld", drift_ppm / 256));
 }
 /*---------------------------------------------------------------------------*/
 /* Either reset or update the neighbor's drift */
@@ -145,9 +143,7 @@ compensate_internal(uint32_t time_delta_usec, int32_t drift_ppm, int32_t *remain
   *tick_conversion_error = amount - rtimerticks_to_us(amount_ticks);
 
   if(ABS(amount_ticks) > RTIMER_ARCH_SECOND / 128) {
-    TSCH_LOG_ADD(tsch_log_message,
-        snprintf(log->message, sizeof(log->message),
-            "!too big compensation %ld delta %ld", amount_ticks, time_delta_usec));
+    TSCH_LOGF("!too big compensation %ld delta %ld", amount_ticks, time_delta_usec);
     amount_ticks = (amount_ticks > 0 ? RTIMER_ARCH_SECOND : -RTIMER_ARCH_SECOND) / 128;
   }
 
