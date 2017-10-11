@@ -35,6 +35,7 @@
 
 /********** Includes **********/
 
+#include <stdbool.h>
 #include "contiki.h"
 #include "net/mac/mac.h"
 #include "net/mac/tsch/tsch-security.h"
@@ -166,16 +167,16 @@ void TSCH_CALLBACK_LEAVING_NETWORK();
 /* Are we coordinator of the TSCH network? */
 #ifndef TSCH_IS_COORDINATOR
 /* Are we coordinator of the TSCH network? */
-extern int tsch_is_coordinator;
+extern bool tsch_is_coordinator;
 #elif TSCH_IS_COORDINATOR == 0
-static const int tsch_is_coordinator = 0;
+#define tsch_is_coordinator 0
 #else
-static const int tsch_is_coordinator = 1;
+#define tsch_is_coordinator 1
 #endif
 /* Are we associated to a TSCH network? */
-extern int tsch_is_associated;
+extern bool tsch_is_associated;
 /* Is the PAN running link-layer security? */
-extern int tsch_is_pan_secured;
+extern bool tsch_is_pan_secured;
 /* The TSCH MAC driver */
 extern const struct mac_driver tschmac_driver;
 
@@ -188,8 +189,8 @@ void tsch_set_eb_period(uint32_t period);
 /* The keep-alive timeout */
 void tsch_set_ka_timeout(uint32_t timeout);
 /* Set the node as PAN coordinator */
-void tsch_set_coordinator(int enable);
+void tsch_set_coordinator(bool enable);
 /* Set the pan as secured or not */
-void tsch_set_pan_secured(int enable);
+void tsch_set_pan_secured(bool enable);
 
 #endif /* __TSCH_H__ */
