@@ -170,7 +170,7 @@ add_timer(struct etimer *timer)
 
   // this is protection vs addin alredy expired timers
   if (timer_expired_at(&timer->timer, now)){
-      process_post(proc, PROCESS_EVENT_TIMER, timer);
+      //process_post(proc, PROCESS_EVENT_TIMER, timer);
       // PRINTF("etimer: alredy expired\n");
       return;
   }
