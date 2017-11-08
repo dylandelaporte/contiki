@@ -722,7 +722,13 @@ PT_THREAD(tsch_scan(struct pt *pt))
     }
 
     /* Turn radio on and wait for EB */
-    NETSTACK_RADIO.on();
+    while ( NETSTACK_RADIO.on() != 1){
+        PRINTF("TSCH: scanning: failed turn on radio\n");
+        const unsigned radio_fail_period = 10*CLOCK_SECOND;
+        etimer_set(&scan_timer, radio_fail_period);
+        PT_WAIT_UNTIL(pt, etimer_expired(&scan_timer));
+        break;
+    }
 
     is_packet_pending = NETSTACK_RADIO.pending_packet();
     while(!is_packet_pending) {
