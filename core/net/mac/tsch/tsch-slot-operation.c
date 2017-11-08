@@ -692,6 +692,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                                  ack_start_time, tsch_timing[tsch_ts_max_ack]);
               ack_len = 0;
               if (NETSTACK_RADIO.receiving_packet()){
+                  TSCH_LOGF("tx ack: tooo long\n");
                   ack_len = -1;
               }
               TSCH_DEBUG_TX_EVENT();
@@ -923,9 +924,10 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
           {
             current_input->len = data_len;
           } else {
-            TSCH_LOG_ADD(tsch_log_message,
-                snprintf(log->message, sizeof(log->message),
-                "!failed to authenticate frame %u", current_input->len));
+            TSCH_LOGF("!failed to authenticate sec%d[%d] frame%d[%u]\n"
+                    , frame.aux_hdr.security_control.security_level
+                    , frame.aux_hdr.key_index
+                    , frame.fcf.frame_type, current_input->len);
             frame_valid = 0;
           }
           }//if (frame.fcf.security_enabled)
