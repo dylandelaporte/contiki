@@ -1056,6 +1056,7 @@ send_packet(mac_callback_t sent, void *ptr)
 #endif
 
   hdr_len = NETSTACK_FRAMER.create();
+  if (hdr_len < 0){
     TSCH_PRINTF("TSCH:! can't send packet due to framer error\n");
     ret = MAC_TX_ERR;
   } else {
