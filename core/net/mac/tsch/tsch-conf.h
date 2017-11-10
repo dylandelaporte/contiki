@@ -77,12 +77,28 @@
 #define TSCH_JOIN_HOPPING_SEQUENCE TSCH_DEFAULT_HOPPING_SEQUENCE
 #endif
 
+#ifndef TSCH_JOIN_HOPPING_SEQUENCE_SIZE
+#define TSCH_JOIN_HOPPING_SEQUENCE_SIZE() sizeof(TSCH_JOIN_HOPPING_SEQUENCE)
+#endif
+
 /* Maximum length of the TSCH channel hopping sequence. Must be greater or
  * equal to the length of TSCH_DEFAULT_HOPPING_SEQUENCE. */
 #ifdef TSCH_CONF_HOPPING_SEQUENCE_MAX_LEN
 #define TSCH_HOPPING_SEQUENCE_MAX_LEN TSCH_CONF_HOPPING_SEQUENCE_MAX_LEN
 #else
 #define TSCH_HOPPING_SEQUENCE_MAX_LEN 16
+#endif
+
+// Style of nodes scan chanels during association
+//< select random chanel in TSCH_JOIN_HOPPING_SEQUENCE
+#define TSCH_JOIN_HOPPING_RANDOM  0
+//< select consequntly chanel in TSCH_JOIN_HOPPING_SEQUENCE, one by one
+#define TSCH_JOIN_HOPPING_STEPPED 1
+
+#ifdef TSCH_CONF_JOIN_STYLE
+#define TSCH_JOIN_STYLE TSCH_CONF_JOIN_STYLE
+#else
+#define TSCH_JOIN_STYLE TSCH_JOIN_HOPPING_RANDOM
 #endif
 
 /* Timeslot timing */
@@ -213,6 +229,15 @@
 #define TSCH_RADIO_ON_DURING_TIMESLOT TSCH_CONF_RADIO_ON_DURING_TIMESLOT
 #else
 #define TSCH_RADIO_ON_DURING_TIMESLOT 0
+#endif
+
+/* Association on turn-on strategy:
+ * 0 - associate cycling until success
+ * 1 - associate once, if not succeed, invoke disassociate */
+#ifdef TSCH_CONF_ASSOCIATION_SINGLE
+#define TSCH_ASSOCIATION_SINGLE TSCH_CONF_ASSOCIATION_SINGLE
+#else
+#define TSCH_ASSOCIATION_SINGLE 0
 #endif
 
 /* How long to scan each channel in the scanning phase */

@@ -480,21 +480,24 @@ void tsch_poll(void){
 }
 
 void tsch_activate(bool onoff){
-    if (onoff)
+    if (onoff){
+        if (tsch_status < tschACTIVE)
+            tsch_poll();
         tsch_status = tschACTIVE;
-    else
-        tsch_status = tschDISABLED;
-    if (tsch_is_associated)
+    }
+    else {
         tsch_disassociate();
-    else
-        tsch_poll();
+        if (tsch_status >tschDISABLED)
+            tsch_poll();
+        tsch_status = tschDISABLED;
+}
 }
 
 /* Leave the TSCH network */
 void
 tsch_disassociate(void)
 {
-  if(tsch_is_associated == 1) {
+  if(tsch_status >= tschACTIVE) {
     tsch_is_associated = 0;
     tsch_poll();
 #ifdef TSCH_CALLBACK_LEAVING_NETWORK
@@ -729,12 +732,40 @@ PT_THREAD(tsch_scan(struct pt *pt))
     /* Switch to a (new) channel for scanning */
     if(current_channel == 0 || now_time - current_channel_since > TSCH_CHANNEL_SCAN_DURATION) {
       /* Pick a channel at random in TSCH_JOIN_HOPPING_SEQUENCE */
-      uint8_t scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[
-          random_rand() % sizeof(TSCH_JOIN_HOPPING_SEQUENCE)];
+        uint8_t scan_channel;
+        if (TSCH_JOIN_HOPPING_SEQUENCE_SIZE() <= 1)
+            scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[0];
+#if TSCH_JOIN_STYLE == TSCH_JOIN_HOPPING_RANDOM
+        else
+            scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[
+          random_rand() % TSCH_JOIN_HOPPING_SEQUENCE_SIZE()];
+#else
+        else{
+#if TSCH_CONF_ASSOCIATION_SINGLE
+            if (tsch_current_asn.ls4b >= TSCH_JOIN_HOPPING_SEQUENCE_SIZE())
+                break;
+#endif
+            scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[
+                tsch_current_asn.ls4b % TSCH_JOIN_HOPPING_SEQUENCE_SIZE()
+                ];
+            tsch_current_asn.ls4b++;
+        }
+#endif
+        if (NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel)== RADIO_RESULT_OK)
+        {
         NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel);
         current_channel = scan_channel;
         TSCH_PRINTF("TSCH: scanning on channel %u\n", scan_channel);
       current_channel_since = now_time;
+    }
+        else{
+            PRINTF("TSCH: scanning failed channel %u\n", scan_channel);
+            if (current_channel != 0)
+                // if there was success chanels, can skip this one
+                continue;
+            else
+                current_channel_since = now_time;
+        }
     }
 
     /* Turn radio on and wait for EB */
@@ -779,10 +810,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
       tsch_associate(input_eb, t0);
     }
 
-    if(tsch_is_associated) {
-      /* End of association, turn the radio off */
-      NETSTACK_RADIO.off();
-    } else if(!tsch_is_coordinator) {
+    if(!tsch_is_coordinator) {
       /* Go back to scanning */
     }
   }
@@ -792,6 +820,8 @@ PT_THREAD(tsch_scan(struct pt *pt))
 }
 
 /*---------------------------------------------------------------------------*/
+static int turn_off(int keep_radio_on);
+
 /* The main TSCH process */
 PROCESS_THREAD(tsch_process, ev, data)
 {
@@ -809,7 +839,7 @@ PROCESS_THREAD(tsch_process, ev, data)
   while(1) {
 
     PROCESS_YIELD_UNTIL(tsch_is_active());
-    while(!tsch_is_associated) {
+    do {
       if(tsch_is_coordinator) {
         /* We are coordinator, start operating now */
         tsch_start_coordinator();
@@ -818,6 +848,9 @@ PROCESS_THREAD(tsch_process, ev, data)
         PROCESS_PT_SPAWN(&scan_pt, tsch_scan(&scan_pt));
       }
     }
+    while(!tsch_is_associated && !TSCH_ASSOCIATION_SINGLE);
+
+    if(tsch_is_associated || !TSCH_ASSOCIATION_SINGLE) {
 
     /* We are part of a TSCH network, start slot operation */
     tsch_slot_operation_start();
@@ -826,10 +859,18 @@ PROCESS_THREAD(tsch_process, ev, data)
      * as long as we are associated */
     PROCESS_YIELD_UNTIL(!tsch_is_associated);
 
+    }//if(tsch_is_associated)
+    else {
+        PRINTF("TSCH:failed to associate, shut down net\n");
+        turn_off(true);
+    }
+
     /* Will need to re-synchronize */
     tsch_reset();
   }
 
+    /* End of association, turn the radio off */
+  NETSTACK_RADIO.off();
   PROCESS_END();
 }
 
