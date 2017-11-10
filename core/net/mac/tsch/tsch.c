@@ -698,11 +698,22 @@ PT_THREAD(tsch_scan(struct pt *pt))
             tsch_current_asn.ls4b++;
         }
 #endif
+        if (NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel)== RADIO_RESULT_OK)
+        {
         NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel);
         current_channel = scan_channel;
       current_channel_since = now_time;
         PRINTF("TSCH: scanning on channel %u\n", scan_channel);
       }
+        else{
+            PRINTF("TSCH: scanning failed channel %u\n", scan_channel);
+            if (current_channel != 0)
+                // if there was success chanels, can skip this one
+                continue;
+            else
+                current_channel_since = now_time;
+        }
+    }
 
     /* Turn radio on and wait for EB */
     NETSTACK_RADIO.on();
