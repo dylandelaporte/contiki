@@ -72,6 +72,10 @@
 #define TSCH_JOIN_HOPPING_SEQUENCE TSCH_DEFAULT_HOPPING_SEQUENCE
 #endif
 
+#ifndef TSCH_JOIN_HOPPING_SEQUENCE_SIZE
+#define TSCH_JOIN_HOPPING_SEQUENCE_SIZE() sizeof(TSCH_JOIN_HOPPING_SEQUENCE)
+#endif
+
 /* Maximum length of the TSCH channel hopping sequence. Must be greater or
  * equal to the length of TSCH_DEFAULT_HOPPING_SEQUENCE. */
 #ifdef TSCH_CONF_HOPPING_SEQUENCE_MAX_LEN

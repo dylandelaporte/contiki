@@ -676,8 +676,12 @@ PT_THREAD(tsch_scan(struct pt *pt))
     /* Switch to a (new) channel for scanning */
     if(current_channel == 0 || now_time - current_channel_since > TSCH_CHANNEL_SCAN_DURATION) {
       /* Pick a channel at random in TSCH_JOIN_HOPPING_SEQUENCE */
-      uint8_t scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[
-          random_rand() % sizeof(TSCH_JOIN_HOPPING_SEQUENCE)];
+        uint8_t scan_channel;
+        if (TSCH_JOIN_HOPPING_SEQUENCE_SIZE() <= 1)
+            scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[0];
+        else
+            scan_channel = TSCH_JOIN_HOPPING_SEQUENCE[
+          random_rand() % TSCH_JOIN_HOPPING_SEQUENCE_SIZE()];
         NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel);
         current_channel = scan_channel;
       current_channel_since = now_time;
