@@ -174,6 +174,10 @@ int rtimer_cancel(struct rtimer *rtimer);
  */
 #define RTIMER_NOW() rtimer_arch_now()
 
+#define RTIME_EXPIRED( t ) (RTIMER_CLOCK_LT(t, RTIMER_NOW()))
+// \return 1(true) - when expired
+bool  rtime_expired(rtimer_clock_t timeout);
+
 #ifndef __rtimer_diff_t
 #define __rtimer_diff_t rtimer_diff_t
 typedef int32_t rtimer_diff_t;
