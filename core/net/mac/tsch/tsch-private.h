@@ -73,6 +73,9 @@ enum tsch_timeslot_timing_elements {
   tsch_ts_elements_count, /* Not a timing element */
 };
 
+// TSCH slot frame handle id type
+typedef uint8_t tsch_sf_h;
+
 /***** External Variables *****/
 
 /* 802.15.4 broadcast MAC address */
