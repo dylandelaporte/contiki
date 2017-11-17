@@ -125,6 +125,9 @@ rtimer_clock_t tsch_timing[tsch_ts_elements_count];
 const linkaddr_t tsch_broadcast_address = { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
 /* Address used for the EB virtual neighbor queue */
 const linkaddr_t tsch_eb_address = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
+#elif LINKADDR_SIZE == 4
+const linkaddr_t tsch_broadcast_address = { { 0xff, 0xff, 0xff, 0xff } };
+const linkaddr_t tsch_eb_address = { { 0, 0, 0, 0 } };
 #else /* LINKADDR_SIZE == 8 */
 const linkaddr_t tsch_broadcast_address = { { 0xff, 0xff } };
 const linkaddr_t tsch_eb_address = { { 0, 0 } };
