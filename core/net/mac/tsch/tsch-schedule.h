@@ -93,8 +93,6 @@ struct tsch_link {
   uint16_t handle;
   /* MAC address of neighbor */
   linkaddr_t addr;
-  /* Slotframe identifier */
-  uint16_t slotframe_handle;
   /* Identifier of Slotframe to which this link belongs
    * Unused. */
   /* uint8_t handle; */
@@ -102,6 +100,8 @@ struct tsch_link {
   uint16_t timeslot;
   /* Channel offset for this link */
   uint16_t channel_offset;
+  /* Slotframe identifier */
+  tsch_sf_h slotframe_handle;
   /* A bit string that defines
    * b0 = Transmit, b1 = Receive, b2 = Shared, b3 = Timekeeping, b4 = reserved */
   uint8_t link_options;
@@ -116,7 +116,7 @@ struct tsch_slotframe {
   /* Slotframes are stored as a list: "next" must be the first field */
   struct tsch_slotframe *next;
   /* Unique identifier */
-  uint16_t handle;
+  tsch_sf_h handle;
   /* Number of timeslots in the slotframe.
    * Stored as struct asn_divisor_t because we often need ASN%size */
   struct tsch_asn_divisor_t size;
@@ -134,9 +134,9 @@ void tsch_schedule_create_minimal(void);
 void tsch_schedule_print(void);
 
 /* Adds and returns a slotframe (NULL if failure) */
-struct tsch_slotframe *tsch_schedule_add_slotframe(uint16_t handle, uint16_t size);
+struct tsch_slotframe *tsch_schedule_add_slotframe(tsch_sf_h handle, uint16_t size);
 /* Looks for a slotframe from a handle */
-struct tsch_slotframe *tsch_schedule_get_slotframe_by_handle(uint16_t handle);
+struct tsch_slotframe *tsch_schedule_get_slotframe_by_handle(tsch_sf_h handle);
 /* Removes a slotframe Return 1 if success, 0 if failure */
 int tsch_schedule_remove_slotframe(struct tsch_slotframe *slotframe);
 /* Removes all slotframes, resulting in an empty schedule */

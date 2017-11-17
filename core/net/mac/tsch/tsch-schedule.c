@@ -73,7 +73,7 @@ LIST(slotframe_list);
 
 /* Adds and returns a slotframe (NULL if failure) */
 struct tsch_slotframe *
-tsch_schedule_add_slotframe(uint16_t handle, uint16_t size)
+tsch_schedule_add_slotframe(tsch_sf_h handle, uint16_t size)
 {
   if(size == 0) {
     return NULL;
@@ -139,7 +139,7 @@ tsch_schedule_remove_slotframe(struct tsch_slotframe *slotframe)
 /*---------------------------------------------------------------------------*/
 /* Looks for a slotframe from a handle */
 struct tsch_slotframe *
-tsch_schedule_get_slotframe_by_handle(uint16_t handle)
+tsch_schedule_get_slotframe_by_handle(tsch_sf_h handle)
 {
   if(!tsch_is_locked()) {
     struct tsch_slotframe *sf = list_head(slotframe_list);
