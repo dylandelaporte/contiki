@@ -819,6 +819,9 @@ PT_THREAD(tsch_scan(struct pt *pt))
   }
   ANNOTATE("TSCH: scanning complete\n");
 
+  /* End of association, turn the radio off */
+  NETSTACK_RADIO.off();
+
   PT_END(pt);
 }
 
