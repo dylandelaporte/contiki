@@ -101,6 +101,24 @@
 #define TSCH_JOIN_STYLE TSCH_JOIN_HOPPING_RANDOM
 #endif
 
+
+//  select start conditions on scan.
+//  should define macro on TSCH_JOIN_HOPPING_START(ch, time)
+//      where ch - local scaner ch variable
+//            time - local scaner last scan variable
+//  * usage:
+//      - assign start scaning with  my_faivorite_chanel
+//  #define TSCH_CONF_JOIN_HOPPING_START(ch, time) {ch = my_faivorite_chanel;}
+//      - force to choose new chanel for scan
+//  #define TSCH_CONF_JOIN_HOPPING_START(ch, time) {time -= TSCH_CHANNEL_SCAN_DURATION;}
+//
+#ifdef TSCH_CONF_JOIN_HOPPING_START
+#define TSCH_JOIN_HOPPING_START(ch, time)  TSCH_CONF_JOIN_HOPPING_START(ch, time)
+#else
+#define TSCH_JOIN_HOPPING_START(ch, time)
+#endif
+
+
 /* Timeslot timing */
 
 #ifndef TSCH_CONF_DEFAULT_TIMESLOT_LENGTH

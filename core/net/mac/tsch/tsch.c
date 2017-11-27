@@ -714,11 +714,13 @@ PT_THREAD(tsch_scan(struct pt *pt))
         PT_EXIT(pt);
     }
 
-  PT_BEGIN(pt);
-
   static struct etimer scan_timer;
   /* Time when we started scanning on current_channel */
   static clock_time_t current_channel_since;
+    /* Hop to any channel offset */
+    static uint8_t current_channel = 0;
+
+  PT_BEGIN(pt);
 
   TSCH_ASN_INIT(tsch_current_asn, 0, 0);
 
@@ -727,10 +729,9 @@ PT_THREAD(tsch_scan(struct pt *pt))
   if (poll_period > 0)
   etimer_set(&scan_timer, poll_period);
   current_channel_since = clock_time();
+  TSCH_JOIN_HOPPING_START(current_channel, current_channel_since);
 
   while(!tsch_is_associated && !tsch_is_coordinator) {
-    /* Hop to any channel offset */
-    static uint8_t current_channel = 0;
 
     /* We are not coordinator, try to associate */
     int is_packet_pending = 0;
@@ -806,6 +807,8 @@ PT_THREAD(tsch_scan(struct pt *pt))
       rtimer_clock_t t0;
       /* Read packet */
       input_eb->len = NETSTACK_RADIO.read(input_eb->payload, TSCH_PACKET_MAX_LEN);
+      if (input_eb->len > 0){
+      input_eb->channel = current_channel;
 
       /* Save packet timestamp */
       NETSTACK_RADIO.get_object(RADIO_PARAM_LAST_PACKET_TIMESTAMP, &t0, sizeof(rtimer_clock_t));
@@ -815,6 +818,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
               , input_eb->len, current_channel, t0);
 
       tsch_associate(input_eb, t0);
+      }//if (input_eb->len > 0)
     }
 
     if(!tsch_is_coordinator) {
