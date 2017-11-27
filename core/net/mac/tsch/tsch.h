@@ -35,6 +35,7 @@
 
 /********** Includes **********/
 
+#include <stdbool.h>
 #include "contiki.h"
 #include "net/mac/mac.h"
 #include "net/mac/tsch/tsch-security.h"
@@ -51,6 +52,7 @@
 
 /* With TSCH_ADAPTIVE_TIMESYNC enabled: keep-alive timeout used after reaching
  * accurate drift compensation. */
+// value: 0 - remove keepalive function from TSCH stack
 #ifdef TSCH_CONF_MAX_KEEPALIVE_TIMEOUT
 #define TSCH_MAX_KEEPALIVE_TIMEOUT TSCH_CONF_MAX_KEEPALIVE_TIMEOUT
 #else
@@ -63,6 +65,9 @@
 #else
 #define TSCH_DESYNC_THRESHOLD (2 * TSCH_MAX_KEEPALIVE_TIMEOUT)
 #endif
+
+// this handle use to get check last synt timeout. it overrides TSCH_DESYNC_THRESHOLD
+//#define TSCH_DESYNC_THRESHOLD_SLOTS()
 
 /* Period between two consecutive EBs */
 #ifdef TSCH_CONF_EB_PERIOD
@@ -134,6 +139,10 @@
 #define TSCH_INIT_SCHEDULE_FROM_EB 1
 #endif
 
+/* By default: TSCH loads slot timing from coordinator EB
+ * but for debug purposes it can be ommited by enabling this macro*/
+//#define TSCH_DEBUG_NO_TIMING_FROM_EB
+
 /* An ad-hoc mechanism to have TSCH select its time source without the
  * help of an upper-layer, simply by collecting statistics on received
  * EBs and their join priority. Disabled by default as we recomment
@@ -160,11 +169,16 @@ void TSCH_CALLBACK_LEAVING_NETWORK();
 /***** External Variables *****/
 
 /* Are we coordinator of the TSCH network? */
-extern int tsch_is_coordinator;
+#ifndef TSCH_IS_COORDINATOR
+/* Are we coordinator of the TSCH network? */
+extern bool tsch_is_coordinator;
+#else
+#define tsch_is_coordinator TSCH_IS_COORDINATOR
+#endif
 /* Are we associated to a TSCH network? */
-extern int tsch_is_associated;
+extern bool tsch_is_associated;
 /* Is the PAN running link-layer security? */
-extern int tsch_is_pan_secured;
+extern bool tsch_is_pan_secured;
 /* The TSCH MAC driver */
 extern const struct mac_driver tschmac_driver;
 
@@ -177,8 +191,18 @@ void tsch_set_eb_period(uint32_t period);
 /* The keep-alive timeout */
 void tsch_set_ka_timeout(uint32_t timeout);
 /* Set the node as PAN coordinator */
-void tsch_set_coordinator(int enable);
+void tsch_set_coordinator(bool enable);
 /* Set the pan as secured or not */
-void tsch_set_pan_secured(int enable);
+void tsch_set_pan_secured(bool enable);
+
+
+/* Set TSCH to send a keepalive message after TSCH_KEEPALIVE_TIMEOUT */
+#if !TSCH_IS_COORDINATOR && (TSCH_MAX_KEEPALIVE_TIMEOUT > 0)
+void tsch_schedule_keepalive(void);
+#else
+#define tsch_schedule_keepalive()
+#endif
+/* Leave the TSCH network */
+void tsch_disassociate(void);
 
 #endif /* __TSCH_H__ */

@@ -56,8 +56,10 @@
 #include <string.h>
 
 #if TSCH_LOG_LEVEL >= 1
+#undef DEBUG
 #define DEBUG DEBUG_PRINT
 #else /* TSCH_LOG_LEVEL */
+#undef DEBUG
 #define DEBUG DEBUG_NONE
 #endif /* TSCH_LOG_LEVEL */
 #include "net/net-debug.h"
@@ -71,7 +73,7 @@ LIST(slotframe_list);
 
 /* Adds and returns a slotframe (NULL if failure) */
 struct tsch_slotframe *
-tsch_schedule_add_slotframe(uint16_t handle, uint16_t size)
+tsch_schedule_add_slotframe(tsch_sf_h handle, uint16_t size)
 {
   if(size == 0) {
     return NULL;
@@ -92,8 +94,7 @@ tsch_schedule_add_slotframe(uint16_t handle, uint16_t size)
       /* Add the slotframe to the global list */
       list_add(slotframe_list, sf);
     }
-    PRINTF("TSCH-schedule: add_slotframe %u %u\n",
-           handle, size);
+    TSCH_PRINTF("TSCH-schedule: add_slotframe %u %u\n", handle, size);
     tsch_release_lock();
     return sf;
   }
@@ -138,7 +139,7 @@ tsch_schedule_remove_slotframe(struct tsch_slotframe *slotframe)
 /*---------------------------------------------------------------------------*/
 /* Looks for a slotframe from a handle */
 struct tsch_slotframe *
-tsch_schedule_get_slotframe_by_handle(uint16_t handle)
+tsch_schedule_get_slotframe_by_handle(tsch_sf_h handle)
 {
   if(!tsch_is_locked()) {
     struct tsch_slotframe *sf = list_head(slotframe_list);
@@ -173,6 +174,9 @@ tsch_schedule_get_link_by_handle(uint16_t handle)
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
+void tsch_schedule_link_addr_aqure(struct tsch_link *l);
+void tsch_schedule_link_addr_release(uint8_t link_options, const linkaddr_t* addr);
+
 /* Adds a link to a slotframe, return a pointer to it (NULL if failure) */
 struct tsch_link *
 tsch_schedule_add_link(struct tsch_slotframe *slotframe,
@@ -186,15 +190,14 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
      * to keep neighbor state in sync with link options etc.) */
     tsch_schedule_remove_link_by_timeslot(slotframe, timeslot);
     if(!tsch_get_lock()) {
-      PRINTF("TSCH-schedule:! add_link memb_alloc couldn't take lock\n");
+      TSCH_PUTS("TSCH-schedule:! add_link memb_alloc couldn't take lock\n");
     } else {
       l = memb_alloc(&link_memb);
       if(l == NULL) {
-        PRINTF("TSCH-schedule:! add_link memb_alloc failed\n");
+        TSCH_PUTS("TSCH-schedule:! add_link memb_alloc failed\n");
         tsch_release_lock();
       } else {
         static int current_link_handle = 0;
-        struct tsch_neighbor *n;
         /* Add the link to the slotframe */
         list_add(slotframe->links_list, l);
         /* Initialize link */
@@ -210,27 +213,32 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
         }
         linkaddr_copy(&l->addr, address);
 
-        PRINTF("TSCH-schedule: add_link %u %u %u %u %u %u\n",
+        TSCH_PRINTF8("TSCH-schedule: add_link %u %u %u %u %u %u\n",
                slotframe->handle, link_options, link_type, timeslot, channel_offset, TSCH_LOG_ID_FROM_LINKADDR(address));
 
         /* Release the lock before we update the neighbor (will take the lock) */
         tsch_release_lock();
-
-        if(l->link_options & LINK_OPTION_TX) {
-          n = tsch_queue_add_nbr(&l->addr);
-          /* We have a tx link to this neighbor, update counters */
-          if(n != NULL) {
-            n->tx_links_count++;
-            if(!(l->link_options & LINK_OPTION_SHARED)) {
-              n->dedicated_tx_links_count++;
-            }
-          }
-        }
+        tsch_schedule_link_addr_aqure(l);
       }
     }
   }
   return l;
 }
+
+/*---------------------------------------------------------------------------*/
+/* Changes adress on a link*/
+void tsch_schedule_link_change_addr(struct tsch_link *l, const linkaddr_t *address)
+{
+    if(address == NULL) {
+      address = &linkaddr_null;
+    }
+    if (linkaddr_cmp(address, &l->addr))
+        return;
+    linkaddr_copy(&l->addr, address);
+    tsch_schedule_link_addr_release(l->link_options, &l->addr);
+    tsch_schedule_link_addr_aqure(l);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Removes a link from slotframe. Return 1 if success, 0 if failure */
 int
@@ -251,7 +259,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
       if(l == current_link) {
         current_link = NULL;
       }
-      PRINTF("TSCH-schedule: remove_link %u %u %u %u %u\n",
+      TSCH_PRINTF8("TSCH-schedule: remove_link %u %u %u %u %u\n",
              slotframe->handle, l->link_options, l->timeslot, l->channel_offset,
              TSCH_LOG_ID_FROM_LINKADDR(&l->addr));
 
@@ -261,16 +269,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
       /* Release the lock before we update the neighbor (will take the lock) */
       tsch_release_lock();
 
-      /* This was a tx link to this neighbor, update counters */
-      if(link_options & LINK_OPTION_TX) {
-        struct tsch_neighbor *n = tsch_queue_add_nbr(&addr);
-        if(n != NULL) {
-          n->tx_links_count--;
-          if(!(link_options & LINK_OPTION_SHARED)) {
-            n->dedicated_tx_links_count--;
-          }
-        }
-      }
+      tsch_schedule_link_addr_release(link_options, &addr);
 
       return 1;
     } else {
@@ -279,6 +278,36 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
   }
   return 0;
 }
+
+/*---------------------------------------------------------------------------*/
+void tsch_schedule_link_addr_aqure(struct tsch_link *l){
+    struct tsch_neighbor *n;
+    if(l->link_options & LINK_OPTION_TX) {
+      n = tsch_queue_add_nbr(&l->addr);
+      /* We have a tx link to this neighbor, update counters */
+      if(n != NULL) {
+        n->tx_links_count++;
+        if(!(l->link_options & LINK_OPTION_SHARED)) {
+          n->dedicated_tx_links_count++;
+        }
+      }
+    }
+}
+
+void tsch_schedule_link_addr_release(uint8_t link_options, const linkaddr_t* addr){
+    /* This was a tx link to this neighbor, update counters */
+    if(link_options & LINK_OPTION_TX) {
+      struct tsch_neighbor *n = tsch_queue_add_nbr(addr);
+      if(n != NULL) {
+        n->tx_links_count--;
+        if(!(link_options & LINK_OPTION_SHARED)) {
+          n->dedicated_tx_links_count--;
+        }
+      }
+    }
+}
+
+
 /*---------------------------------------------------------------------------*/
 /* Removes a link from slotframe and timeslot. Return a 1 if success, 0 if failure */
 int
@@ -310,10 +339,11 @@ tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe, uint16_t ti
 /*---------------------------------------------------------------------------*/
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
 struct tsch_link *
-tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset,
+tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
+    , tsch_slot_offset_t *time_offset,
     struct tsch_link **backup_link)
 {
-  uint16_t time_to_curr_best = 0;
+  tsch_slot_offset_t time_to_curr_best = 0;
   struct tsch_link *curr_best = NULL;
   struct tsch_link *curr_backup = NULL; /* Keep a back link in case the current link
   turns out useless when the time comes. For instance, for a Tx-only link, if there is
@@ -324,10 +354,10 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
     /* For each slotframe, look for the earliest occurring link */
     while(sf != NULL) {
       /* Get timeslot from ASN, given the slotframe length */
-      uint16_t timeslot = TSCH_ASN_MOD(*asn, sf->size);
+      tsch_slot_offset_t timeslot = TSCH_ASN_MOD(*asn, sf->size);
       struct tsch_link *l = list_head(sf->links_list);
       while(l != NULL) {
-        uint16_t time_to_timeslot =
+          tsch_slot_offset_t time_to_timeslot =
           l->timeslot > timeslot ?
           l->timeslot - timeslot :
           sf->size.val + l->timeslot - timeslot;

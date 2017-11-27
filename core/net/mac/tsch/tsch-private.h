@@ -70,8 +70,13 @@ enum tsch_timeslot_timing_elements {
   tsch_ts_max_ack,
   tsch_ts_max_tx,
   tsch_ts_timeslot_length,
+  tsch_ts_rfon_prepslot_guard,
   tsch_ts_elements_count, /* Not a timing element */
+  tsch_ts_netwide_count = tsch_ts_timeslot_length, /* Not a timing element */
 };
+
+// TSCH slot frame handle id type
+typedef uint8_t tsch_sf_h;
 
 /***** External Variables *****/
 
@@ -81,6 +86,7 @@ extern const linkaddr_t tsch_broadcast_address;
 extern const linkaddr_t tsch_eb_address;
 /* The current Absolute Slot Number (ASN) */
 extern struct tsch_asn_t tsch_current_asn;
+extern struct tsch_asn_t tsch_last_sync_asn;
 extern uint8_t tsch_join_priority;
 extern struct tsch_link *current_link;
 /* TSCH channel hopping sequence */
@@ -96,17 +102,23 @@ PROCESS_NAME(tsch_pending_events_process);
 
 /********** Functions *********/
 
-/* Set TSCH to send a keepalive message after TSCH_KEEPALIVE_TIMEOUT */
-void tsch_schedule_keepalive(void);
-/* Leave the TSCH network */
-void tsch_disassociate(void);
-
 /************ Macros **********/
 
 /* Calculate packet tx/rx duration in rtimer ticks based on sent
  * packet len in bytes with 802.15.4 250kbps data rate.
  * One byte = 32us. Add two bytes for CRC and one for len field */
-#define TSCH_PACKET_DURATION(len) US_TO_RTIMERTICKS(32 * ((len) + 3))
+#ifdef RF_CORE_CONF_BAUD
+#define TSCH_BYTE_US (8000000ul/RF_CORE_CONF_BAUD)
+#else
+#define TSCH_BYTE_US 32
+#endif
+
+#define TSCH_PACKET_DURATION(len) US_TO_RTIMERTICKS(TSCH_BYTE_US * ((len) + 3))
+
+/* Delay between the SFD RSSI detects preamble and it is detected in software. */
+#ifndef RADIO_RSSI_DETECT_DELAY
+#define RADIO_RSSI_DETECT_DELAY TSCH_PACKET_DURATION(0)
+#endif
 
 /* Convert rtimer ticks to clock and vice versa */
 #define TSCH_CLOCK_TO_TICKS(c) (((c) * RTIMER_SECOND) / CLOCK_SECOND)

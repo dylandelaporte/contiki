@@ -84,11 +84,31 @@ by default, useful in case of duplicate seqno */
 /* Max TSCH packet lenght */
 #define TSCH_PACKET_MAX_LEN MIN(127,PACKETBUF_SIZE)
 
+/********** Types *********/
+
+/* Stores data about an incoming packet */
+struct input_packet {
+  uint8_t payload[TSCH_PACKET_MAX_LEN]; /* Packet payload */
+  struct tsch_asn_t rx_asn; /* ASN when the packet was received */
+  int len; /* Packet len */
+  int16_t rssi; /* RSSI for this packet */
+  uint8_t channel; /* Channel we received the packet on */
+#if TSCH_WITH_LINK_SELECTOR > 1
+  uint16_t      slotframe;
+  uint16_t      timeslot;
+#endif
+};
+
+/********** variables *********/
+// this tempoary packet used by tsch_scan
+extern struct input_packet   tsch_temp_packet;
+
 /********** Functions *********/
 
 /* Construct enhanced ACK packet and return ACK length */
 int tsch_packet_create_eack(uint8_t *buf, int buf_size,
-    const linkaddr_t *dest_addr, uint8_t seqno, int16_t drift, int nack);
+    const linkaddr_t *dest_addr, const frame802154_t *frame
+    , int16_t drift, int nack);
 /* Parse enhanced ACK packet, extract drift and nack */
 int tsch_packet_parse_eack(const uint8_t *buf, int buf_size,
     uint8_t seqno, frame802154_t *frame, struct ieee802154_ies *ies, uint8_t *hdr_len);
@@ -101,5 +121,10 @@ int tsch_packet_update_eb(uint8_t *buf, int buf_size, uint8_t tsch_sync_ie_offse
 int tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
     frame802154_t *frame, struct ieee802154_ies *ies,
     uint8_t *hdrlen, int frame_without_mic);
+
+// Parse EB and extract ASN and join priority, and validate EB
+int tsch_packet_parse_my_eb(const struct input_packet *input_eb,
+    frame802154_t *frame, struct ieee802154_ies *ies
+    );
 
 #endif /* __TSCH_PACKET_H__ */

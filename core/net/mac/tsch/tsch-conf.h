@@ -44,6 +44,11 @@
 
 #include "contiki.h"
 
+/* Include Project Specific conf for TSCH*/
+#ifdef TSCH_CONF_H
+#include TSCH_CONF_H
+#endif /* PROJECT_CONF_H */
+
 /******** Configuration *******/
 
 /* Default IEEE 802.15.4e hopping sequences, obtained from https://gist.github.com/twatteyne/2e22ee3c1a802b685695 */
@@ -72,6 +77,10 @@
 #define TSCH_JOIN_HOPPING_SEQUENCE TSCH_DEFAULT_HOPPING_SEQUENCE
 #endif
 
+#ifndef TSCH_JOIN_HOPPING_SEQUENCE_SIZE
+#define TSCH_JOIN_HOPPING_SEQUENCE_SIZE() sizeof(TSCH_JOIN_HOPPING_SEQUENCE)
+#endif
+
 /* Maximum length of the TSCH channel hopping sequence. Must be greater or
  * equal to the length of TSCH_DEFAULT_HOPPING_SEQUENCE. */
 #ifdef TSCH_CONF_HOPPING_SEQUENCE_MAX_LEN
@@ -79,6 +88,36 @@
 #else
 #define TSCH_HOPPING_SEQUENCE_MAX_LEN 16
 #endif
+
+// Style of nodes scan chanels during association
+//< select random chanel in TSCH_JOIN_HOPPING_SEQUENCE
+#define TSCH_JOIN_HOPPING_RANDOM  0
+//< select consequntly chanel in TSCH_JOIN_HOPPING_SEQUENCE, one by one
+#define TSCH_JOIN_HOPPING_STEPPED 1
+
+#ifdef TSCH_CONF_JOIN_STYLE
+#define TSCH_JOIN_STYLE TSCH_CONF_JOIN_STYLE
+#else
+#define TSCH_JOIN_STYLE TSCH_JOIN_HOPPING_RANDOM
+#endif
+
+
+//  select start conditions on scan.
+//  should define macro on TSCH_JOIN_HOPPING_START(ch, time)
+//      where ch - local scaner ch variable
+//            time - local scaner last scan variable
+//  * usage:
+//      - assign start scaning with  my_faivorite_chanel
+//  #define TSCH_CONF_JOIN_HOPPING_START(ch, time) {ch = my_faivorite_chanel;}
+//      - force to choose new chanel for scan
+//  #define TSCH_CONF_JOIN_HOPPING_START(ch, time) {time -= TSCH_CHANNEL_SCAN_DURATION;}
+//
+#ifdef TSCH_CONF_JOIN_HOPPING_START
+#define TSCH_JOIN_HOPPING_START(ch, time)  TSCH_CONF_JOIN_HOPPING_START(ch, time)
+#else
+#define TSCH_JOIN_HOPPING_START(ch, time)
+#endif
+
 
 /* Timeslot timing */
 
@@ -89,6 +128,20 @@
 /* Configurable Rx guard time is micro-seconds */
 #ifndef TSCH_CONF_RX_WAIT
 #define TSCH_CONF_RX_WAIT 2200
+#endif /* TSCH_CONF_RX_WAIT */
+
+/* Configurable guard time [us] for turn on radio, before slot activity */
+#ifndef TSCH_CONF_RFON_GUARD_TIME
+#define TSCH_CONF_RFON_GUARD_TIME 0
+#endif /* TSCH_CONF_RX_WAIT */
+
+
+#ifndef TSCH_CONF_TS_MAX_TX
+#define TSCH_CONF_TS_MAX_TX 4256
+#endif /* TSCH_CONF_RX_WAIT */
+
+#ifndef TSCH_CONF_TS_MAX_ACK
+#define TSCH_CONF_TS_MAX_ACK 2400
 #endif /* TSCH_CONF_RX_WAIT */
 
 /* The default timeslot timing in the standard is a guard time of
@@ -118,7 +171,7 @@
 #define TSCH_DEFAULT_TS_ACK_WAIT           400
 #define TSCH_DEFAULT_TS_RX_TX              192
 #define TSCH_DEFAULT_TS_MAX_ACK            2400
-#define TSCH_DEFAULT_TS_MAX_TX             4256
+#define TSCH_DEFAULT_TS_MAX_TX             TSCH_CONF_TS_MAX_TX
 #define TSCH_DEFAULT_TS_TIMESLOT_LENGTH    10000
 
 #elif TSCH_CONF_DEFAULT_TIMESLOT_LENGTH == 15000
@@ -128,13 +181,13 @@
 #define TSCH_DEFAULT_TS_CCA                128
 #define TSCH_DEFAULT_TS_TX_OFFSET          4000
 #define TSCH_DEFAULT_TS_RX_OFFSET          (TSCH_DEFAULT_TS_TX_OFFSET - (TSCH_CONF_RX_WAIT / 2))
-#define TSCH_DEFAULT_TS_RX_ACK_DELAY       3600
 #define TSCH_DEFAULT_TS_TX_ACK_DELAY       4000
 #define TSCH_DEFAULT_TS_RX_WAIT            TSCH_CONF_RX_WAIT
 #define TSCH_DEFAULT_TS_ACK_WAIT           800
+#define TSCH_DEFAULT_TS_RX_ACK_DELAY       (TSCH_DEFAULT_TS_TX_ACK_DELAY - (TSCH_DEFAULT_TS_ACK_WAIT/2))
 #define TSCH_DEFAULT_TS_RX_TX              2072
-#define TSCH_DEFAULT_TS_MAX_ACK            2400
-#define TSCH_DEFAULT_TS_MAX_TX             4256
+#define TSCH_DEFAULT_TS_MAX_ACK            TSCH_CONF_TS_MAX_ACK
+#define TSCH_DEFAULT_TS_MAX_TX             TSCH_CONF_TS_MAX_TX
 #define TSCH_DEFAULT_TS_TIMESLOT_LENGTH    15000
 
 #elif TSCH_CONF_DEFAULT_TIMESLOT_LENGTH == 65000U
@@ -155,15 +208,20 @@
 #define TSCH_DEFAULT_TS_ACK_WAIT           800
 #define TSCH_DEFAULT_TS_RX_TX              2072
 #define TSCH_DEFAULT_TS_MAX_ACK            2400
-#define TSCH_DEFAULT_TS_MAX_TX             4256
+#define TSCH_DEFAULT_TS_MAX_TX             TSCH_CONF_TS_MAX_TX
 #define TSCH_DEFAULT_TS_TIMESLOT_LENGTH    65000
 
 #else
-#error "TSCH: Unsupported default timeslot length"
+//* should be user defined slot timing
 #endif
 
 /* A custom feature allowing upper layers to assign packets to
  * a specific slotframe and link */
+// 1 - enables PACKETBUF_ATTR_TSCH_SLOTFRAME/TIMESLOT attributes
+#define  TSCH_LINK_SELECTOR_ENABLED 1
+// 2 - enbles this attributes for received packets
+#define  TSCH_LINK_SELECTOR_ENABLEDRX 2
+
 #ifdef TSCH_CONF_WITH_LINK_SELECTOR
 #define TSCH_WITH_LINK_SELECTOR TSCH_CONF_WITH_LINK_SELECTOR
 #else /* TSCH_CONF_WITH_LINK_SELECTOR */
@@ -191,11 +249,54 @@
 #define TSCH_RADIO_ON_DURING_TIMESLOT 0
 #endif
 
+/* Association on turn-on strategy:
+ * 0 - associate cycling until success
+ * 1 - associate once, if not succeed, invoke disassociate */
+#ifdef TSCH_CONF_ASSOCIATION_SINGLE
+#define TSCH_ASSOCIATION_SINGLE TSCH_CONF_ASSOCIATION_SINGLE
+#else
+#define TSCH_ASSOCIATION_SINGLE 0
+#endif
+
 /* How long to scan each channel in the scanning phase */
 #ifdef TSCH_CONF_CHANNEL_SCAN_DURATION
 #define TSCH_CHANNEL_SCAN_DURATION TSCH_CONF_CHANNEL_SCAN_DURATION
 #else
 #define TSCH_CHANNEL_SCAN_DURATION CLOCK_SECOND
 #endif
+
+/* ACK timing style:
+ * \value 0 - default: old behaviour - where ACK at time position from estimated
+ *              packet trasmition time.
+ *              tx_duration(t) + TSCH_DEFAULT_TS_TX_ACK_DELAY
+ * \value 1 - immediate ACK after receive + TSCH_DEFAULT_TS_TX_ACK_DELAY.
+ *          rely on radio_driver behaviour - that blocks receive/transmit operation
+ *          right for operation time.
+ *  */
+#define TSCH_ACK_TIMING_OLD         0
+#define TSCH_ACK_TIMING_IMMEDIATE   1
+#ifdef TSCH_CONF_ACK_TIMING_STYLE
+#define TSCH_ACK_TIMING_STYLE TSCH_CONF_ACK_TIMING_STYLE
+#else
+#define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
+#endif
+
+/* phantom TSCH adress, if != eb_adress, binds width adress declared in links
+ * this allows use different queues on same receiver adress,
+ * denoted to different links
+ * */
+#ifdef TSCH_CONF_WITH_PHANTOM_NBR
+#define TSCH_WITH_PHANTOM_NBR TSCH_CONF_WITH_PHANTOM_NBR
+#else
+#define TSCH_WITH_PHANTOM_NBR  0
+#endif /* TSCH_CONF_EB_AUTOSELECT */
+
+//* Initiates sequence no of packets from RTclock at strtup.
+//* this should help to pass though duplicates filter when fast
+//* chip restarts.
+#ifndef TSCH_CONF_SEQ_FROMRT
+#define TSCH_CONF_SEQ_FROMRT 0
+#endif
+
 
 #endif /* __TSCH_CONF_H__ */

@@ -56,8 +56,10 @@
 #include <string.h>
 
 #if TSCH_LOG_LEVEL >= 1
+#undef DEBUG
 #define DEBUG DEBUG_PRINT
 #else /* TSCH_LOG_LEVEL */
+#undef DEBUG
 #define DEBUG DEBUG_NONE
 #endif /* TSCH_LOG_LEVEL */
 #include "net/net-debug.h"
@@ -66,7 +68,8 @@
 /* Construct enhanced ACK packet and return ACK length */
 int
 tsch_packet_create_eack(uint8_t *buf, int buf_size,
-                        const linkaddr_t *dest_addr, uint8_t seqno, int16_t drift, int nack)
+                        const linkaddr_t *dest_addr, const frame802154_t *frame
+                        , int16_t drift, int nack)
 {
   int ret;
   uint8_t curr_len = 0;
@@ -82,7 +85,7 @@ tsch_packet_create_eack(uint8_t *buf, int buf_size,
    * - if at least one address is present: include exactly one PAN ID (dest by default) */
   p.fcf.panid_compression = 0;
   p.dest_pid = IEEE802154_PANID;
-  p.seq = seqno;
+  p.seq = frame->seq;
 #if TSCH_PACKET_EACK_WITH_DEST_ADDR
   if(dest_addr != NULL) {
     p.fcf.dest_addr_mode = LINKADDR_SIZE > 2 ? FRAME802154_LONGADDRMODE : FRAME802154_SHORTADDRMODE;;
@@ -95,13 +98,19 @@ tsch_packet_create_eack(uint8_t *buf, int buf_size,
   linkaddr_copy((linkaddr_t *)&p.src_addr, &linkaddr_node_addr);
 #endif
 #if LLSEC802154_ENABLED
-  if(tsch_is_pan_secured) {
+  if(frame->fcf.security_enabled) {
     p.fcf.security_enabled = 1;
     p.aux_hdr.security_control.security_level = TSCH_SECURITY_KEY_SEC_LEVEL_ACK;
     p.aux_hdr.security_control.key_id_mode = FRAME802154_1_BYTE_KEY_ID_MODE;
     p.aux_hdr.security_control.frame_counter_suppression = 1;
     p.aux_hdr.security_control.frame_counter_size = 1;
+#if (TSCH_SECURITY_STRICT & TSCH_SECURITY_RELAX_KEYID)
+    // when declared that net keyid free for user specify, use same keyid for ack
+    // as source packet
+    p.aux_hdr.key_index = frame->aux_hdr.key_index;
+#else
     p.aux_hdr.key_index = TSCH_SECURITY_KEY_INDEX_ACK;
+#endif
   }
 #endif /* LLSEC802154_ENABLED */
 
@@ -244,8 +253,8 @@ tsch_packet_create_eb(uint8_t *buf, int buf_size,
   {
     int i;
     ies.ie_tsch_timeslot_id = 1;
-    for(i = 0; i < tsch_ts_elements_count; i++) {
-      ies.ie_tsch_timeslot[i] = RTIMERTICKS_TO_US(tsch_timing[i]);
+    for(i = 0; i < tsch_ts_netwide_count; i++) {
+      ies.ie_tsch_timeslot[i] = rtimerticks_to_us(tsch_timing[i]);
     }
   }
 #endif /* TSCH_PACKET_EB_WITH_TIMESLOT_TIMING */
@@ -358,19 +367,14 @@ tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
 
   /* Parse 802.15.4-2006 frame, i.e. all fields before Information Elements */
   if((ret = frame802154_parse((uint8_t *)buf, buf_size, frame)) == 0) {
-    PRINTF("TSCH:! parse_eb: failed to parse frame\n");
+    TSCH_PUTS("TSCH:! parse_eb: failed to parse frame\n");
     return 0;
   }
 
   if(frame->fcf.frame_version < FRAME802154_IEEE802154E_2012
      || frame->fcf.frame_type != FRAME802154_BEACONFRAME) {
-    PRINTF("TSCH:! parse_eb: frame is not a valid TSCH beacon. Frame version %u, type %u, FCF %02x %02x\n",
-           frame->fcf.frame_version, frame->fcf.frame_type, buf[0], buf[1]);
-    PRINTF("TSCH:! parse_eb: frame was from 0x%x/", frame->src_pid);
-    PRINTLLADDR((const uip_lladdr_t *)&frame->src_addr);
-    PRINTF(" to 0x%x/", frame->dest_pid);
-    PRINTLLADDR((const uip_lladdr_t *)&frame->dest_addr);
-    PRINTF("\n");
+      TSCH_LOG_FRAME("TSCH:! parse_eb: frame is not a valid TSCH beacon."
+              , frame, buf);
     return 0;
   }
 
@@ -397,7 +401,7 @@ tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
 
     /* Parse information elements. We need to substract the MIC length, as the exact payload len is needed while parsing */
     if((ret = frame802154e_parse_information_elements(buf + curr_len, buf_size - curr_len - mic_len, ies)) == -1) {
-      PRINTF("TSCH:! parse_eb: failed to parse IEs\n");
+      TSCH_PUTS("TSCH:! parse_eb: failed to parse IEs\n");
       return 0;
     }
     curr_len += ret;

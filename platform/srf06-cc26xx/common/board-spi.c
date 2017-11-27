@@ -150,11 +150,15 @@ board_spi_close()
   while(!ti_lib_prcm_load_get());
 
   /* Restore pins to a low-consumption state */
+  if (BOARD_IOID_SPI_MISO != IOID_UNUSED) {
   ti_lib_ioc_pin_type_gpio_input(BOARD_IOID_SPI_MISO);
   ti_lib_ioc_io_port_pull_set(BOARD_IOID_SPI_MISO, IOC_IOPULL_DOWN);
+  }
 
+  if (BOARD_IOID_SPI_MOSI != IOID_UNUSED) {
   ti_lib_ioc_pin_type_gpio_input(BOARD_IOID_SPI_MOSI);
   ti_lib_ioc_io_port_pull_set(BOARD_IOID_SPI_MOSI, IOC_IOPULL_DOWN);
+  }
 
   ti_lib_ioc_pin_type_gpio_input(BOARD_IOID_SPI_CLK_FLASH);
   ti_lib_ioc_io_port_pull_set(BOARD_IOID_SPI_CLK_FLASH, IOC_IOPULL_DOWN);
