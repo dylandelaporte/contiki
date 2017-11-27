@@ -688,24 +688,36 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               ack_start_time = tx_start_time + tx_duration;
 #endif
               /* Unicast: wait for ack after tx: sleep until ack time */
-              TSCH_SCHEDULE_AND_YIELD(pt, t
-                  , ack_start_time
+              BUSYWAIT_UNTIL_ABS(0, ack_start_time
                   , tsch_timing[tsch_ts_rx_ack_delay] - RADIO_DELAY_BEFORE_RX
-                  , "TxBeforeAck");
+                  ); //"TxBeforeAck"
               TSCH_DEBUG_TX_EVENT();
+              ack_start_time +=  tsch_timing[tsch_ts_rx_ack_delay];
               tsch_radio_on(TSCH_RADIO_CMD_ON_WITHIN_TIMESLOT);
               /* Wait for ACK to come */
+#if 1 //TSCH_RESYNC_WITH_SFD_TIMESTAMPS
+              // rely that ACK time more then tsch_ts_ack_wait, so
+              //    for moment Tack_start+ack_delay+ack_wait ACK is receiving
+              //    or there is no ACK
+              TSCH_SCHEDULE_AND_YIELD(pt, t
+                  , ack_start_time
+                  , tsch_timing[tsch_ts_ack_wait] + RADIO_DELAY_BEFORE_RX
+                  , "TxWaitAck");
+              TSCH_DEBUG_TX_EVENT();
+              ack_start_time += tsch_timing[tsch_ts_ack_wait];
+#else
               BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet()
                    , ack_start_time
-                   , tsch_timing[tsch_ts_rx_ack_delay] + tsch_timing[tsch_ts_ack_wait]
+                   , tsch_timing[tsch_ts_ack_wait]
                      + RADIO_DELAY_BEFORE_DETECT + RADIO_RSSI_DETECT_DELAY);
               TSCH_DEBUG_TX_EVENT();
 
               ack_start_time = RTIMER_NOW() - RADIO_DELAY_BEFORE_DETECT;
 
+#endif
               /* Wait for ACK to finish */
               BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
-                                 ack_start_time, tsch_timing[tsch_ts_max_ack]);
+                                 ack_start_time, tsch_timing[tsch_ts_max_ack]+ RADIO_DELAY_BEFORE_RX);
               ack_len = 0;
               if (NETSTACK_RADIO.receiving_packet()){
                   TSCH_LOGF("tx ack: tooo long\n");
@@ -881,34 +893,56 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 
     /* Start radio for at least guard time */
     tsch_radio_on(TSCH_RADIO_CMD_ON_WITHIN_TIMESLOT);
-    packet_seen = NETSTACK_RADIO.receiving_packet() || NETSTACK_RADIO.pending_packet();
-    if(!packet_seen) {
+
+#if TSCH_RESYNC_WITH_SFD_TIMESTAMPS
+    TSCH_SCHEDULE_AND_YIELD(pt, t, current_slot_start
+                            , tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_RX
+                            , "RxWait");
+    packet_seen = NETSTACK_RADIO.receiving_packet();
+    const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_RX;
+    const unsigned wait_limit = pend_limit + tsch_timing[tsch_ts_max_tx];
+#else
+    const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait];
+    const unsigned wait_limit = pend_limit + tsch_timing[tsch_ts_max_tx];
+
+    packet_seen = 0;
+    //need to take accurate packet rx time
+    while(!packet_seen) {
       /* Check if receiving within guard time */
       BUSYWAIT_UNTIL_ABS((packet_seen = NETSTACK_RADIO.receiving_packet()),
-          current_slot_start, tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_DETECT);
+          current_slot_start, pend_limit + RADIO_DELAY_BEFORE_DETECT);
+      if (!packet_seen)
+          break;
+      rx_start_time = RTIMER_NOW() - RADIO_DELAY_BEFORE_DETECT;
+      TSCH_DEBUG_RX_EVENT();
+      // sure that packet receives till rx wait time. this should help filter out
+      // false receiving detection before packet actualy starts receive
+      BUSYWAIT_UNTIL_ABS(!(packet_seen = NETSTACK_RADIO.receiving_packet()),
+          current_slot_start, pend_limit);
     }
+#endif
     if(!packet_seen) {
       /* no packets on air */
       tsch_radio_off(TSCH_RADIO_CMD_OFF_FORCE);
     } else {
       TSCH_DEBUG_RX_EVENT();
-      /* Save packet timestamp */
-      rx_start_time = RTIMER_NOW() - RADIO_DELAY_BEFORE_DETECT;
 
       /* Wait until packet is received, turn radio off */
-      BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
-          current_slot_start, tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait] + tsch_timing[tsch_ts_max_tx]);
-      TSCH_DEBUG_RX_EVENT();
+        BUSYWAIT_UNTIL_ABS(!(NETSTACK_RADIO.receiving_packet()),
+            current_slot_start, wait_limit);
+        rx_end_time = RTIMER_NOW();
 
-      rx_end_time = RTIMER_NOW();
+      TSCH_DEBUG_RX_EVENT();
       tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
 
-      if(NETSTACK_RADIO.pending_packet()) {
+    packet_seen = NETSTACK_RADIO.pending_packet();
         static int header_len;
         static frame802154_t frame;
         radio_value_t radio_last_rssi;
 
         /* Read packet */
+        // take last packet, and drop others - since them are looks trash
+        while( NETSTACK_RADIO.pending_packet() )
         current_input->len = NETSTACK_RADIO.read((void *)current_input->payload, TSCH_PACKET_MAX_LEN);
         NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &radio_last_rssi);
         current_input->rx_asn = tsch_current_asn;
@@ -1027,10 +1061,9 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
                 rx_end_time = rx_start_time + packet_duration;
 #endif
                 /* Wait for time to ACK and transmit ACK */
-                TSCH_SCHEDULE_AND_YIELD(pt, t
-                         , rx_end_time
+                BUSYWAIT_UNTIL_ABS(0, rx_end_time
                          , tsch_timing[tsch_ts_tx_ack_delay] - RADIO_DELAY_BEFORE_TX
-                         , "RxBeforeAck");
+                         ); //"RxBeforeAck"
                 TSCH_DEBUG_RX_EVENT();
                 NETSTACK_RADIO.transmit(ack_len);
                 tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
@@ -1076,8 +1109,6 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
           /* Poll process for processing of pending input and logs */
           process_poll(&tsch_pending_events_process);
         }//if(frame_valid)
-      }//if(NETSTACK_RADIO.pending_packet())
-
     }//else(!packet_seen)
 
     if(input_queue_drop != 0) {
