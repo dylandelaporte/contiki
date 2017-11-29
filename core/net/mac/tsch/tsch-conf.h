@@ -242,6 +242,16 @@
 #define TSCH_HW_FRAME_FILTERING 1
 #endif /* TSCH_CONF_HW_FRAME_FILTERING */
 
+/* HW issues, that TSCH should handle  */
+// denotes that radio can generate spurous RX events, or frames, while wait received
+//  packet. and this packets should be droped while last readen packet read.
+#define TSCH_HW_FEATURE_SPUROUS_RX  1
+#ifdef TSCH_CONF_HW_FEATURE
+#define TSCH_HW_FEATURE TSCH_CONF_HW_FEATURE
+#else /* TSCH_CONF_HW_FEATURE */
+#define TSCH_HW_FEATURE 0
+#endif /* TSCH_CONF_HW_FEATURE */
+
 /* Keep radio always on within TSCH timeslot (1) or turn it off between packet and ACK? (0) */
 #ifdef TSCH_CONF_RADIO_ON_DURING_TIMESLOT
 #define TSCH_RADIO_ON_DURING_TIMESLOT TSCH_CONF_RADIO_ON_DURING_TIMESLOT
