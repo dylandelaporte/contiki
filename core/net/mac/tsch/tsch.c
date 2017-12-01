@@ -223,6 +223,7 @@ tsch_reset(void)
 {
   ANNOTATE("TSCH:reset");
   int i;
+  tsch_slot_operation_stop();
   frame802154_set_pan_id(0xffff);
   /* First make sure pending packet callbacks are sent etc */
   process_post_synch(&tsch_pending_events_process, PROCESS_EVENT_POLL, NULL);

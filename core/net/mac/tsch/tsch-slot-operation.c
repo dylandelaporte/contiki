@@ -322,6 +322,11 @@ tsch_schedule_slot_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
     return 0;
   }
   ref_time += offset - RTIMER_GUARD;
+  // FIX: this is when rtimer_set cant overide current timer. When, for some
+  //    cause, last timer was expired - in this case expired timer will counts for
+  //    rtimer clock override. thus, during override wait it will block new rtimer
+  //    operation start.
+  rtimer_cancel(tm);
   r = rtimer_set(tm, ref_time, 1, (void (*)(struct rtimer *, void *))tsch_slot_operation, NULL);
   if(r != RTIMER_OK) {
     return 0;
@@ -1280,10 +1285,10 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
 /*---------------------------------------------------------------------------*/
 /* Set global time before starting slot operation,
  * with a rtimer time and an ASN */
+static struct rtimer tsch_slot_operation_timer;
 void
 tsch_slot_operation_start(void)
 {
-  static struct rtimer slot_operation_timer;
   rtimer_clock_t time_to_next_active_slot;
   rtimer_clock_t prev_slot_start;
   TSCH_DEBUG_INIT();
@@ -1305,8 +1310,13 @@ tsch_slot_operation_start(void)
     current_slot_start += time_to_next_active_slot;
     // forced use RF power prefetch, to ensure if RF powered off.
     time_to_next_active_slot = tsch_next_slot_prefetched_time(time_to_next_active_slot);
-  } while(!tsch_schedule_slot_operation(&slot_operation_timer, prev_slot_start, time_to_next_active_slot, "association"));
+  } while(!tsch_schedule_slot_operation(&tsch_slot_operation_timer, prev_slot_start, time_to_next_active_slot, "association"));
 }
+/*---------------------------------------------------------------------------*/
+void tsch_slot_operation_stop(void){
+    rtimer_cancel(&tsch_slot_operation_timer);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Start actual slot operation */
 void
