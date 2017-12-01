@@ -1149,14 +1149,14 @@ send_packet(mac_callback_t sent, void *ptr)
     /* Enqueue packet */
     p = tsch_queue_add_packet(nbr_addr, sent, ptr);
     if(p == NULL) {
-        TSCH_PRINTF8("TSCH:! can't send packet to %u with seqno %u, queue %u %u\n",
+        TSCH_PRINTF8("TSCH:! can't send packet to %x with seqno %u, queue %u %u\n",
           TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
           packet_count_before,
           tsch_queue_packet_count(nbr_addr));
       ret = MAC_TX_ERR;
     } else {
       p->header_len = hdr_len;
-      TSCH_PRINTF8("TSCH: send packet to %u with seqno %u, queue %u %u, len %u %u\n",
+      TSCH_PRINTF8("TSCH: send packet to %x with seqno %u, queue %u %u, len %u %u\n",
              TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
              packet_count_before,
              tsch_queue_packet_count(nbr_addr),
