@@ -524,7 +524,7 @@ bool tsch_next_timeslot_far(void){
     // use tsch_ts_rfon_prepslot_guard to predict rf off+on time
     const rtimer_clock_t time_gap = tsch_timing[tsch_ts_rfon_prepslot_guard]*2;
     if (timeout <= time_gap){
-        TSCH_PRINTF("TSCH: supress rf off, next slot %ldus\n", timeout);
+        TSCH_LOGF("TSCH: supress rf off, next slot %ldus\n", timeout);
     }
     return (timeout > time_gap);
 }
