@@ -237,7 +237,7 @@ add_single_access(struct rtimer *rtimer)
 {
   int first = 0;
 
-  if(next_rtimer == NULL) {
+  if ((next_rtimer == NULL) || (next_rtimer == rtimer)) {
     first = 1;
   }
 
