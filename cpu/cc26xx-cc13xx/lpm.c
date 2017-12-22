@@ -84,6 +84,8 @@ LIST(modules_list);
 
 #define MAX_SLEEP_TIME        RTIMER_SECOND
 #define MIN_SAFE_SCHEDULE     8u
+// about 300us
+#define WAKE_UP_FROM_DEEP_SCHEDULE   (RTIMER_SECOND / 3000)
 /*---------------------------------------------------------------------------*/
 /* Prototype of a function in clock.c. Called every time we come out of DS */
 void clock_update(void);
@@ -283,15 +285,16 @@ check_next_etimer(rtimer_clock_t now, rtimer_clock_t *next_etimer, bool *next_et
 
   /* Find out the time of the next etimer */
   if(etimer_pending()) {
-    int32_t until_next_etimer = (int32_t)etimer_next_expiration_time() - (int32_t)clock_time();
+    int32_t until_next_etimer = etimer_next_expiration_time() - clock_time();
     if(until_next_etimer < 1) {
       max_pm = MIN(max_pm, LPM_MODE_AWAKE);
     } else {
-      *next_etimer_set = true;
-      *next_etimer = soc_rtc_last_isr_time() + (until_next_etimer * (RTIMER_SECOND / CLOCK_SECOND));
-      if(RTIMER_CLOCK_LT(*next_etimer, now + STANDBY_MIN_DURATION)) {
+      rtimer_clock_t next_rt = soc_rtc_last_isr_time() + (until_next_etimer * (RTIMER_SECOND / CLOCK_SECOND));
+      if(RTIMER_CLOCK_LT(next_rt, (now + STANDBY_MIN_DURATION) )) {
         max_pm = MIN(max_pm, LPM_MODE_SLEEP);
       }
+      *next_etimer_set = true;
+      *next_etimer = next_rt;
     }
   }
 
@@ -374,7 +377,8 @@ setup_sleep_mode(void)
       /* Schedule the next system wakeup due to etimer.
        * No need to compare the `next_etimer` to `now` here as this branch
        * is only entered when there's sufficient time for deep sleeping. */
-      soc_rtc_schedule_one_shot(AON_RTC_CH1, next_etimer);
+     //prefetch
+      soc_rtc_schedule_one_shot(AON_RTC_CH1, next_etimer-WAKE_UP_FROM_DEEP_SCHEDULE);
     } else {
       /* Use the farthest possible wakeup time */
       soc_rtc_schedule_one_shot(AON_RTC_CH1, now - 1);
