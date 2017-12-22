@@ -1004,9 +1004,10 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
 
     /* End of slot operation, schedule next slot or resynchronize */
 
+    tsch_slot_offset_t timeslot_desync = (100 * TSCH_CLOCK_TO_SLOTS(TSCH_DESYNC_THRESHOLD / 100, tsch_timing[tsch_ts_timeslot_length]));//TSCH_DESYNC_THRESHOLD_SLOTS();
     /* Do we need to resynchronize? i.e., wait for EB again */
-    if(!tsch_is_coordinator && (TSCH_ASN_DIFF(tsch_current_asn, last_sync_asn) >
-        (100 * TSCH_CLOCK_TO_SLOTS(TSCH_DESYNC_THRESHOLD / 100, tsch_timing[tsch_ts_timeslot_length])))) {
+    if(!tsch_is_coordinator && (TSCH_ASN_DIFF(tsch_current_asn, last_sync_asn) >timeslot_desync)) 
+    {
       TSCH_LOG_ADD(tsch_log_message,
             snprintf(log->message, sizeof(log->message),
                 "! leaving the network, last sync %u",
@@ -1032,6 +1033,7 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
         }
 
         /* Get next active link */
+        timeslot_diff = timeslot_desync;
         current_link = tsch_schedule_get_next_active_link(&tsch_current_asn, &timeslot_diff, &backup_link);
         if(current_link == NULL) {
           /* There is no next link. Fall back to default

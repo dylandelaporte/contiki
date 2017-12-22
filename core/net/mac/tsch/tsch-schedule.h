@@ -95,6 +95,15 @@
 //< scheduler, when TXslot have no any data to send, turn on option flag LINK_OPTION_DISABLE
 //  this intends to help reduce slot activity when no data sends
 #define LINK_OPTION_IDLED_AUTOOFF   0x20
+//< this feature escapes to activate timesource EB slot to latest possible time, enough
+//      to keep net in timesync
+//  scheduler plan slot with this flag in future to:
+//      N*FrameLen+SlotTime < (TSCH_DESYNC_THRESHOLD_SLOTS - Tryes*FrameLen)
+//  where:
+//      TSCH_DESYNC_THRESHOLD_SLOTS - timeout for timesource EB
+//      Tryes - expected amount of packets loose \sa TSCH_CONF_TIMESYNC_EB_LOOSES
+//  this flag works when active TSCH_SCHEDULE_OMMIT_NOXFER
+#define LINK_OPTION_TIME_EB_ESCAPE  0x40
 
 /************ Types ***********/
 
@@ -176,6 +185,8 @@ int tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link
 int tsch_schedule_remove_link_by_timeslot(struct tsch_slotframe *slotframe, uint16_t timeslot);
 
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
+//  \arg time_offset - gives TSCH_DESYNC_THRESHOLD_SLOTS value, used to escape
+//                  timesource EB
 struct tsch_link * tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset,
     struct tsch_link **backup_link);
 

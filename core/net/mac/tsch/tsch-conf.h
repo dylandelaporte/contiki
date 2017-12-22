@@ -177,6 +177,17 @@
 #define TSCH_ADAPTIVE_TIMESYNC 1
 #endif
 
+/* Estimate possible looses fo timesource EB. need to prevent timesync loose
+ * when used EB slot with option LINK_OPTION_TIME_EB_ESCAPE
+ * \sa LINK_OPTION_TIME_EB_ESCAPE
+ * */
+#ifdef TSCH_CONF_TIMESYNC_EB_LOOSES
+#define TSCH_TIMESYNC_EB_LOOSES TSCH_CONF_TIMESYNC_EB_LOOSES
+#else
+//#define TSCH_TIMESYNC_EB_LOOSES 5
+#define TSCH_TIMESYNC_EB_LOOSES TSCH_MAC_MAX_FRAME_RETRIES
+#endif
+
 /* HW frame filtering enabled */
 #ifdef TSCH_CONF_HW_FRAME_FILTERING
 #define TSCH_HW_FRAME_FILTERING TSCH_CONF_HW_FRAME_FILTERING
