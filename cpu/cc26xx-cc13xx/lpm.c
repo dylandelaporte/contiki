@@ -84,6 +84,8 @@ LIST(modules_list);
 
 #define MAX_SLEEP_TIME        RTIMER_SECOND
 #define MIN_SAFE_SCHEDULE     8u
+// about 300us
+#define WAKE_UP_FROM_DEEP_SCHEDULE   (RTIMER_SECOND / 3000)
 /*---------------------------------------------------------------------------*/
 /* Prototype of a function in clock.c. Called every time we come out of DS */
 void clock_update(void);
@@ -374,7 +376,8 @@ setup_sleep_mode(void)
       /* Schedule the next system wakeup due to etimer.
        * No need to compare the `next_etimer` to `now` here as this branch
        * is only entered when there's sufficient time for deep sleeping. */
-      soc_rtc_schedule_one_shot(AON_RTC_CH1, next_etimer);
+     //prefetch
+      soc_rtc_schedule_one_shot(AON_RTC_CH1, next_etimer-WAKE_UP_FROM_DEEP_SCHEDULE);
     } else {
       /* Use the farthest possible wakeup time */
       soc_rtc_schedule_one_shot(AON_RTC_CH1, now - 1);
