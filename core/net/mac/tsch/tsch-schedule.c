@@ -363,12 +363,21 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
   if(!tsch_is_locked()) {
     struct tsch_slotframe *sf = list_head(slotframe_list);
     /* For each slotframe, look for the earliest occurring link */
-    while(sf != NULL) {
+    for(;sf != NULL; sf = list_item_next(sf)) {
+      if (sf->size.val == 0)
+          continue;
       /* Get timeslot from ASN, given the slotframe length */
       tsch_slot_offset_t timeslot = TSCH_ASN_MOD(*asn, sf->size);
       struct tsch_link *l = list_head(sf->links_list);
-      while(l != NULL) {
-          tsch_slot_offset_t time_to_timeslot =
+      for(; l != NULL; l = list_item_next(l)) {
+          if ((l->link_options & (LINK_OPTION_DISABLE)) != 0)
+              continue;
+          if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER){
+          if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX)) == 0)
+              // when link ton transfers, skip it
+              continue;
+          }//if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER)
+        tsch_slot_offset_t time_to_timeslot =
           l->timeslot > timeslot ?
           l->timeslot - timeslot :
           sf->size.val + l->timeslot - timeslot;
@@ -409,11 +418,8 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
             curr_best = new_best;
           }
         }
-
-        l = list_item_next(l);
-      }
-      sf = list_item_next(sf);
-    }
+      }//for(; l != NULL
+    }//for(;sf != NULL
     if(time_offset != NULL) {
       *time_offset = time_to_curr_best;
     }

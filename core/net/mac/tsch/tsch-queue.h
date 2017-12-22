@@ -188,7 +188,7 @@ struct tsch_packet *tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n,
 /* Returns the head packet from a neighbor queue (from neighbor address) */
 struct tsch_packet *tsch_queue_get_packet_for_dest_addr(const linkaddr_t *addr, struct tsch_link *link);
 /* Returns the head packet of any neighbor queue with zero backoff counter.
- * Writes pointer to the neighbor in *n */
+ * Writes pointer to the last not empty neighbor in *n */
 struct tsch_packet *tsch_queue_get_unicast_packet_for_any(struct tsch_neighbor **n, struct tsch_link *link);
 /* May the neighbor transmit over a share link? */
 int tsch_queue_backoff_expired(const struct tsch_neighbor *n);

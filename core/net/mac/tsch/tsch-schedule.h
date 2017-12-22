@@ -72,6 +72,17 @@
 #define TSCH_SCHEDULE_MAX_LINKS 32
 #endif
 
+// Enable skip slots that have ho xfer activity - options RX or TX are disabled
+#define TSCH_SCHEDULE_OMMIT_NOXFER    1
+
+/* shedule policies set */
+#ifdef TSCH_SCHEDULE_CONF_POLICY
+#define TSCH_SCHEDULE_POLICY TSCH_SCHEDULE_CONF_POLICY
+#else
+#define TSCH_SCHEDULE_POLICY 0
+#endif
+
+
 /********** Constants *********/
 
 /* Link options */
@@ -79,6 +90,11 @@
 #define LINK_OPTION_RX              2
 #define LINK_OPTION_SHARED          4
 #define LINK_OPTION_TIME_KEEPING    8
+//< scheduler skip this slot
+#define LINK_OPTION_DISABLE         0x10
+//< scheduler, when TXslot have no any data to send, turn on option flag LINK_OPTION_DISABLE
+//  this intends to help reduce slot activity when no data sends
+#define LINK_OPTION_IDLED_AUTOOFF   0x20
 
 /************ Types ***********/
 
@@ -119,6 +135,8 @@ struct tsch_slotframe {
   tsch_sf_h handle;
   /* Number of timeslots in the slotframe.
    * Stored as struct asn_divisor_t because we often need ASN%size */
+  // when size.val == 0 - slotframe ommits from schedule, with all it`s links
+  //    this can be used for fast enable/disable
   struct tsch_asn_divisor_t size;
   /* List of links belonging to this slotframe */
   LIST_STRUCT(links_list);

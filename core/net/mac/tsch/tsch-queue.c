@@ -409,19 +409,22 @@ tsch_queue_get_unicast_packet_for_any(struct tsch_neighbor **n, struct tsch_link
   if(!tsch_is_locked()) {
     struct tsch_neighbor *curr_nbr = list_head(neighbor_list);
     struct tsch_packet *p = NULL;
-    while(curr_nbr != NULL) {
+    for(; curr_nbr != NULL; curr_nbr = list_item_next(curr_nbr)) {
       if(!curr_nbr->is_broadcast && curr_nbr->tx_links_count == 0) {
         /* Only look up for non-broadcast neighbors we do not have a tx link to */
-        p = tsch_queue_get_packet_for_nbr(curr_nbr, link);
-        if(p != NULL) {
+        if ( tsch_queue_is_empty(curr_nbr) )
+            continue;
+
           if(n != NULL) {
             *n = curr_nbr;
           }
+
+        p = tsch_queue_get_packet_for_nbr(curr_nbr, link);
+        if(p != NULL) {
           return p;
         }
       }
-      curr_nbr = list_item_next(curr_nbr);
-    }
+    }//for(; curr_nbr != NULL
   }
   return NULL;
 }
