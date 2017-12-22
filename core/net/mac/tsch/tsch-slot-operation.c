@@ -992,6 +992,13 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
           PT_SPAWN(&slot_operation_pt, &slot_rx_pt, tsch_rx_slot(&slot_rx_pt, t));
         }
       }
+      else { //if is_active_slot
+          if ((current_link->link_options & LINK_OPTION_IDLED_AUTOOFF) != 0)
+          if ( (current_neighbor == NULL) || tsch_queue_is_empty(current_neighbor) )
+          {
+              current_link->link_options |= LINK_OPTION_DISABLE;
+          }
+      }
       TSCH_DEBUG_SLOT_END();
     }
 
@@ -1040,7 +1047,7 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
         /* Update current slot start */
         prev_slot_start = current_slot_start;
         current_slot_start += time_to_next_active_slot;
-        current_slot_start += tsch_timesync_adaptive_compensate(time_to_next_active_slot);
+                           + tsch_timesync_adaptive_compensate(time_to_next_active_slot);
       } while(!tsch_schedule_slot_operation(t, prev_slot_start, time_to_next_active_slot, "main"));
     }
 
