@@ -285,15 +285,16 @@ check_next_etimer(rtimer_clock_t now, rtimer_clock_t *next_etimer, bool *next_et
 
   /* Find out the time of the next etimer */
   if(etimer_pending()) {
-    int32_t until_next_etimer = (int32_t)etimer_next_expiration_time() - (int32_t)clock_time();
+    int32_t until_next_etimer = etimer_next_expiration_time() - clock_time();
     if(until_next_etimer < 1) {
       max_pm = MIN(max_pm, LPM_MODE_AWAKE);
     } else {
-      *next_etimer_set = true;
-      *next_etimer = soc_rtc_last_isr_time() + (until_next_etimer * (RTIMER_SECOND / CLOCK_SECOND));
-      if(RTIMER_CLOCK_LT(*next_etimer, now + STANDBY_MIN_DURATION)) {
+      rtimer_clock_t next_rt = soc_rtc_last_isr_time() + (until_next_etimer * (RTIMER_SECOND / CLOCK_SECOND));
+      if(RTIMER_CLOCK_LT(next_rt, (now + STANDBY_MIN_DURATION) )) {
         max_pm = MIN(max_pm, LPM_MODE_SLEEP);
       }
+      *next_etimer_set = true;
+      *next_etimer = next_rt;
     }
   }
 
