@@ -1336,6 +1336,7 @@ tsch_slot_operation_start(void)
 /*---------------------------------------------------------------------------*/
 void tsch_slot_operation_stop(void){
     rtimer_cancel(&tsch_slot_operation_timer);
+    tsch_in_slot_operation = 0;
 }
 
 /*---------------------------------------------------------------------------*/
