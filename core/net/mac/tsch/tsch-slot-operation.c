@@ -1114,6 +1114,26 @@ void tsch_slot_operation_stop(void){
 }
 
 /*---------------------------------------------------------------------------*/
+bool tsch_slot_operation_break_before(rtimer_clock_t timeout){
+    if (!tsch_in_slot_operation)
+        return true;
+    rtimer_clock_t now = RTIMER_NOW();
+    rtimer_clock_t time_to_next_active_slot = current_slot_start - now;
+    if (time_to_next_active_slot < timeout)
+        return false;
+
+    tsch_slot_operation_stop();
+    // evaluate current ASN.
+    unsigned asns = time_to_next_active_slot/tsch_timing[tsch_ts_timeslot_length];
+    rtimer_clock_t time_estimated_slots;
+    time_estimated_slots = asns*tsch_timing[tsch_ts_timeslot_length];
+    time_estimated_slots += tsch_timesync_adaptive_compensate(time_estimated_slots);
+    TSCH_ASN_DEC(tsch_current_asn, asns);
+    current_slot_start -= time_estimated_slots;
+    return true;
+}
+
+/*---------------------------------------------------------------------------*/
 /* Start actual slot operation */
 void
 tsch_slot_operation_sync(rtimer_clock_t next_slot_start,

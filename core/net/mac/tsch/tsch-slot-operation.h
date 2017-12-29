@@ -121,5 +121,13 @@ void tsch_slot_operation_sync(rtimer_clock_t next_slot_start,
 /* Start actual slot operation */
 void tsch_slot_operation_start(void);
 void tsch_slot_operation_stop(void);
+// \brief Break current slot operation correctrly - in sync state, valid for later
+//  tsch_slot_operation_start invoke.
+//  \arg timeout - time [rtc] to planed next slot, that not breaks.
+//          Break later oparation that planed: now+timeout < current_slot_start
+// * usage:
+//      if( tsch_slot_operation_break_before(timeout) )
+//          tsch_slot_operation_start();
+bool tsch_slot_operation_break_before(rtimer_clock_t timeout);
 
 #endif /* __TSCH_SLOT_OPERATION_H__ */
