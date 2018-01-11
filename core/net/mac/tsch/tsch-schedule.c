@@ -54,6 +54,7 @@
 #include "sys/process.h"
 #include "sys/rtimer.h"
 #include <string.h>
+#include <assert.h>
 
 #if TSCH_LOG_LEVEL >= 1
 #undef DEBUG
@@ -349,12 +350,15 @@ tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe, uint16_t ti
 }
 /*---------------------------------------------------------------------------*/
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
+//  \arg time_offset - gives TSCH_DESYNC_THRESHOLD_SLOTS value, used to escape
+//                  timesource EB
 struct tsch_link *
 tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
     , tsch_slot_offset_t *time_offset,
     struct tsch_link **backup_link)
 {
   tsch_slot_offset_t time_to_curr_best = 0;
+  struct tsch_slotframe * best_frame = NULL;
   struct tsch_link *curr_best = NULL;
   struct tsch_link *curr_backup = NULL; /* Keep a back link in case the current link
   turns out useless when the time comes. For instance, for a Tx-only link, if there is
@@ -372,17 +376,26 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
       for(; l != NULL; l = list_item_next(l)) {
           if ((l->link_options & (LINK_OPTION_DISABLE)) != 0)
               continue;
+          tsch_slot_offset_t linktime = l->timeslot;
           if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER){
           if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX)) == 0)
               // when link ton transfers, skip it
               continue;
+              if ((l->link_options & LINK_OPTION_TIME_EB_ESCAPE) != 0){
+                  // TODO use cource calculation to escape use division
+                  linktime += *time_offset; //(*time_offset/sf->size.val)*sf->size.val;
+                  tsch_slot_offset_t loosetime = sf->size.val*TSCH_TIMESYNC_EB_LOOSES;
+                  if (*time_offset > loosetime)
+                      linktime -= loosetime;
+              }
           }//if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER)
         tsch_slot_offset_t time_to_timeslot =
-          l->timeslot > timeslot ?
-          l->timeslot - timeslot :
-          sf->size.val + l->timeslot - timeslot;
+                  linktime > timeslot ?
+                  linktime - timeslot :
+                  sf->size.val + linktime - timeslot;
         if(curr_best == NULL || time_to_timeslot < time_to_curr_best) {
           time_to_curr_best = time_to_timeslot;
+          best_frame        = sf;
           curr_best = l;
           curr_backup = NULL;
         } else if(time_to_timeslot == time_to_curr_best) {
@@ -416,11 +429,31 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
           /* Maintain curr_best */
           if(new_best != NULL) {
             curr_best = new_best;
+            best_frame  = sf;
           }
         }
       }//for(; l != NULL
     }//for(;sf != NULL
+    if (curr_best != NULL)
     if(time_offset != NULL) {
+      if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER)
+      if (*time_offset > 0)
+      if ((curr_best->link_options & LINK_OPTION_TIME_EB_ESCAPE) != 0)
+      {
+          tsch_slot_offset_t timeslot = 0;
+          timeslot = TSCH_ASN_MOD(*asn, best_frame->size);
+          // make fine calculation here using div
+          tsch_slot_offset_t sf_size = best_frame->size.val;
+          tsch_slot_offset_t linktime = (*time_offset/sf_size);
+          if (linktime >= TSCH_TIMESYNC_EB_LOOSES)
+              linktime -= TSCH_TIMESYNC_EB_LOOSES;
+          linktime = linktime * sf_size;
+          linktime += curr_best->timeslot;
+          if (timeslot > linktime)
+              linktime += sf_size;
+          time_to_curr_best = linktime - timeslot;
+      }
+      assert(time_to_curr_best >= 0);
       *time_offset = time_to_curr_best;
     }
   }
