@@ -274,20 +274,6 @@ tsch_calculate_channel(struct tsch_asn_t *asn, int_fast8_t channel_offset)
   return tsch_hopping_sequence[index_of_offset];
 }
 
-bool tsch_slot_operation_break_before(rtimer_clock_t safegap){
-    rtimer_clock_t now = RTIMER_NOW();
-    rtimer_clock_t time_to_slot = (current_slot_start - now);
-    if (time_to_slot < safegap)
-        return false;
-    tsch_slot_operation_stop();
-    unsigned asn_to_slot = time_to_slot/tsch_timing[tsch_ts_timeslot_length];
-    time_to_slot = asn_to_slot * tsch_timing[tsch_ts_timeslot_length];
-    time_to_slot += tsch_timesync_adaptive_compensate(time_to_slot);
-    current_slot_start -= time_to_slot;
-    TSCH_ASN_DEC(tsch_current_asn, asn_to_slot);
-    return true;
-}
-
 /*---------------------------------------------------------------------------*/
 /* Timing utility functions */
 
@@ -1335,6 +1321,34 @@ tsch_slot_operation_start(void)
 void tsch_slot_operation_stop(void){
     rtimer_cancel(&tsch_slot_operation_timer);
     tsch_in_slot_operation = 0;
+}
+
+/*---------------------------------------------------------------------------*/
+bool tsch_slot_operation_break_before(rtimer_clock_t timeout){
+    if (!tsch_in_slot_operation)
+        return true;
+    rtimer_clock_t now = RTIMER_NOW();
+    rtimer_clock_t time_to_next_active_slot = current_slot_start - now;
+    if (time_to_next_active_slot < timeout)
+        return false;
+
+    tsch_slot_operation_stop();
+    // evaluate current ASN.
+    unsigned asns = time_to_next_active_slot/tsch_timing[tsch_ts_timeslot_length];
+    rtimer_clock_t time_estimated_slots;
+    time_estimated_slots = asns*tsch_timing[tsch_ts_timeslot_length];
+    time_estimated_slots += tsch_timesync_adaptive_compensate(time_estimated_slots);
+    TSCH_ASN_DEC(tsch_current_asn, asns);
+    current_slot_start -= time_estimated_slots;
+    return true;
+}
+
+bool tsch_slot_operation_invalidate_before(rtimer_clock_t timeout){
+      if( tsch_slot_operation_break_before(timeout) ){
+          tsch_slot_operation_start();
+          return true;
+      }
+      return false;
 }
 
 /*---------------------------------------------------------------------------*/
