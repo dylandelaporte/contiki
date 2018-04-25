@@ -485,7 +485,6 @@ void tsch_poll(void){
 
 void tsch_activate(bool onoff){
     if (onoff){
-        if (tsch_status < tschACTIVE)
             tsch_poll();
         tsch_status = tschACTIVE;
     }
