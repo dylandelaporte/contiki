@@ -433,8 +433,10 @@ void tsch_poll(void){
 
 void tsch_activate(bool onoff){
     if (onoff){
-            tsch_poll();
         tsch_status = tschACTIVE;
+        process_post_synch(&tsch_process, PROCESS_EVENT_INIT, NULL);
+        //process_post_synch(&tsch_pending_events_process, PROCESS_EVENT_INIT, NULL);
+            tsch_poll();
     }
     else {
         tsch_disassociate();
@@ -753,12 +755,15 @@ static int turn_off(int keep_radio_on);
 PROCESS_THREAD(tsch_process, ev, data)
 {
   static struct pt scan_pt;
+  if (ev == PROCESS_EVENT_INIT){
+      PT_INIT(process_pt);
+  }
 
   PROCESS_BEGIN();
 
   while(1) {
 
-    PROCESS_YIELD_UNTIL(tsch_is_active());
+    PROCESS_WAIT_UNTIL(tsch_is_active());
     do {
       if(tsch_is_coordinator) {
         /* We are coordinator, start operating now */
@@ -768,7 +773,10 @@ PROCESS_THREAD(tsch_process, ev, data)
         PROCESS_PT_SPAWN(&scan_pt, tsch_scan(&scan_pt));
       }
     }
-    while(!tsch_is_associated && !TSCH_ASSOCIATION_SINGLE);
+    while(tsch_is_active() && !tsch_is_associated && !TSCH_ASSOCIATION_SINGLE);
+
+    if (!tsch_is_active())
+        continue;
 
     if(tsch_is_associated || !TSCH_ASSOCIATION_SINGLE) {
 
@@ -777,14 +785,13 @@ PROCESS_THREAD(tsch_process, ev, data)
 
     /* Yield our main process. Slot operation will re-schedule itself
      * as long as we are associated */
-    PROCESS_YIELD_UNTIL(!tsch_is_associated);
+    PROCESS_WAIT_UNTIL(!tsch_is_associated);
 
     }//if(tsch_is_associated)
     else {
         PRINTF("TSCH:failed to associate, shut down net\n");
         turn_off(true);
     }
-
     /* Will need to re-synchronize */
     tsch_reset();
   }
