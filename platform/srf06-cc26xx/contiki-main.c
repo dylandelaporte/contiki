@@ -175,8 +175,9 @@ main(void)
   soc_rtc_init();
   clock_init();
   rtimer_init();
-
+#if !CONTIKI_WD_DISABLE
   watchdog_init();
+#endif
   process_init();
 
   random_init(0x1234);
@@ -235,7 +236,9 @@ main(void)
 
   autostart_start(autostart_processes);
 
+#if !CONTIKI_WD_DISABLE
   watchdog_start();
+#endif
 
   fade(LEDS_ORANGE);
 
@@ -243,7 +246,9 @@ main(void)
     uint8_t r;
     do {
       r = process_run();
+#if !CONTIKI_WD_DISABLE
       watchdog_periodic();
+#endif
     } while(r > 0);
 
     /* Drop to some low power mode */
