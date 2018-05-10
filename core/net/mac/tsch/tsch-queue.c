@@ -219,6 +219,8 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
   if(n != NULL) {
     if(tsch_get_lock()) {
 
+      TSCH_LOGF("drop nb $%lx\n", TSCH_LOG_ID_FROM_LINKADDR(&n->addr));
+
       /* Remove neighbor from list */
       list_remove(neighbor_list, n);
 
@@ -359,6 +361,8 @@ void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style)
     struct tsch_neighbor *n = list_head(neighbor_list);
     while(n != NULL) {
       struct tsch_neighbor *next_n = list_item_next(n);
+      TSCH_LOGF("free nb $%lx style%d\n"
+              , TSCH_LOG_ID_FROM_LINKADDR(&n->addr), style);
       /* Queue is empty, no tx link to this neighbor: deallocate.
        * Always keep time source and virtual broadcast neighbors. */
       if(!n->is_broadcast && !n->is_time_source && !n->tx_links_count){
