@@ -171,6 +171,11 @@ void tsch_queue_free_packet(struct tsch_packet *p);
 void tsch_queue_reset(void);
 /* Deallocate neighbors with empty queue */
 void tsch_queue_free_unused_neighbors(void);
+enum { tsch_free_UNUSED = 0
+    /* Flush and Deallocate neighbors wich are not in links*/
+     , tsch_free_UNLINKED = 1
+};
+void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style);
 /* Is the neighbor queue empty? */
 int tsch_queue_is_empty(const struct tsch_neighbor *n);
 /* Returns the first packet from a neighbor queue */

@@ -331,7 +331,12 @@ tsch_queue_reset(void)
 /*---------------------------------------------------------------------------*/
 /* Deallocate neighbors with empty queue */
 void
-tsch_queue_free_unused_neighbors(void)
+tsch_queue_free_unused_neighbors(void){
+    tsch_queue_free_neighbors(tsch_free_UNUSED);
+}
+
+void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style)
+
 {
   /* Deallocate unneeded neighbors */
   if(!tsch_is_locked()) {
@@ -340,9 +345,13 @@ tsch_queue_free_unused_neighbors(void)
       struct tsch_neighbor *next_n = list_item_next(n);
       /* Queue is empty, no tx link to this neighbor: deallocate.
        * Always keep time source and virtual broadcast neighbors. */
-      if(!n->is_broadcast && !n->is_time_source && !n->tx_links_count
-         && tsch_queue_is_empty(n)) {
+      if(!n->is_broadcast && !n->is_time_source && !n->tx_links_count){
+        if ((style & tsch_free_UNLINKED) != 0){
+            tsch_queue_flush_nbr_queue(n);
+        }
+        if (tsch_queue_is_empty(n)) {
         tsch_queue_remove_nbr(n);
+      }
       }
       n = next_n;
     }
