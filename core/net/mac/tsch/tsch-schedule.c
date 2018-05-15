@@ -334,11 +334,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
       uint16_t timeslot = TSCH_ASN_MOD(*asn, sf->size);
       struct tsch_link *l = list_head(sf->links_list);
       for(; l != NULL; l = list_item_next(l)) {
+          tsch_slot_offset_t linktime = l->timeslot;
+
+          // plan point is not avoidable
           if ((l->link_options & (LINK_OPTION_DISABLE)) != 0)
               continue;
-          tsch_slot_offset_t linktime = l->timeslot;
           if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER){
-          if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX)) == 0)
+          if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX|LINK_OPTION_PLANPOINT)) == 0)
               // when link ton transfers, skip it
               continue;
               if ((l->link_options & LINK_OPTION_TIME_EB_ESCAPE) != 0){

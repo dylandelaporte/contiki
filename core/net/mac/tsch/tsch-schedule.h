@@ -104,6 +104,10 @@
 //      Tryes - expected amount of packets loose \sa TSCH_CONF_TIMESYNC_EB_LOOSES
 //  this flag works when active TSCH_SCHEDULE_OMMIT_NOXFER
 #define LINK_OPTION_TIME_EB_ESCAPE  0x40
+//< scheduler forced to stops on this slot. this is like phantom LINK_OPTION_TX
+//      but actualy not affects transmit.
+//      it helpful for TSCH_SCHEDULE_OMMIT_NOXFER policy style
+#define LINK_OPTION_PLANPOINT       0x80
 
 /************ Types ***********/
 
