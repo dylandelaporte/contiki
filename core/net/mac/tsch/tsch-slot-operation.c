@@ -137,6 +137,7 @@ enum tsch_radio_state_on_cmd {
 enum tsch_radio_state_off_cmd {
   TSCH_RADIO_CMD_OFF_END_OF_TIMESLOT,
   TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT,
+  TSCH_RADIO_CMD_BREAK_NOISE_TIMESLOT,
   TSCH_RADIO_CMD_OFF_FORCE,
 };
 
@@ -497,8 +498,35 @@ tsch_radio_off(enum tsch_radio_state_off_cmd command)
     if (tsch_timing[tsch_ts_rfon_prepslot_guard] <= 0)
     if(!TSCH_RADIO_ON_DURING_TIMESLOT) {
       do_it = 1;
+      break;
     }
+#if (TSCH_HW_FEATURE & TSCH_HW_FEATURE_BREAK_BY_POWER)
+    // process it same as frame break
+    // no break
+#else
     break;
+#endif
+
+  case TSCH_RADIO_CMD_BREAK_NOISE_TIMESLOT:
+      // this is need to break current receiving op. do it by invalidate
+      //    current power
+#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_BREAK_BY_POWER
+  {
+      radio_value_t pwrlevel;
+      radio_result_t ok;
+      ok = NETSTACK_RADIO.get_value(RADIO_PARAM_TXPOWER, &pwrlevel);
+      if (ok == RADIO_RESULT_OK){
+          ok = NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, pwrlevel-10);
+          ok = NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, pwrlevel);
+      }
+      if (ok != RADIO_RESULT_OK)
+          do_it = 1;
+  }
+#else
+      do_it = 1;
+#endif
+      break;
+
   case TSCH_RADIO_CMD_OFF_FORCE:
     do_it = 1;
     break;
@@ -723,12 +751,19 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 
 #endif
               /* Wait for ACK to finish */
-              BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
+              BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet()
+#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
+                                  || NETSTACK_RADIO.pending_packet()
+#endif
+                                  ),
                                  ack_start_time, tsch_timing[tsch_ts_max_ack]+ RADIO_DELAY_BEFORE_RX);
               ack_len = 0;
               if (NETSTACK_RADIO.receiving_packet()){
                   TSCH_LOGF("tx ack: tooo long\n");
                   ack_len = -1;
+                  // looks like some noise as on air. need to reser RF receiver to prepare
+                  //    for next frame
+                  tsch_radio_off(TSCH_RADIO_CMD_BREAK_NOISE_TIMESLOT);
               }
               TSCH_DEBUG_TX_EVENT();
               tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
@@ -949,8 +984,11 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       TSCH_DEBUG_RX_EVENT();
 
       /* Wait until packet is received, turn radio off */
-        BUSYWAIT_UNTIL_ABS(!(NETSTACK_RADIO.receiving_packet()),
-            current_slot_start, wait_limit);
+        BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet()
+#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
+                              || (NETSTACK_RADIO.pending_packet() > 0)
+#endif
+                              ), current_slot_start, wait_limit);
         rx_end_time = RTIMER_NOW();
 
       TSCH_DEBUG_RX_EVENT();
@@ -965,6 +1003,11 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
           //    on jumming air, or hardware issue.
       } while( TSCH_HW_SPUROUS_RX && (NETSTACK_RADIO.pending_packet() > 0) );
       packet_seen = (current_input->len > 0);
+      if (!packet_seen){
+          // looks like some noise as on air. need to reser RF receiver to prepare
+          //    for next frame
+          tsch_radio_off(TSCH_RADIO_CMD_BREAK_NOISE_TIMESLOT);
+      }
     }
     if(packet_seen) {
         static int header_len;
