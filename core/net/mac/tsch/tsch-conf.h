@@ -246,6 +246,9 @@
 // denotes that radio can generate spurous RX events, or frames, while wait received
 //  packet. and this packets should be droped while last readen packet read.
 #define TSCH_HW_FEATURE_SPUROUS_RX  1
+// denotes that radio receive can be reset by TransmitPower reset. Else use
+//   ordinar radio.off
+#define TSCH_HW_FEATURE_BREAK_BY_POWER  2
 #ifdef TSCH_CONF_HW_FEATURE
 #define TSCH_HW_FEATURE TSCH_CONF_HW_FEATURE
 #else /* TSCH_CONF_HW_FEATURE */
