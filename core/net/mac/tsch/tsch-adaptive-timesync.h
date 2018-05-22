@@ -83,6 +83,8 @@
 #else
 #define TSCH_DRIFT_SYNC_ESTIMATE 0
 #endif
+//  this value allows faster learn times for statistics accumulation on new timesource
+#define TSCH_DRIFT_SYNC_ESTIMATE_FASTER_INIT   2
 
 // a handle for last_drift_ppm correction. invoke on learning in tsch_timesync_update
 //#define TSCH_TIMESYNC_ON_DRIFT(last_drift_ppm, time_delta_asn, drift_ticks) last_drift_ppm

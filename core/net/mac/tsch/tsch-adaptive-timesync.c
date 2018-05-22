@@ -98,8 +98,8 @@ uint32_t drift_accu = 0;
 static inline
 uint32_t drift1t_avg() {return drift_accu>>DRIFT_AVG2;};
 
-void drift1t_reset(){
-    drift_accu = 0;
+void drift1t_reset(int x){
+    drift_accu = (x) << DRIFT_AVG2;
 }
 
 void    drift1t_append(uint32_t error_time, uint32_t time_delta_asn) {
@@ -127,7 +127,7 @@ int tsch_timesync_estimate_sync_timeout(){
 }
 #else
 #define drift1t_append(x) (void)x
-#define drift1t_reset()
+#define drift1t_reset(x)
 #endif //TSCH_DRIFT_SYNC_ESTIMATE
 
 /*---------------------------------------------------------------------------*/
@@ -158,6 +158,14 @@ timesync_learn_drift_ticks(uint32_t time_delta_asn, int32_t drift_ticks)
 }
 /*---------------------------------------------------------------------------*/
 /* Either reset or update the neighbor's drift */
+unsigned tsch_timesync_learn_timeout(){
+#if (TSCH_DRIFT_SYNC_ESTIMATE & TSCH_DRIFT_SYNC_ESTIMATE_FASTER_INIT) != 0
+    if (timesync_entry_count < 4 )
+        return TSCH_SLOTS_PER_SECOND;
+#endif
+    return 4 * TSCH_SLOTS_PER_SECOND;
+}
+
 void
 tsch_timesync_update(struct tsch_neighbor *n, uint16_t time_delta_asn, int32_t drift_correction)
 {
@@ -170,10 +178,10 @@ tsch_timesync_update(struct tsch_neighbor *n, uint16_t time_delta_asn, int32_t d
     timesync_entry_count = 0;
     compensated_ticks = 0;
     asn_since_last_learning = 0;
-    drift1t_reset();
+    drift1t_reset(drift_correction);
   } else {
     asn_since_last_learning += time_delta_asn;
-    if(asn_since_last_learning >= 4 * TSCH_SLOTS_PER_SECOND) {
+    if( asn_since_last_learning >= tsch_timesync_learn_timeout() ) {
       timesync_learn_drift_ticks(asn_since_last_learning, drift_correction);
       compensated_ticks = 0;
       asn_since_last_learning = 0;
