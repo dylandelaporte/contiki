@@ -249,6 +249,9 @@
 // denotes that radio receive can be reset by TransmitPower reset. Else use
 //   ordinar radio.off
 #define TSCH_HW_FEATURE_BREAK_BY_POWER  2
+// denotes use radio.pending() as test for received packet.
+//      helpful when radio.receiving is not relyable
+#define TSCH_HW_FEATURE_RECV_BY_PENDING 4
 #ifdef TSCH_CONF_HW_FEATURE
 #define TSCH_HW_FEATURE TSCH_CONF_HW_FEATURE
 #else /* TSCH_CONF_HW_FEATURE */

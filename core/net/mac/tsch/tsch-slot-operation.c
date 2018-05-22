@@ -750,7 +750,11 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 
 #endif
               /* Wait for ACK to finish */
-              BUSYWAIT_UNTIL_ABS(!NETSTACK_RADIO.receiving_packet(),
+              BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet()
+#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
+                                  || NETSTACK_RADIO.pending_packet()
+#endif
+                                  ),
                                  ack_start_time, tsch_timing[tsch_ts_max_ack]+ RADIO_DELAY_BEFORE_RX);
               ack_len = 0;
               if (NETSTACK_RADIO.receiving_packet()){
@@ -971,8 +975,11 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       TSCH_DEBUG_RX_EVENT();
 
       /* Wait until packet is received, turn radio off */
-        BUSYWAIT_UNTIL_ABS(!(NETSTACK_RADIO.receiving_packet()),
-            current_slot_start, wait_limit);
+        BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet()
+#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
+                              || (NETSTACK_RADIO.pending_packet() > 0)
+#endif
+                              ), current_slot_start, wait_limit);
         rx_end_time = RTIMER_NOW();
 
       TSCH_DEBUG_RX_EVENT();
