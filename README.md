@@ -24,7 +24,7 @@ This fork improves:
 contiki core improves
 --------------------------------
 + rtime:
-    - [rtimer\_multiple\_access]
+    - [rtimer\_multiple\_access] - PR #1290
     - rtime\_expired() / RTIME\_EXPIRED
 
 + process\_abort() [add-proc-abort]
@@ -44,6 +44,10 @@ contiki core improves
     - [alexrayne-make-cpp] - DEBUG symbol pass to compiler
     - [fix-make-loose-objects] - prevent delete project objects that have deps but not included in contiki lib
     - [fix-alexrayne-cc26-srec] - fix srec make routine when  build on windows platform
+    - [bkozak/build_in_seperate_dir] - PR#1417 We can now set BUILDDIR to build in seperate dir
+    - [ivan-alekhin/customrules-fix] - Allow to search "customrules" in additional directories.
+    - [fix-make-dotpath] - ommits '.' dir in SOURCEDIRS if one alredy provided PROJECTDIRS
+     
 
 + [optimise-list-inlines] - core lists ontimisation by inlining code
 
@@ -52,7 +56,11 @@ contiki core improves
 - PR #2347 [fix-make-dotpath]
 - PR #2338 from tim-ist/bmp_fix
 - [ivan-alekhin/customrules-fix]
+- PR #1417 [bkozak/build\_in\_seperate\_dir] - We can now set BUILDDIR to build in seperate dir
 - [pengi/apps\_from\_platform] - Load platform before apps
+- PR #1265 [bkozak/optomize\_etimer\_implementation] - etimer_expired_at, timer_expired
+- PR #1290 [rtimer\_multiple\_access]
+- PR #2599 [lavr18-add-cc26-i2c] - Add board-i2c library for the launchpad 
 
 Work fo Launchpad cc26xx platform:
 -------------------------------
@@ -68,8 +76,10 @@ Work fo Launchpad cc26xx platform:
     * fixes over RF RAT timer sync vs core clock
     * RF cores features TSCH\_HW\_FEATURE\_xxx:
         - RF\_CORE\_CONF\_PENDING - a bit styles over pending receiving frames. Introduced RF\_CORE\_PENDING\_READS style - for more relyable pending receiver.
-    * RTC CH2 isr hander [cc26xx-add-rtc-isr-ch2]  
     * surropt RF prop mode RADIO\_PARAM\_LAST\_RSSI
+
+- RTC CH2 isr hander [cc26xx-add-rtc-isr-ch2]  
+
 - RTIMER\_CONF\_ARCH\_SECOND - provide RTC resolution setup. now tick of RTC can be setup
 
 - [bkozak/add\_rtimer\_multiple\_access] - import PR for rtimer safer work
@@ -129,7 +139,7 @@ more control on scheduler: [tsch-sched-disables]:
 - LINK\_OPTION\_DISABLE - allow turn off link softly, without rebuild frames structule
 - LINK\_OPTION\_IDLED\_AUTOOFF - provide autoset disable option when link inactive. for TX slots/
 - TSCH\_SCHEDULE\_OMMIT\_NOXFER - allows to skip slots that have no RX or TX links activity
-- tsch\_slot\_operation\_break\_before/invalidate - allows to force reschedule next slot by demant
+- tsch\_slot\_operation\_break\_before/invalidate [tsch-sched-invalidate] - allows to force reschedule next slot by demant
 - tsch\_slot\_operation\_stop -
 - tsch\_schedule\_link\_change\_option/addr - link option change on fly< no need to debulf frames
 - TSCH\_WITH\_LINK\_SELECTOR - allows to pass desired frame*timeslot in packet attributes PACKETBUF\_ATTR\_TSCH\_SLOTFRAME/TIMESLOT
@@ -157,6 +167,7 @@ improve adaptive TSCH frame period estimation via sync drift [tsch-adaptive_sync
 
 security keys:
 ---------------------------------------
+- [tsch-log-sec-keyid]
 - TSCH\_SEC\_KEY [tsch-sec-user] - provide user specified keys for packets encription
 - better sequrity error handling via tsch\_security\_secure\_packet - it provides errors tschERR\_UNSECURED/NOKEY, mac provide error MAC\_TX\_ERR\_SEC
 - [fix-tsch-sec-nonce]
@@ -170,10 +181,13 @@ fixes:
 
 +! [fix-tsch-seq-ffff] - fixes for net packet numbers ffff
 
++ [alexrayne-tsch-slot\_prep\_time] - RTIMER_GUARD now work on all slot ops, at tsch\_schedule\_slot\_operation. TSCH\_SCHEDULE\_AND\_YIELD now use for accurate positioninig in slot.
+
+
 some code optimisations:
 ---------------------------------------
 - [opt-tsch-frame802154\_has\_panid]
 - [tsch-rtime-optimise]
--+ [tsch-scan-share\_eb\_parse ] - code size optimise
--+ TSCH\_CONF\_H - introduced for lightweight code rebuild on tsch parameters change
-- tsch\_queue\_get\_time\_source [tsch-fast-gettimesrc] - fast implementation, not use search over nbr lis
+- [tsch-scan-share\_eb\_parse ] - code size optimise
+- +TSCH\_CONF\_H - introduced for lightweight code rebuild on tsch parameters change
+- tsch\_queue\_get\_time\_source [tsch-fast-gettimesrc] - fast implementation, not use search over nbr list
