@@ -18,6 +18,30 @@ For more information, see the Contiki website:
 
 [http://contiki-os.org](http://contiki-os.org)
 
+This fork (brief):
+============================
+This fork is born in project with TSCH net, star topology.
+ 
+Used frequent beacons - about 8/sec, for faster net association. Used multilevel frames - short, and long. This Frames interacts, so that activation short frame depends on long one.
+
+Syncronising with net was optimised by listen beacons as rare as possible, depends on estimation of drift by adaptive sync algorithm. This gives much power consumption economy.
+Therefore in adaptive sync was intoduced hooks on new estimation comes.  
+
+For association - provided more control over chanels list, and chanel hoping style. 
+
+Also multiple slots can be attached to work with single receiver, and with different protocols on different ports. 
+
+Used AES128 encription, but there was myltiple ports - wityhout encription, and different keys. 
+Such work demands some flexibility with encription of links and packets - reailised assigning key per recv/sender adress and port.   
+
+Has imroved cc26xx RFcore-prop driver. 
+Most important - provided power control, that use GLDO during receive. Linear LDO hav eless noise - and gives about 12db for SNR.
+
+Also improved ake system - it now can build in separate dir, and more clever on dependencies, and cache it.
+
+And other little work for core library, etimer and rtimer, cc26xx LPM, SPI ... 
+
+
 This fork improves:
 ============================
 
@@ -58,7 +82,7 @@ contiki core improves
 - [ivan-alekhin/customrules-fix]
 - PR #1417 [bkozak/build\_in\_seperate\_dir] - We can now set BUILDDIR to build in seperate dir
 - [pengi/apps\_from\_platform] - Load platform before apps
-- PR #1265 [bkozak/optomize\_etimer\_implementation] - etimer_expired_at, timer_expired
+- PR #1265 [bkozak/optomize\_etimer\_implementation] - etimer\_expired\_at, timer\_expired
 - PR #1290 [rtimer\_multiple\_access]
 - PR #2599 [lavr18-add-cc26-i2c] - Add board-i2c library for the launchpad 
 
@@ -132,6 +156,7 @@ TSCH association control [tsch-scan-flex]:
 - fixes on assosianiton proc:
     + [alexrayne-tsch-scan-yelds]
 - add events JOINING/LEAVING\_NETWORK callbacks invoke on coordinator start, disassociate [fix-tsch-cb-leave]     
+- TSCH\_CONF\_SEQ\_FROMRT - provides initialisation packet seq from RTC [tsch-seq-from-rt]
 
 more control on scheduler: [tsch-sched-disables]:
 -------------------------------------------
@@ -163,7 +188,7 @@ improve adaptive TSCH frame period estimation via sync drift [tsch-adaptive_sync
 ---------------------------------------
 - TSCH\_DRIFT\_SYNC\_ESTIMATE - allow rarely listen EB beacons for sync, for lower power consumption.
 - TSCH\_TIMESYNC\_ON\_DRIFT(...) - provides user handle on drift sync extimation 
-- [alexrayne-tsch-drift_fail_protect] - when RF RAT timer unsync with  core clock, measured sync drift may be disaster. this is detects it, and resync RAT. 
+- [alexrayne-tsch-drift\_fail\_protect] - when RF RAT timer unsync with  core clock, measured sync drift may be disaster. this is detects it, and resync RAT. 
 
 security keys:
 ---------------------------------------
@@ -171,7 +196,6 @@ security keys:
 - TSCH\_SEC\_KEY [tsch-sec-user] - provide user specified keys for packets encription
 - better sequrity error handling via tsch\_security\_secure\_packet - it provides errors tschERR\_UNSECURED/NOKEY, mac provide error MAC\_TX\_ERR\_SEC
 - [fix-tsch-sec-nonce]
--+ TSCH\_CONF\_SEQ\_FROMRT - provides initialisation packet seq from RTC [tsch-seq-from-rt]
 
 fixes:
 ---------------------------------------
@@ -181,7 +205,7 @@ fixes:
 
 +! [fix-tsch-seq-ffff] - fixes for net packet numbers ffff
 
-+ [alexrayne-tsch-slot\_prep\_time] - RTIMER_GUARD now work on all slot ops, at tsch\_schedule\_slot\_operation. TSCH\_SCHEDULE\_AND\_YIELD now use for accurate positioninig in slot.
++ [alexrayne-tsch-slot\_prep\_time] - RTIMER\_GUARD now work on all slot ops, at tsch\_schedule\_slot\_operation. TSCH\_SCHEDULE\_AND\_YIELD now use for accurate positioninig in slot.
 
 
 some code optimisations:
