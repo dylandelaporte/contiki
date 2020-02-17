@@ -33,29 +33,28 @@
 #ifndef CONTIKI_CONF_H_
 #define CONTIKI_CONF_H_
 
+/* include the project config */
+#ifdef PROJECT_CONF_PATH
+#include PROJECT_CONF_PATH
+#endif /* PROJECT_CONF_PATH */
+
 #ifdef INCLUDE_SUBPLATFORM_CONF
 #include "subplatform-conf.h"
 #endif /* INCLUDE_SUBPLATFORM_CONF */
 
-#define PROFILE_CONF_ON 0
-#define ENERGEST_CONF_ON 0
+#define PLATFORM_CONF_PROVIDES_MAIN_LOOP 1
+
 #define LOG_CONF_ENABLED 1
-#define RIMESTATS_CONF_ON 1
-#define RIMESTATS_CONF_ENABLED 1
 
 #define COOJA 1
+
+#define ASSERT_CONF_RETURNS  1
 
 #ifndef EEPROM_CONF_SIZE
 #define EEPROM_CONF_SIZE				1024
 #endif
 
 #define w_memcpy memcpy
-
-#if NETSTACK_CONF_WITH_IPV4
-#if NETSTACK_CONF_WITH_IPV6
-#error NETSTACK_CONF_WITH_IPV4 && NETSTACK_CONF_WITH_IPV6: Bad configuration
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-#endif /* NETSTACK_CONF_WITH_IPV4 */
 
 #ifdef NETSTACK_CONF_H
 
@@ -67,127 +66,42 @@
 #else /* NETSTACK_CONF_H */
 
 /* Default network config */
-#if NETSTACK_CONF_WITH_IPV6
-
-#define NULLRDC_CONF_802154_AUTOACK  1
-#define NULLRDC_CONF_SEND_802154_ACK 1
-#define NULLRDC_CONF_ACK_WAIT_TIME                RTIMER_SECOND / 500
-#define NULLRDC_CONF_AFTER_ACK_DETECTED_WAIT_TIME 0
-
-
-/* Network setup for IPv6 */
-#define NETSTACK_CONF_NETWORK       sicslowpan_driver
-#define NETSTACK_CONF_MAC           csma_driver
-#define NETSTACK_CONF_RDC           nullrdc_driver
-#define NETSTACK_CONF_RADIO         cooja_radio_driver
-#define NETSTACK_CONF_FRAMER        framer_802154
-
-#else /* NETSTACK_CONF_WITH_IPV6 */
-
-#if NETSTACK_CONF_WITH_IPV4
-
-/* Network setup for IPv4 */
-#define NETSTACK_CONF_NETWORK rime_driver /* NOTE: uip_over_mesh. else: uip_driver */
-#define NETSTACK_CONF_MAC nullmac_driver
-#define NETSTACK_CONF_RDC nullrdc_driver
-#define NETSTACK_CONF_RADIO cooja_radio_driver
-#define UIP_CONF_IP_FORWARD           1
-
-#else /* NETSTACK_CONF_WITH_IPV4 */
-
-/* Network setup for Rime */
-#define NETSTACK_CONF_NETWORK rime_driver
-#define NETSTACK_CONF_MAC csma_driver
-#define NETSTACK_CONF_RDC nullrdc_driver
-#define NETSTACK_CONF_RADIO cooja_radio_driver
-/*#define NETSTACK_CONF_FRAMER framer_nullmac*/
-
-#endif /* NETSTACK_CONF_WITH_IPV4 */
-#endif /* NETSTACK_CONF_WITH_IPV6 */
+#define CSMA_CONF_SEND_SOFT_ACK 1
+#define CSMA_CONF_ACK_WAIT_TIME                RTIMER_SECOND / 500
+#define CSMA_CONF_AFTER_ACK_DETECTED_WAIT_TIME 0
 
 #endif /* NETSTACK_CONF_H */
 
-#define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
+/* Radio setup */
+#define NETSTACK_CONF_RADIO cooja_radio_driver
 
 /* Default network config */
 #if NETSTACK_CONF_WITH_IPV6
 
 
-
-/* Network setup for IPv6 */
-#define NETSTACK_CONF_NETWORK       sicslowpan_driver
-#define NETSTACK_CONF_MAC           csma_driver
-#define NETSTACK_CONF_RDC           nullrdc_driver
-#define NETSTACK_CONF_RADIO         cooja_radio_driver
-#define NETSTACK_CONF_FRAMER        framer_802154
-#define NETSTACK_CONF_WITH_IPV6               1
-
-#define LINKADDR_CONF_SIZE          8
-
-#define UIP_CONF_LL_802154          1
-#define UIP_CONF_LLH_LEN            0
-
-#define UIP_CONF_ROUTER             1
-
-/* configure number of neighbors and routes */
+/* configure network size and density */
+#ifndef NETSTACK_MAX_ROUTE_ENTRIES
+#define NETSTACK_MAX_ROUTE_ENTRIES   300
+#endif /* NETSTACK_MAX_ROUTE_ENTRIES */
 #ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS     300
+#define NBR_TABLE_CONF_MAX_NEIGHBORS 300
 #endif /* NBR_TABLE_CONF_MAX_NEIGHBORS */
-#ifndef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES   300
-#endif /* UIP_CONF_MAX_ROUTES */
-#ifndef RPL_NS_CONF_LINK_NUM
-#define RPL_NS_CONF_LINK_NUM 300
-#endif /* RPL_NS_CONF_LINK_NUM */
 
-#define TCPIP_CONF_ANNOTATE_TRANSMISSIONS 1
-
-#ifndef UIP_CONF_ND6_SEND_RA
-#define UIP_CONF_ND6_SEND_RA		0
-#endif
-
-#ifndef UIP_CONF_ND6_REACHABLE_TIME
-#define UIP_CONF_ND6_REACHABLE_TIME     600000
-#endif
-
-#ifndef UIP_CONF_ND6_RETRANS_TIMER
-#define UIP_CONF_ND6_RETRANS_TIMER      10000
-#endif
-
-#define LINKADDR_CONF_SIZE            8
-#define UIP_CONF_NETIF_MAX_ADDRESSES  3
+/* configure queues */
+#ifndef QUEUEBUF_CONF_NUM
+#define QUEUEBUF_CONF_NUM 64
+#endif /* QUEUEBUF_CONF_NUM */
 
 #ifndef UIP_CONF_IPV6_QUEUE_PKT
 #define UIP_CONF_IPV6_QUEUE_PKT         1
 #endif /* UIP_CONF_IPV6_QUEUE_PKT */
-#define UIP_CONF_IPV6_CHECKS            1
-#define UIP_CONF_IPV6_REASSEMBLY        0
-#define UIP_CONF_NETIF_MAX_ADDRESSES    3
-#define UIP_CONF_IP_FORWARD             0
-
-#define SICSLOWPAN_CONF_COMPRESSION             SICSLOWPAN_COMPRESSION_HC06
-#ifndef SICSLOWPAN_CONF_FRAG
-#define SICSLOWPAN_CONF_FRAG                    1
-#define SICSLOWPAN_CONF_MAXAGE                  8
-#endif /* SICSLOWPAN_CONF_FRAG */
-#define SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS       2
 
 #endif /* NETSTACK_CONF_WITH_IPV6 */
-
-
-#define PACKETBUF_CONF_ATTRS_INLINE 1
-
-#ifndef QUEUEBUF_CONF_NUM
-#define QUEUEBUF_CONF_NUM 16
-#endif
 
 #define CC_CONF_REGISTER_ARGS          1
 #define CC_CONF_FUNCTION_POINTER_ARGS  1
 #define CC_CONF_VA_ARGS                1
 #define CC_CONF_INLINE inline
-
-#define CCIF
-#define CLIF
 
 /* These names are deprecated, use C99 names. */
 #include <inttypes.h>
@@ -200,65 +114,54 @@ typedef unsigned short uip_stats_t;
 
 #define CLOCK_CONF_SECOND 1000L
 typedef unsigned long clock_time_t;
-typedef uint64_t rtimer_clock_t;
-#define RTIMER_CLOCK_DIFF(a,b)     ((int64_t)((a)-(b)))
 
+/* Use 64-bit rtimer (default in Contiki-NG is 32) */
+#define RTIMER_CONF_CLOCK_SIZE 8
+
+/* 1 len byte, 2 bytes CRC */
+#define RADIO_PHY_OVERHEAD         3
+/* 250kbps data rate. One byte = 32us */
+#define RADIO_BYTE_AIR_TIME       32
 #define RADIO_DELAY_BEFORE_TX 0
 #define RADIO_DELAY_BEFORE_RX 0
 #define RADIO_DELAY_BEFORE_DETECT 0
 
-#define AODV_COMPLIANCE
-#define AODV_NUM_RT_ENTRIES 32
-
-#define WITH_ASCII 1
-
-#define UIP_CONF_ICMP_DEST_UNREACH 1
-
-#define UIP_CONF_DHCP_LIGHT
-#define UIP_CONF_LLH_LEN         0
-#define UIP_CONF_MAX_CONNECTIONS 4
-#define UIP_CONF_MAX_LISTENPORTS 8
-#define UIP_CONF_UDP_CONNS       12
-#define UIP_CONF_FWCACHE_SIZE    30
-#define UIP_CONF_BROADCAST       1
 #define UIP_ARCH_IPCHKSUM        1
-#define UIP_CONF_UDP             1
-#define UIP_CONF_UDP_CHECKSUMS   1
-#define UIP_CONF_PINGADDRCONF    0
-#define UIP_CONF_LOGGING         0
 
-#define UIP_CONF_TCP_SPLIT       0
-
-#if NETSTACK_CONF_WITH_IPV6
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-
-/* Turn off example-provided putchars */
-#define SLIP_BRIDGE_CONF_NO_PUTCHAR 1
-
+#if MAC_CONF_WITH_TSCH
+/* A bug in cooja causes many EBs to be missed at scan. Increase EB
+   frequency to shorten the join process */
+#undef TSCH_CONF_EB_PERIOD
+#define TSCH_CONF_EB_PERIOD (4 * CLOCK_SECOND)
+#undef TSCH_CONF_MAX_EB_PERIOD
+#define TSCH_CONF_MAX_EB_PERIOD (4 * CLOCK_SECOND)
+#endif /* MAC_CONF_WITH_TSCH */
 
 #define CFS_CONF_OFFSET_TYPE	long
 
-#ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE            1600
-#endif
+#define PLATFORM_CONF_SUPPORTS_STACK_CHECK  0
 
-#ifndef UIP_CONF_TCP_MSS
-#define UIP_CONF_TCP_MSS                (UIP_CONF_BUFFER_SIZE - 70)
-#endif
+/*---------------------------------------------------------------------------*/
+/* Support for the new GPIO HAL */
+#define GPIO_HAL_CONF_ARCH_HDR_PATH      "dev/gpio-hal-arch.h"
+#define GPIO_HAL_CONF_ARCH_SW_TOGGLE     1
+#define GPIO_HAL_CONF_PORT_PIN_NUMBERING 0
+#define GPIO_HAL_CONF_PIN_COUNT          4
 
-#ifndef UIP_CONF_RECEIVE_WINDOW
-#define UIP_CONF_RECEIVE_WINDOW         (UIP_CONF_BUFFER_SIZE - 70)
-#endif
+/* Virtual LED pins 0, 1, 2 (Green, Red, Yellow) */
+#define COOJA_LED_GREEN_PIN              0
+#define COOJA_LED_RED_PIN                1
+#define COOJA_LED_YELLOW_PIN             2
 
-#define RF_CHANNEL                     26
-#define IEEE802154_CONF_PANID          0xABCD
-#define NETSTACK_RADIO_MAX_PAYLOAD_LEN 125
+/* Virtual button on pin 3 */
+#define COOJA_BTN_PIN                    3
 
-/* include the project config */
-/* PROJECT_CONF_H might be defined in the project Makefile */
-#ifdef PROJECT_CONF_H
-#include PROJECT_CONF_H
-#endif /* PROJECT_CONF_H */
-
-
+#define BUTTON_HAL_CONF_DEBOUNCE_DURATION 0
+/*---------------------------------------------------------------------------*/
+/* Virtual LED colors */
+#define LEDS_CONF_COUNT                  3
+#define LEDS_CONF_GREEEN                 1
+#define LEDS_CONF_RED                    2
+#define LEDS_CONF_YELLOW                 4
+/*---------------------------------------------------------------------------*/
 #endif /* CONTIKI_CONF_H_ */

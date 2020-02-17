@@ -37,13 +37,22 @@
 #include "lib/simEnvChange.h"
 
 #include "net/packetbuf.h"
-#include "net/rime/rimestats.h"
 #include "net/netstack.h"
 
 #include "dev/radio.h"
 #include "dev/cooja-radio.h"
 
-#define COOJA_RADIO_BUFSIZE PACKETBUF_SIZE
+/*
+ * The maximum number of bytes this driver can accept from the MAC layer for
+ * transmission or will deliver to the MAC layer after reception. Includes
+ * the MAC header and payload, but not the FCS.
+ */
+#ifdef COOJA_RADIO_CONF_BUFSIZE
+#define COOJA_RADIO_BUFSIZE COOJA_RADIO_CONF_BUFSIZE
+#else
+#define COOJA_RADIO_BUFSIZE 125
+#endif
+
 #define CCA_SS_THRESHOLD -95
 
 const struct simInterface radio_interface;
@@ -173,7 +182,6 @@ radio_read(void *buf, unsigned short bufsize)
   }
   if(bufsize < simInSize) {
     simInSize = 0; /* rx flush */
-    RIMESTATS_ADD(toolong);
     return 0;
   }
 
@@ -248,6 +256,9 @@ radio_send(const void *payload, unsigned short payload_len)
 static int
 prepare_packet(const void *data, unsigned short len)
 {
+  if(len > COOJA_RADIO_BUFSIZE) {
+    return RADIO_TX_ERR;
+  }
   pending_data = data;
   return 0;
 }
@@ -290,7 +301,7 @@ PROCESS_THREAD(cooja_radio_process, ev, data)
     len = radio_read(packetbuf_dataptr(), PACKETBUF_SIZE);
     if(len > 0) {
       packetbuf_set_datalen(len);
-      NETSTACK_RDC.input();
+      NETSTACK_MAC.input();
     }
   }
 
@@ -331,6 +342,13 @@ get_value(radio_param_t param, radio_value_t *value)
     return RADIO_RESULT_OK;
   case RADIO_PARAM_LAST_LINK_QUALITY:
     *value = simLQI;
+    return RADIO_RESULT_OK;
+  case RADIO_PARAM_RSSI:
+    /* return a fixed value depending on the channel */
+    *value = -90 + simRadioChannel - 11;
+    return RADIO_RESULT_OK;
+  case RADIO_CONST_MAX_PAYLOAD_LEN:
+    *value = (radio_value_t)COOJA_RADIO_BUFSIZE;
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;

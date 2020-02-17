@@ -42,7 +42,7 @@
 #include "aql.h"
 
 #define DEBUG   DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 static unsigned char char_buf[DB_MAX_CHAR_SIZE_PER_ROW];
 static uint8_t next_free_offset;
@@ -88,6 +88,21 @@ aql_clear(aql_adt_t *adt)
   adt->value_count = 0;
   adt->flags = 0;
   memset(adt->aggregators, 0, sizeof(adt->aggregators));
+}
+
+db_result_t
+aql_add_relation(aql_adt_t *adt, const char *name)
+{
+  if(adt->relation_count >= AQL_RELATION_LIMIT) {
+    return DB_LIMIT_ERROR;
+  }
+
+  strncpy(adt->relations[adt->relation_count], name,
+	  sizeof(adt->relations[0]) - 1);
+  adt->relations[adt->relation_count][sizeof(adt->relations[0]) - 1] = '\0';
+  adt->relation_count++;
+
+  return DB_OK;
 }
 
 db_result_t

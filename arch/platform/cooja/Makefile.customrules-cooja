@@ -10,21 +10,13 @@ CUSTOM_RULE_LINK=1
 
 REDEF_PRINTF=1 # Redefine functions to enable printf()s inside Cooja
 
-# NB: Assumes ARCHIVE was not overridden and is in $(OBJECTDIR)
+# NB: Assumes ARCHIVE was not overridden and is in $(BUILD_DIR_BOARD)
 $(ARCHIVE): $(CONTIKI_OBJECTFILES) | $(OBJECTDIR)
 	$(AR_COMMAND_1) $^ $(AR_COMMAND_2)
 
-# NB: Assumes JNILIB was not overridden and is in $(OBJECTDIR)
+# NB: Assumes JNILIB was not overridden and is in $(BUILD_DIR_BOARD)
 $(JNILIB): $(CONTIKI_APP_OBJ) $(MAIN_OBJ) $(PROJECT_OBJECTFILES) $(ARCHIVE) | $(OBJECTDIR)
-ifdef SYMBOLS
-	@echo Generating symbols
-	# Recreate symbols file and relink with final memory layout (twice)
-	${CONTIKI}/tools/make-symbols-nm $(JNILIB)
-	$(CC) $(CFLAGS) -c symbols.c -o $(OBJECTDIR)/symbols.o
-	$(LINK_COMMAND_1) $^ $(LINK_COMMAND_2)
-	${CONTIKI}/tools/make-symbols-nm $(JNILIB)
-	$(CC) $(CFLAGS) -c symbols.c -o $(OBJECTDIR)/symbols.o
-endif ## SYMBOLS
+
 ifdef REDEF_PRINTF
 	@echo Redefining printf
 	-$(foreach OBJ,$^, $(OBJCOPY) --redefine-sym printf=log_printf $(OBJ); )
@@ -40,10 +32,5 @@ $(CONTIKI_APP).cooja: $(JNILIB)
 
 # Trickiness: GNU make matches this against the file base name.
 # Assume that the directory part is the standard location.
-mtype%.o: contiki-cooja-main.o | $(OBJECTDIR)
-	mv contiki-cooja-main.o $@
-
-symbols.c:
-	# Create initial symbol files if not existing
-	cp ${CONTIKI}/tools/empty-symbols.c symbols.c
-	cp ${CONTIKI}/tools/empty-symbols.h symbols.h
+mtype%.o: platform.o | $(OBJECTDIR)
+	mv platform.o $@

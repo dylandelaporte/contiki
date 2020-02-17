@@ -43,6 +43,8 @@
 #include "contiki.h"
 #include "sys/etimer.h"
 
+#include "node-id-z1.h"
+
 #include <stdio.h>
 
 static struct etimer etimer;

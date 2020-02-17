@@ -1,28 +1,20 @@
-DEFINES+=PROJECT_CONF_H=\"project-conf.h\"
-
 CONTIKI_PROJECT = sensniff
+CONTIKI = ../..
 
-PROJECT_SOURCEFILES += sensniff-rdc.c netstack.c
-PROJECTDIRS += pool $(TARGET)
+PLATFORMS_ONLY = cc2538dk openmote z1 zoul cc26x0-cc13x0 jn516x simplelink
 
-ifeq ($(TARGET),)
-  -include Makefile.target
-  ifeq ($(TARGET),)
-    TARGET=srf06-cc26xx
-    $(info TARGET not defined, using target $(TARGET))
-  endif
-endif
+PROJECT_SOURCEFILES += sensniff-mac.c netstack.c
+MODULES_REL += pool $(TARGET)
 
-CONTIKI_WITH_RIME = 1
-
-### Optionally, the target can add its own Makefile, to do things like e.g.
-### add more source files to the build or define make variables.
--include $(TARGET)/Makefile.$(TARGET)
+include $(CONTIKI)/Makefile.identify-target
 
 all: $(CONTIKI_PROJECT)
 
-CONTIKI = ../..
-include $(CONTIKI)/Makefile.include
+# Disable all networking layer 3 upwards 
+MAKE_NET=MAKE_NET_NULLNET
+
+# use a custom MAC driver: sensniff_mac_driver
+MAKE_MAC = MAKE_MAC_OTHER
 
 PYTHON ?= python
 SENSNIFF = $(CONTIKI)/tools/sensniff/sensniff.py
@@ -36,6 +28,8 @@ SENSNIFF_FLAGS += -b $(BAUDRATE)
 ifneq ($(PORT),)
   SENSNIFF_FLAGS += -d $(PORT)
 endif
+
+include $(CONTIKI)/Makefile.include
 
 sniff:
 ifeq ($(wildcard $(SENSNIFF)), )

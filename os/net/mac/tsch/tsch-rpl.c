@@ -35,24 +35,38 @@
  * \author Simon Duquennoy <simonduq@sics.se>
  */
 
-#if UIP_CONF_IPV6_RPL
+/**
+ * \addtogroup tsch
+ * @{
+*/
 
 #include "contiki.h"
-#include "net/rpl/rpl.h"
-#include "net/rpl/rpl-private.h"
+
+#if UIP_CONF_IPV6_RPL
+
+#include "net/routing/routing.h"
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-private.h"
-#include "net/mac/tsch/tsch-schedule.h"
-#include "net/mac/tsch/tsch-log.h"
-#include "tsch-rpl.h"
+#include "net/link-stats.h"
 
-#if TSCH_LOG_LEVEL >= 1
-#define DEBUG DEBUG_PRINT
-#else /* TSCH_LOG_LEVEL */
-#define DEBUG DEBUG_NONE
-#endif /* TSCH_LOG_LEVEL */
-#include "net/net-debug.h"
+#if ROUTING_CONF_RPL_LITE
+#include "net/routing/rpl-lite/rpl.h"
+#elif ROUTING_CONF_RPL_CLASSIC
+#include "net/routing/rpl-classic/rpl.h"
+#include "net/routing/rpl-classic/rpl-private.h"
+#endif
 
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "TSCH RPL"
+#define LOG_LEVEL LOG_LEVEL_MAC
+
+/*---------------------------------------------------------------------------*/
+/* To use, set #define TSCH_CALLBACK_KA_SENT tsch_rpl_callback_ka_sent */
+void
+tsch_rpl_callback_ka_sent(int status, int transmissions)
+{
+  NETSTACK_ROUTING.link_callback(packetbuf_addr(PACKETBUF_ADDR_RECEIVER), status, transmissions);
+}
 /*---------------------------------------------------------------------------*/
 /* To use, set #define TSCH_CALLBACK_JOINING_NETWORK tsch_rpl_callback_joining_network */
 void
@@ -66,30 +80,46 @@ tsch_rpl_callback_joining_network(void)
 void
 tsch_rpl_callback_leaving_network(void)
 {
-  rpl_dag_t *dag = rpl_get_any_dag();
-  if(dag != NULL) {
-    rpl_local_repair(dag->instance);
-  }
+  /* Forget past link statistics. If we are leaving a TSCH
+  network, there are changes we've been out of sync in the recent past, and
+  as a result have irrelevant link statistices. */
+  link_stats_reset();
+  /* RPL local repair */
+  NETSTACK_ROUTING.local_repair("TSCH leaving");
 }
 /*---------------------------------------------------------------------------*/
 /* Set TSCH EB period based on current RPL DIO period.
  * To use, set #define RPL_CALLBACK_NEW_DIO_INTERVAL tsch_rpl_callback_new_dio_interval */
 void
-tsch_rpl_callback_new_dio_interval(uint8_t dio_interval)
+tsch_rpl_callback_new_dio_interval(clock_time_t dio_interval)
 {
   /* Transmit EBs only if we have a valid rank as per 6TiSCH minimal */
-  rpl_dag_t *dag = rpl_get_any_dag();
-  if(dag != NULL && dag->rank != INFINITE_RANK) {
+  rpl_dag_t *dag;
+  rpl_rank_t root_rank;
+  rpl_rank_t dag_rank;
+#if ROUTING_CONF_RPL_LITE
+  dag = &curr_instance.dag;
+  root_rank = ROOT_RANK;
+  dag_rank = DAG_RANK(dag->rank);
+#else
+  rpl_instance_t *instance;
+  dag = rpl_get_any_dag();
+  instance = dag != NULL ? dag->instance : NULL;
+  root_rank = ROOT_RANK(instance);
+  dag_rank = DAG_RANK(dag->rank, instance);
+#endif
+
+  if(dag != NULL && dag->rank != RPL_INFINITE_RANK) {
     /* If we are root set TSCH as coordinator */
-    if(dag->rank == ROOT_RANK(dag->instance)) {
+    if(dag->rank == root_rank) {
       tsch_set_coordinator(1);
     }
     /* Set EB period */
-    tsch_set_eb_period((CLOCK_SECOND * 1UL << dag->instance->dio_intcurrent) / 1000);
+    tsch_set_eb_period(dio_interval);
     /* Set join priority based on RPL rank */
-    tsch_set_join_priority(DAG_RANK(dag->rank, dag->instance) - 1);
+    tsch_set_join_priority(dag_rank - 1);
   } else {
-    tsch_set_eb_period(0);
+    tsch_set_eb_period(TSCH_EB_PERIOD);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -98,10 +128,21 @@ tsch_rpl_callback_new_dio_interval(uint8_t dio_interval)
 void
 tsch_rpl_callback_parent_switch(rpl_parent_t *old, rpl_parent_t *new)
 {
-  if(tsch_is_associated == 1) {
+  /* Map the TSCH time source on the RPL preferred parent (but stick to the
+   * current time source if there is no preferred aarent) */
+  if(tsch_is_associated == 1 && new != NULL) {
     tsch_queue_update_time_source(
       (const linkaddr_t *)uip_ds6_nbr_lladdr_from_ipaddr(
-        rpl_get_parent_ipaddr(new)));
+        rpl_parent_get_ipaddr(new)));
   }
 }
+/*---------------------------------------------------------------------------*/
+/* Check RPL has joined DODAG.
+ * To use, set #define TSCH_RPL_CHECK_DODAG_JOINED tsch_rpl_check_dodag_joined */
+int
+tsch_rpl_check_dodag_joined(void)
+{
+  return NETSTACK_ROUTING.node_has_joined();
+}
 #endif /* UIP_CONF_IPV6_RPL */
+/** @} */

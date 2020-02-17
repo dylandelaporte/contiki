@@ -32,7 +32,7 @@
 #ifndef IP64_NULL_DRIVER_H
 #define IP64_NULL_DRIVER_H
 
-#include "ip64-driver.h"
+#include "ip64/ip64-driver.h"
 
 extern const struct ip64_driver ip64_null_driver;
 

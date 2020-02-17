@@ -31,7 +31,7 @@
 #include "contiki.h"
 #include "contiki-net.h"
 
-#include "dev/spi.h"
+#include "dev/spi-legacy.h"
 #include "cc2420.h"
 #include "isr_compat.h"
 
@@ -50,13 +50,9 @@
 /*---------------------------------------------------------------------------*/
 ISR(CC2420_IRQ, cc2420_port1_interrupt)
 {
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
-
   if(cc2420_interrupt()) {
     LPM4_EXIT;
   }
-
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 void

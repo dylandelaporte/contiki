@@ -42,28 +42,23 @@
  *         Domenico De Guglielmo <d.deguglielmo@iet.unipi.it >
  */
 
+/**
+ * \addtogroup tsch
+ * @{
+*/
+
 #include "contiki.h"
 #include "lib/list.h"
 #include "lib/memb.h"
 #include "lib/random.h"
 #include "net/queuebuf.h"
-#include "net/mac/rdc.h"
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-private.h"
-#include "net/mac/tsch/tsch-queue.h"
-#include "net/mac/tsch/tsch-schedule.h"
-#include "net/mac/tsch/tsch-slot-operation.h"
-#include "net/mac/tsch/tsch-log.h"
 #include <string.h>
 
-#if TSCH_LOG_LEVEL >= 1
-#undef DEBUG
-#define DEBUG DEBUG_PRINT
-#else /* TSCH_LOG_LEVEL */
-#undef DEBUG
-#define DEBUG DEBUG_NONE
-#endif /* TSCH_LOG_LEVEL */
-#include "net/net-debug.h"
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "TSCH Queue"
+#define LOG_LEVEL LOG_LEVEL_MAC
 
 /* Check if TSCH_QUEUE_NUM_PER_NEIGHBOR is power of two */
 #if (TSCH_QUEUE_NUM_PER_NEIGHBOR & (TSCH_QUEUE_NUM_PER_NEIGHBOR - 1)) != 0
@@ -166,6 +161,8 @@ tsch_queue_update_time_source(const linkaddr_t *new_addr)
         }
         n_time_source = new_time_src;
 
+        tsch_stats_reset_neighbor_stats();
+
 #ifdef TSCH_CALLBACK_NEW_TIME_SOURCE
         TSCH_CALLBACK_NEW_TIME_SOURCE(old_time_src, new_time_src);
 #endif
@@ -186,9 +183,7 @@ tsch_queue_flush_nbr_queue(struct tsch_neighbor *n)
     if(p != NULL) {
       /* Set return status for packet_sent callback */
       p->ret = MAC_TX_ERR;
-      TSCH_LOG_ADD(tsch_log_text,
-          log->text = "TSCH-queue:! flushing packet\n";
-      );
+      LOG_WARN("! flushing packet\n");
       /* Call packet_sent callback */
       mac_call_sent_callback(p->sent, p->ptr, p->ret, p->transmissions);
       /* Free packet queuebuf */
@@ -226,11 +221,22 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
 /*---------------------------------------------------------------------------*/
 /* Add packet to neighbor queue. Use same lockfree implementation as ringbuf.c (put is atomic) */
 struct tsch_packet *
-tsch_queue_add_packet(const linkaddr_t *addr, mac_callback_t sent, void *ptr)
+tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
+                      mac_callback_t sent, void *ptr)
 {
   struct tsch_neighbor *n = NULL;
   int16_t put_index = -1;
   struct tsch_packet *p = NULL;
+
+#ifdef TSCH_CALLBACK_PACKET_READY
+  /* The scheduler provides a callback which sets the timeslot and other attributes */
+  if(TSCH_CALLBACK_PACKET_READY() < 0) {
+    /* No scheduled slots for the packet available; drop it early to save queue space. */
+    LOG_DBG("tsch_queue_add_packet(): rejected by the scheduler\n");
+    return NULL;
+  }
+#endif
+
   if(!tsch_is_locked()) {
     n = tsch_queue_add_nbr(addr);
     if(n != NULL) {
@@ -248,10 +254,11 @@ tsch_queue_add_packet(const linkaddr_t *addr, mac_callback_t sent, void *ptr)
             p->ptr = ptr;
             p->ret = MAC_TX_DEFERRED;
             p->transmissions = 0;
+            p->max_transmissions = max_transmissions;
             /* Add to ringbuf (actual add committed through atomic operation) */
             n->tx_array[put_index] = p;
             ringbufindex_put(&n->tx_ringbuf);
-            TSCH_LOGF("TSCH-queue:for %lx is added packet=%p[%u/%u]\n"
+            TSCH_DBG("TSCH-queue:for %lx is added packet=%p[%u/%u]\n"
                         , TSCH_LOG_ID_FROM_LINKADDR(addr)
                         , (long)p, put_index
                         , ringbufindex_elements(&n->tx_ringbuf)
@@ -273,6 +280,13 @@ tsch_queue_add_packet(const linkaddr_t *addr, mac_callback_t sent, void *ptr)
       log->packet.qb    = p ? p->qb : NULL;
   );
   return 0;
+}
+/*---------------------------------------------------------------------------*/
+/* Returns the number of packets currently in any TSCH queue */
+int
+tsch_queue_global_packet_count(void)
+{
+  return QUEUEBUF_NUM - memb_numfree(&packet_memb);
 }
 /*---------------------------------------------------------------------------*/
 /* Returns the number of packets currently in the queue */
@@ -298,7 +312,7 @@ tsch_queue_remove_packet_from_queue(struct tsch_neighbor *n)
       /* Get and remove packet from ringbuf (remove committed through an atomic operation */
       int16_t get_index = ringbufindex_get(&n->tx_ringbuf);
       if(get_index != -1) {
-          TSCH_PRINTF("TSCH-queue: packet is removed, get_index=%u\n", get_index);
+          LOG_DBG("TSCH-queue: packet is removed, get_index=%u\n", get_index);
         return n->tx_array[get_index];
       } else {
         return NULL;
@@ -316,6 +330,49 @@ tsch_queue_free_packet(struct tsch_packet *p)
     queuebuf_free(p->qb);
     memb_free(&packet_memb, p);
   }
+}
+/*---------------------------------------------------------------------------*/
+/* Updates neighbor queue state after a transmission */
+int
+tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
+                      struct tsch_link *link, uint8_t mac_tx_status)
+{
+  int in_queue = 1;
+  int is_shared_link = link->link_options & LINK_OPTION_SHARED;
+  int is_unicast = !n->is_broadcast;
+
+  if(mac_tx_status == MAC_TX_OK) {
+    /* Successful transmission */
+    tsch_queue_remove_packet_from_queue(n);
+    in_queue = 0;
+
+    /* Update CSMA state in the unicast case */
+    if(is_unicast) {
+      if(is_shared_link || tsch_queue_is_empty(n)) {
+        /* If this is a shared link, reset backoff on success.
+         * Otherwise, do so only is the queue is empty */
+        tsch_queue_backoff_reset(n);
+      }
+    }
+  } else {
+    /* Failed transmission */
+    if(p->transmissions >= p->max_transmissions) {
+      /* Drop packet */
+      tsch_queue_remove_packet_from_queue(n);
+      in_queue = 0;
+    }
+    /* Update CSMA state in the unicast case */
+    if(is_unicast) {
+      /* Failures on dedicated (== non-shared) leave the backoff
+       * window nor exponent unchanged */
+      if(is_shared_link) {
+        /* Shared link: increment backoff exponent, pick a new window */
+        tsch_queue_backoff_inc(n);
+      }
+    }
+  }
+
+  return in_queue;
 }
 /*---------------------------------------------------------------------------*/
 /* Flush all neighbor queues */
@@ -502,3 +559,4 @@ tsch_queue_init(void)
   n_broadcast = tsch_queue_add_nbr(&tsch_broadcast_address);
 }
 /*---------------------------------------------------------------------------*/
+/** @} */

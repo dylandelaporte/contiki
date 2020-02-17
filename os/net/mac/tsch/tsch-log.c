@@ -40,6 +40,11 @@
  *
  */
 
+/**
+ * \addtogroup tsch
+ * @{
+*/
+
 #include "contiki.h"
 #include <stdio.h>
 #include "net/mac/tsch/tsch.h"
@@ -50,6 +55,7 @@
 #include "net/mac/tsch/tsch-schedule.h"
 #include "net/mac/tsch/tsch-slot-operation.h"
 #include "lib/ringbufindex.h"
+#include "sys/log.h"
 
 #if TSCH_LOG_LEVEL >= 1
 #undef DEBUG
@@ -71,6 +77,7 @@ PROCESS_NAME(tsch_pending_events_process);
 static struct ringbufindex log_ringbuf;
 static struct tsch_log_t log_array[TSCH_LOG_QUEUE_LEN];
 static int log_dropped = 0;
+static int log_active = 0;
 
 #define LOG_PRINTF(...) printf(__VA_ARGS__)
 
@@ -91,15 +98,16 @@ int tsch_log_process_pending(void)
         LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, log->asn.ls4b);
     } else {
       struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->link->slotframe_handle);
-      LOG_PRINTF("TSCH: {asn-%x.%lx link-%u-%u-%u-%u ch-%u} ",
+      LOG_PRINTF("TSCH: {asn-%x.%lx link-%u-%u-%u-%u %u ch-%u} ",
              log->asn.ms1b, log->asn.ls4b,
-             log->link->slotframe_handle, sf ? sf->size.val : 0, log->link->timeslot, log->link->channel_offset,
-             tsch_calculate_channel(&log->asn, log->link->channel_offset));
+             log->link->slotframe_handle, sf ? sf->size.val : 0, 
+             log->burst_count, log->link->timeslot, log->link->channel_offset,
+             log->channel);
     }
     switch(log->type) {
       case tsch_log_tx:
-          LOG_PRINTF("%s-%u-%u[%u] %u tx %x, st %d-%d",
-            log->tx.dest == 0 ? "bc" : "uc", log->tx.is_data
+          LOG_PRINTF("%s-%u-%u[%u] %u tx ->%x, st %d-%d",
+            linkaddr_cmp(&log->tx.dest, &linkaddr_null) ? "bc" : "uc", log->tx.is_data
             , log->tx.sec_level, log->tx.sec_key,
                 log->tx.datalen,
                 log->tx.dest,
@@ -195,6 +203,8 @@ tsch_log_prepare_add(void)
     struct tsch_log_t *log = &log_array[log_index];
     log->asn = tsch_current_asn;
     log->link = current_link;
+    log->burst_count = tsch_current_burst_count;
+    log->channel = tsch_current_channel;
     return log;
   } else {
     log_dropped++;
@@ -206,16 +216,30 @@ tsch_log_prepare_add(void)
 void
 tsch_log_commit(void)
 {
-  ringbufindex_put(&log_ringbuf);
-  process_poll(&tsch_pending_events_process);
+  if(log_active == 1) {
+    ringbufindex_put(&log_ringbuf);
+    process_poll(&tsch_pending_events_process);
+  }
 }
 /*---------------------------------------------------------------------------*/
 /* Initialize log module */
 void
 tsch_log_init(void)
 {
-  ringbufindex_init(&log_ringbuf, TSCH_LOG_QUEUE_LEN);
+  if(log_active == 0) {
+    ringbufindex_init(&log_ringbuf, TSCH_LOG_QUEUE_LEN);
+    log_active = 1;
+  }
 }
+/*---------------------------------------------------------------------------*/
+/* Stop log module */
+void
+tsch_log_stop(void)
+{
+  if(log_active == 1) {
+    tsch_log_process_pending();
+    log_active = 0;
+  }
 
 void tsch_log_puts(const char* txt){
     TSCH_LOG_ADD(tsch_log_text, log->text = txt; );
@@ -270,3 +294,4 @@ void tsch_log_print_frame(const char* msg, frame802154_t *frame, const void* raw
 }
 
 #endif /* TSCH_LOG_LEVEL */
+/** @} */

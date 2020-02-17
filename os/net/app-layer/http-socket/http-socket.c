@@ -29,7 +29,8 @@
  *
  */
 #include "contiki-net.h"
-#include "ip64-addr.h"
+#include "ipv6/ip64-addr.h"
+#include "resolv.h"
 #include "http-socket.h"
 
 #include <ctype.h>
@@ -442,12 +443,13 @@ event(struct tcp_socket *tcps, void *ptr,
         tcp_socket_send_str(tcps, "Range: bytes=");
         if(s->length) {
           if(s->pos >= 0) {
-            sprintf(str, "%llu-%llu", s->pos, s->pos + s->length - 1);
+            sprintf(str, "%llu-%llu",
+              (long long unsigned int)s->pos, (long long unsigned int)s->pos + s->length - 1);
           } else {
-            sprintf(str, "-%llu", s->length);
+            sprintf(str, "-%llu", (long long unsigned int)s->length);
           }
         } else {
-          sprintf(str, "%llu-", s->pos);
+          sprintf(str, "%llu-", (long long unsigned int)s->pos);
         }
         tcp_socket_send_str(tcps, str);
         tcp_socket_send_str(tcps, "\r\n");

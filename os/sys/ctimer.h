@@ -38,7 +38,7 @@
  */
 
 /**
- * \addtogroup sys
+ * \addtogroup timers
  * @{
  */
 
@@ -49,11 +49,13 @@
  * The ctimer module provides a timer mechanism that calls a specified
  * C function when a ctimer expires.
  *
+ * It is \e not safe to manipulate callback timers within an interrupt context.
  */
 
 #ifndef CTIMER_H_
 #define CTIMER_H_
 
+#include "contiki.h"
 #include "sys/etimer.h"
 
 struct ctimer {
@@ -75,7 +77,8 @@ struct ctimer {
  *             is the exact time that the callback timer last
  *             expired. Therefore, this function will cause the timer
  *             to be stable over time, unlike the ctimer_restart()
- *             function.
+ *             function. If this is executed before the timer expired,
+ *             this function has no effect.
  *
  * \sa ctimer_restart()
  */
@@ -113,7 +116,7 @@ void ctimer_restart(struct ctimer *c);
  *
  */
 void ctimer_set(struct ctimer *c, clock_time_t t,
-		void (*f)(void *), void *ptr);
+                void (*f)(void *), void *ptr);
 
 /**
  * \brief      Set a callback timer.
@@ -129,7 +132,7 @@ void ctimer_set(struct ctimer *c, clock_time_t t,
  *
  */
 void ctimer_set_with_process(struct ctimer *c, clock_time_t t,
-		void (*f)(void *), void *ptr, struct process *p);
+                             void (*f)(void *), void *ptr, struct process *p);
 
 /**
  * \brief      Stop a pending callback timer.

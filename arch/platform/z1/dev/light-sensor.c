@@ -38,7 +38,7 @@
 
 /* Photodiode 1 (P64) on INCH_4 */
 /* Photodiode 2 (P65) on INCH_5 */
-//Enric#define INPUT_CHANNEL      ((1 << INCH_4) | (1 << INCH_5))
+/* Enric#define INPUT_CHANNEL      ((1 << INCH_4) | (1 << INCH_5)) */
 #ifndef INPUT_CHANNEL
 #define INPUT_CHANNEL      (1 << INCH_4)
 #endif

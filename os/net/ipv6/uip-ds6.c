@@ -29,7 +29,7 @@
  */
 
 /**
- * \addtogroup uip6
+ * \addtogroup uip
  * @{
  */
 
@@ -47,12 +47,15 @@
 #include <stddef.h>
 #include "lib/random.h"
 #include "net/ipv6/uip-nd6.h"
+#include "net/ipv6/uip-ds6-nbr.h"
 #include "net/ipv6/uip-ds6.h"
 #include "net/ipv6/multicast/uip-mcast6.h"
-#include "net/ip/uip-packetqueue.h"
+#include "net/ipv6/uip-packetqueue.h"
 
-#define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "IPv6 DS"
+#define LOG_LEVEL LOG_LEVEL_IPV6
 
 struct etimer uip_ds6_timer_periodic;                           /**< Timer for maintenance of data structures */
 
@@ -88,19 +91,45 @@ static uip_ds6_maddr_t *locmaddr;
 static uip_ds6_aaddr_t *locaaddr;
 #endif /* UIP_DS6_AADDR_NB */
 static uip_ds6_prefix_t *locprefix;
+#if (UIP_LLADDR_LEN == 2)
+static const uint8_t iid_prefix[] = { 0x00, 0x00 , 0x00 , 0xff , 0xfe , 0x00 };
+#endif /* (UIP_LLADDR_LEN == 2) */
 
+/* The default prefix */
+static uip_ip6addr_t default_prefix = {
+    .u16 = { 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+/*---------------------------------------------------------------------------*/
+const uip_ip6addr_t *
+uip_ds6_default_prefix()
+{
+  return &default_prefix;
+}
+/*---------------------------------------------------------------------------*/
+void
+uip_ds6_set_default_prefix(const uip_ip6addr_t *prefix)
+{
+  uip_ip6addr_copy(&default_prefix, prefix);
+}
 /*---------------------------------------------------------------------------*/
 void
 uip_ds6_init(void)
 {
+  if(uip_is_addr_unspecified(&default_prefix)) {
+    uip_ip6addr(&default_prefix, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+  }
 
   uip_ds6_neighbors_init();
   uip_ds6_route_init();
 
-  PRINTF("Init of IPv6 data structures\n");
-  PRINTF("%u neighbors\n%u default routers\n%u prefixes\n%u routes\n%u unicast addresses\n%u multicast addresses\n%u anycast addresses\n",
-     NBR_TABLE_MAX_NEIGHBORS, UIP_DS6_DEFRT_NB, UIP_DS6_PREFIX_NB, UIP_DS6_ROUTE_NB,
-     UIP_DS6_ADDR_NB, UIP_DS6_MADDR_NB, UIP_DS6_AADDR_NB);
+  LOG_INFO("Init: %u neighbors\n", NBR_TABLE_MAX_NEIGHBORS);
+  LOG_INFO("%u default routers\n", UIP_DS6_DEFRT_NB);
+  LOG_INFO("%u prefixes\n", UIP_DS6_PREFIX_NB);
+  LOG_INFO("%u routes\n", UIP_DS6_ROUTE_NB);
+  LOG_INFO("%u unicast addresses\n", UIP_DS6_ADDR_NB);
+  LOG_INFO("%u multicast addresses\n", UIP_DS6_MADDR_NB);
+  LOG_INFO("%u anycast addresses\n", UIP_DS6_AADDR_NB);
+
   memset(uip_ds6_prefix_list, 0, sizeof(uip_ds6_prefix_list));
   memset(&uip_ds6_if, 0, sizeof(uip_ds6_if));
   uip_ds6_addr_size = sizeof(struct uip_ds6_addr);
@@ -209,6 +238,10 @@ uip_ds6_list_loop(uip_ds6_element_t *list, uint8_t size,
 {
   uip_ds6_element_t *element;
 
+  if(list == NULL || ipaddr == NULL || out_element == NULL) {
+    return NOSPACE;
+  }
+
   *out_element = NULL;
 
   for(element = list;
@@ -247,13 +280,13 @@ uip_ds6_prefix_add(uip_ipaddr_t *ipaddr, uint8_t ipaddrlen,
     locprefix->l_a_reserved = flags;
     locprefix->vlifetime = vtime;
     locprefix->plifetime = ptime;
-    PRINTF("Adding prefix ");
-    PRINT6ADDR(&locprefix->ipaddr);
-    PRINTF("length %u, flags %x, Valid lifetime %lx, Preffered lifetime %lx\n",
+    LOG_INFO("Adding prefix ");
+    LOG_INFO_6ADDR(&locprefix->ipaddr);
+    LOG_INFO_("length %u, flags %x, Valid lifetime %lx, Preffered lifetime %lx\n",
        ipaddrlen, flags, vtime, ptime);
     return locprefix;
   } else {
-    PRINTF("No more space in Prefix list\n");
+    LOG_INFO("No more space in Prefix list\n");
   }
   return NULL;
 }
@@ -277,9 +310,9 @@ uip_ds6_prefix_add(uip_ipaddr_t *ipaddr, uint8_t ipaddrlen,
     } else {
       locprefix->isinfinite = 1;
     }
-    PRINTF("Adding prefix ");
-    PRINT6ADDR(&locprefix->ipaddr);
-    PRINTF("length %u, vlifetime %lu\n", ipaddrlen, interval);
+    LOG_INFO("Adding prefix ");
+    LOG_INFO_6ADDR(&locprefix->ipaddr);
+    LOG_INFO_("length %u, vlifetime %lu\n", ipaddrlen, interval);
     return locprefix;
   }
   return NULL;
@@ -542,8 +575,6 @@ uip_ds6_select_src(uip_ipaddr_t *src, uip_ipaddr_t *dst)
 void
 uip_ds6_set_addr_iid(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr)
 {
-  /* We consider only links with IEEE EUI-64 identifier or
-   * IEEE 48-bit MAC addresses */
 #if (UIP_LLADDR_LEN == 8)
   memcpy(ipaddr->u8 + 8, lladdr, UIP_LLADDR_LEN);
   ipaddr->u8[8] ^= 0x02;
@@ -553,8 +584,25 @@ uip_ds6_set_addr_iid(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr)
   ipaddr->u8[12] = 0xfe;
   memcpy(ipaddr->u8 + 13, (uint8_t *)lladdr + 3, 3);
   ipaddr->u8[8] ^= 0x02;
+#elif (UIP_LLADDR_LEN == 2)
+  /* derive IID as per RFC 6282 */
+  memcpy(ipaddr->u8 + 8, iid_prefix, 6);
+  memcpy(ipaddr->u8 + 8 + 6, lladdr, UIP_LLADDR_LEN);
 #else
-#error uip-ds6.c cannot build interface address when UIP_LLADDR_LEN is not 6 or 8
+#error uip-ds6.c cannot build interface address when UIP_LLADDR_LEN is not 6, 8, or 2
+#endif
+}
+/*---------------------------------------------------------------------------*/
+void
+uip_ds6_set_lladdr_from_iid(uip_lladdr_t *lladdr, const uip_ipaddr_t *ipaddr)
+{
+#if (UIP_LLADDR_LEN == 8)
+  memcpy(lladdr, ipaddr->u8 + 8, UIP_LLADDR_LEN);
+  lladdr->addr[0] ^= 0x02;
+#elif (UIP_LLADDR_LEN == 2)
+  memcpy(lladdr, ipaddr->u8 + 6, UIP_LLADDR_LEN);
+#else
+#error uip-ds6.c cannot build lladdr address when UIP_LLADDR_LEN is not 8 or 2
 #endif
 }
 
@@ -601,9 +649,9 @@ uip_ds6_dad(uip_ds6_addr_t *addr)
    * If we arrive here it means DAD succeeded, otherwise the dad process
    * would have been interrupted in ds6_dad_ns/na_input
    */
-  PRINTF("DAD succeeded, ipaddr: ");
-  PRINT6ADDR(&addr->ipaddr);
-  PRINTF("\n");
+  LOG_INFO("DAD succeeded, ipaddr: ");
+  LOG_INFO_6ADDR(&addr->ipaddr);
+  LOG_INFO_("\n");
 
   addr->state = ADDR_PREFERRED;
   return;
@@ -618,7 +666,7 @@ int
 uip_ds6_dad_failed(uip_ds6_addr_t *addr)
 {
   if(uip_is_addr_linklocal(&addr->ipaddr)) {
-    PRINTF("Contiki shutdown, DAD for link local address failed\n");
+    LOG_ERR("Contiki shutdown, DAD for link local address failed\n");
     return 0;
   }
   uip_ds6_addr_rm(addr);
@@ -639,7 +687,7 @@ uip_ds6_send_ra_sollicited(void)
    * the RA (setting the timer to 0 below). We keep the code logic for
    * the days contiki will support appropriate timers */
   rand_time = 0;
-  PRINTF("Solicited RA, random time %u\n", rand_time);
+  LOG_INFO("Solicited RA, random time %u\n", rand_time);
 
   if(stimer_remaining(&uip_ds6_timer_ra) > rand_time) {
     if(stimer_elapsed(&uip_ds6_timer_ra) < UIP_ND6_MIN_DELAY_BETWEEN_RAS) {
@@ -660,21 +708,21 @@ uip_ds6_send_ra_periodic(void)
   if(racount > 0) {
     /* send previously scheduled RA */
     uip_nd6_ra_output(NULL);
-    PRINTF("Sending periodic RA\n");
+    LOG_INFO("Sending periodic RA\n");
   }
 
   rand_time = UIP_ND6_MIN_RA_INTERVAL + random_rand() %
     (uint16_t) (UIP_ND6_MAX_RA_INTERVAL - UIP_ND6_MIN_RA_INTERVAL);
-  PRINTF("Random time 1 = %u\n", rand_time);
+  LOG_DBG("Random time 1 = %u\n", rand_time);
 
   if(racount < UIP_ND6_MAX_INITIAL_RAS) {
     if(rand_time > UIP_ND6_MAX_INITIAL_RA_INTERVAL) {
       rand_time = UIP_ND6_MAX_INITIAL_RA_INTERVAL;
-      PRINTF("Random time 2 = %u\n", rand_time);
+      LOG_DBG("Random time 2 = %u\n", rand_time);
     }
     racount++;
   }
-  PRINTF("Random time 3 = %u\n", rand_time);
+  LOG_DBG("Random time 3 = %u\n", rand_time);
   stimer_set(&uip_ds6_timer_ra, rand_time);
 }
 
@@ -686,13 +734,13 @@ uip_ds6_send_rs(void)
 {
   if((uip_ds6_defrt_choose() == NULL)
      && (rscount < UIP_ND6_MAX_RTR_SOLICITATIONS)) {
-    PRINTF("Sending RS %u\n", rscount);
+    LOG_INFO("Sending RS %u\n", rscount);
     uip_nd6_rs_output();
     rscount++;
     etimer_set(&uip_ds6_timer_rs,
                UIP_ND6_RTR_SOLICITATION_INTERVAL * CLOCK_SECOND);
   } else {
-    PRINTF("Router found ? (boolean): %u\n",
+    LOG_INFO("Router found ? (boolean): %u\n",
            (uip_ds6_defrt_choose() != NULL));
     etimer_stop(&uip_ds6_timer_rs);
   }

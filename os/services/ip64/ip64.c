@@ -52,19 +52,19 @@
    ip64_set_ipv4_address() function.
 */
 
-#include "ip64.h"
-#include "ip64-addr.h"
-#include "ip64-addrmap.h"
+#include "ip64/ip64.h"
+#include "ipv6/ip64-addr.h"
+#include "ip64/ip64-addrmap.h"
 #include "ip64-conf.h"
-#include "ip64-special-ports.h"
-#include "ip64-eth-interface.h"
-#include "ip64-slip-interface.h"
-#include "ip64-dns64.h"
+#include "ip64/ip64-special-ports.h"
+#include "ip64/ip64-eth-interface.h"
+#include "ip64/ip64-slip-interface.h"
+#include "ip64/ip64-dns64.h"
 #include "net/ipv6/uip-ds6.h"
-#include "ip64-ipv4-dhcp.h"
+#include "ip64/ip64-ipv4-dhcp.h"
 #include "contiki-net.h"
 
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 #include <string.h> /* for memcpy() */
 #include <stdio.h> /* for printf() */
@@ -861,6 +861,8 @@ ip64_4to6(const uint8_t *ipv4packet, const uint16_t ipv4packet_len,
     break;
   case IP_PROTO_UDP:
     udphdr->udpchksum = 0;
+    /* As the udplen might have changed (DNS) we need to update it also */
+    udphdr->udplen = uip_htons(ipv6_packet_len);
     udphdr->udpchksum = ~(ipv6_transport_checksum(resultpacket,
 						  ipv6len,
 						  IP_PROTO_UDP));

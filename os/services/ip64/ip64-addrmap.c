@@ -29,7 +29,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "ip64-addrmap.h"
+#include "ip64/ip64-addrmap.h"
 
 #include "lib/memb.h"
 #include "lib/list.h"

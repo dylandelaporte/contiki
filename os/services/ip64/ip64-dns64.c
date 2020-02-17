@@ -29,9 +29,9 @@
  *
  */
 
-#include "ip64.h"
-#include "ip64-addr.h"
-#include "ip64-dns64.h"
+#include "ip64/ip64.h"
+#include "ipv6/ip64-addr.h"
+#include "ip64/ip64-dns64.h"
 
 #include <stdio.h>
 

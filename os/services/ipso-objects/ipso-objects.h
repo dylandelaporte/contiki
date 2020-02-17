@@ -37,8 +37,7 @@
  * \defgroup ipso-objects An implementation of IPSO Objects
  * @{
  *
- * This application is an implementation of IPSO Objects for
- * OMA Lightweight M2M.
+ * This is an implementation of IPSO Objects for OMA LWM2M.
  */
 
 /**
@@ -52,7 +51,7 @@
 #ifndef IPSO_OBJECTS_H_
 #define IPSO_OBJECTS_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 
 void ipso_temperature_init(void);
 void ipso_button_init(void);

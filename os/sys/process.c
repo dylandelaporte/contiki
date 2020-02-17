@@ -45,6 +45,7 @@
 
 #include <stdio.h>
 
+#include "contiki.h"
 #include "sys/process.h"
 #include "sys/arg.h"
 
@@ -53,7 +54,7 @@
  */
 struct process *process_list = NULL;
 struct process *process_current = NULL;
- 
+
 static process_event_t lastevent;
 
 /*
@@ -153,7 +154,7 @@ exit_process(struct process *p, struct process *fromprocess)
      */
     for(q = process_list; q != NULL; q = q->next) {
       if(p != q) {
-	call_process(q, PROCESS_EVENT_EXITED, (process_data_t)p);
+        call_process(q, PROCESS_EVENT_EXITED, (process_data_t)p);
       }
     }
 
@@ -169,8 +170,8 @@ exit_process(struct process *p, struct process *fromprocess)
   } else {
     for(q = process_list; q != NULL; q = q->next) {
       if(q->next == p) {
-	q->next = p->next;
-	break;
+        q->next = p->next;
+        break;
       }
     }
   }
@@ -188,7 +189,7 @@ call_process(struct process *p, process_event_t ev, process_data_t data)
     printf("process: process '%s' called again with event %d\n", PROCESS_NAME_STRING(p), ev);
   }
 #endif /* DEBUG */
-  
+
   if((p->state & PROCESS_STATE_RUNNING) &&
      p->thread != NULL) {
     PRINTF("process: calling process '%s' with event %d\n", PROCESS_NAME_STRING(p), ev);
@@ -261,7 +262,7 @@ do_event(void)
   process_data_t data;
   struct process *receiver;
   struct process *p;
-  
+
   /*
    * If there are any events in the queue, take the first one and walk
    * through the list of processes to see if the event should be
@@ -271,10 +272,10 @@ do_event(void)
    */
 
   if(nevents > 0) {
-    
+
     /* There are events that we should deliver. */
     ev = events[fevent].ev;
-    
+
     data = events[fevent].data;
     receiver = events[fevent].p;
 
@@ -288,20 +289,20 @@ do_event(void)
     if(receiver == PROCESS_BROADCAST) {
       for(p = process_list; p != NULL; p = p->next) {
 
-	/* If we have been requested to poll a process, we do this in
-	   between processing the broadcast event. */
-	if(poll_requested) {
-	  do_poll();
-	}
-	call_process(p, ev, data);
+        /* If we have been requested to poll a process, we do this in
+           between processing the broadcast event. */
+        if(poll_requested) {
+          do_poll();
+        }
+        call_process(p, ev, data);
       }
     } else {
       /* This is not a broadcast event, so we deliver it to the
-	 specified process. */
+         specified process. */
       /* If the event was an INIT event, we should also update the
-	 state of the process. */
+         state of the process. */
       if(ev == PROCESS_EVENT_INIT) {
-	receiver->state = PROCESS_STATE_RUNNING;
+        receiver->state = PROCESS_STATE_RUNNING;
       }
 
       /* Make sure that the process actually is running. */
@@ -337,13 +338,13 @@ process_post(struct process *p, process_event_t ev, process_data_t data)
 
   if(PROCESS_CURRENT() == NULL) {
     PRINTF("process_post: NULL process posts event %d to process '%s', nevents %d\n",
-	   ev,PROCESS_NAME_STRING(p), nevents);
+           ev, PROCESS_NAME_STRING(p), nevents);
   } else {
     PRINTF("process_post: Process '%s' posts event %d to process '%s', nevents %d\n",
-	   PROCESS_NAME_STRING(PROCESS_CURRENT()), ev,
-	   p == PROCESS_BROADCAST? "<broadcast>": PROCESS_NAME_STRING(p), nevents);
+           PROCESS_NAME_STRING(PROCESS_CURRENT()), ev,
+           p == PROCESS_BROADCAST ? "<broadcast>" : PROCESS_NAME_STRING(p), nevents);
   }
-  
+
   if(nevents == PROCESS_CONF_NUMEVENTS) {
 #if DEBUG
     if(p == PROCESS_BROADCAST) {
@@ -354,7 +355,7 @@ process_post(struct process *p, process_event_t ev, process_data_t data)
 #endif /* DEBUG */
     return PROCESS_ERR_FULL;
   }
-  
+
   snum = (process_num_events_t)(fevent + nevents) % PROCESS_CONF_NUMEVENTS;
   events[snum].ev = ev;
   events[snum].data = data;
@@ -366,7 +367,7 @@ process_post(struct process *p, process_event_t ev, process_data_t data)
     process_maxevents = nevents;
   }
 #endif /* PROCESS_CONF_STATS */
-  
+
   return PROCESS_ERR_OK;
 }
 /*---------------------------------------------------------------------------*/

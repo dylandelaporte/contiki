@@ -40,16 +40,21 @@
 #include "orchestra.h"
 #include "net/packetbuf.h"
 #include "net/ipv6/uip-icmp6.h"
-#include "net/rpl/rpl-private.h"
-#include "net/rime/rime.h" /* Needed for so-called rime-sniffer */
+#include "net/routing/routing.h"
+#if ROUTING_CONF_RPL_LITE
+#include "net/routing/rpl-lite/rpl.h"
+#elif ROUTING_CONF_RPL_CLASSIC
+#include "net/routing/rpl-classic/rpl.h"
+#include "net/routing/rpl-classic/rpl-private.h"
+#endif
 
 #define DEBUG DEBUG_PRINT
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 /* A net-layer sniffer for packets sent and received */
 static void orchestra_packet_received(void);
 static void orchestra_packet_sent(int mac_status);
-RIME_SNIFFER(orchestra_sniffer, orchestra_packet_received, orchestra_packet_sent);
+NETSTACK_SNIFFER(orchestra_sniffer, orchestra_packet_received, orchestra_packet_sent);
 
 /* The current RPL preferred parent's link-layer address */
 linkaddr_t orchestra_parent_linkaddr;
@@ -105,18 +110,24 @@ orchestra_callback_child_removed(const linkaddr_t *addr)
   }
 }
 /*---------------------------------------------------------------------------*/
-void
+int
 orchestra_callback_packet_ready(void)
 {
   int i;
   /* By default, use any slotframe, any timeslot */
   uint16_t slotframe = 0xffff;
   uint16_t timeslot = 0xffff;
+  /* The default channel offset 0xffff means that the channel offset in the scheduled
+   * tsch_link structure is used instead. Any other value specified in the packetbuf
+   * overrides per-link value, allowing to implement multi-channel Orchestra. */
+  uint16_t channel_offset = 0xffff;
+  int matched_rule = -1;
 
   /* Loop over all rules until finding one able to handle the packet */
   for(i = 0; i < NUM_RULES; i++) {
     if(all_rules[i]->select_packet != NULL) {
-      if(all_rules[i]->select_packet(&slotframe, &timeslot)) {
+      if(all_rules[i]->select_packet(&slotframe, &timeslot, &channel_offset)) {
+        matched_rule = i;
         break;
       }
     }
@@ -125,7 +136,10 @@ orchestra_callback_packet_ready(void)
 #if TSCH_WITH_LINK_SELECTOR
   packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME, slotframe);
   packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT, timeslot);
+  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET, channel_offset);
 #endif
+
+  return matched_rule;
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -153,12 +167,12 @@ orchestra_init(void)
   int i;
   /* Snoop on packet transmission to know if our parent knows about us
    * (i.e. has ACKed at one of our DAOs since we decided to use it as a parent) */
-  rime_sniffer_add(&orchestra_sniffer);
+  netstack_sniffer_add(&orchestra_sniffer);
   linkaddr_copy(&orchestra_parent_linkaddr, &linkaddr_null);
   /* Initialize all Orchestra rules */
   for(i = 0; i < NUM_RULES; i++) {
+    PRINTF("Orchestra: initializing rule %s (%u)\n", all_rules[i]->name, i);
     if(all_rules[i]->init != NULL) {
-      PRINTF("Orchestra: initializing rule %u\n", i);
       all_rules[i]->init(i);
     }
   }

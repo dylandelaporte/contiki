@@ -32,17 +32,18 @@
 
 /**
  * \file
- *         Implementation of the Rime queue buffers
+ *         Implementation of the Packet queue buffers
  * \author
  *         Adam Dunkels <adam@sics.se>
  */
 
 /**
- * \addtogroup rimequeuebuf
+ * \addtogroup queuebuf
  * @{
  */
 
 #include "contiki-net.h"
+#include "net/queuebuf.h"
 
 #if WITH_SWAP
 #include "cfs/cfs.h"

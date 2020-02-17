@@ -32,7 +32,7 @@
  *
  */
 
-/** \addtogroup sys
+/** \addtogroup timers
  * @{
  */
 
@@ -69,7 +69,7 @@
 #ifndef CLOCK_H_
 #define CLOCK_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 
 /**
  * A second, measured in system clock time.
@@ -98,7 +98,7 @@ void clock_init(void);
  *
  * \return The current clock time, measured in system ticks.
  */
-CCIF clock_time_t clock_time(void);
+clock_time_t clock_time(void);
 
 /**
  * Get the current value of the platform seconds.
@@ -108,7 +108,7 @@ CCIF clock_time_t clock_time(void);
  *
  * \return The value.
  */
-CCIF unsigned long clock_seconds(void);
+unsigned long clock_seconds(void);
 
 /**
  * Set the value of the platform seconds.

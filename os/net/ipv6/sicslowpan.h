@@ -49,7 +49,7 @@
 #ifndef SICSLOWPAN_H_
 #define SICSLOWPAN_H_
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 #include "net/mac/mac.h"
 
 /**
@@ -66,11 +66,15 @@
 
 /**
  * \name 6lowpan compressions
+ * \note These are assumed to be in order - so that no compression is 0, then more and more
+ *  compressed version follow. E.g. they can be used for comparing: if x > COMPRESSION_IPV6 ...
  * @{
  */
-#define SICSLOWPAN_COMPRESSION_IPV6        0
-#define SICSLOWPAN_COMPRESSION_HC1         1
-#define SICSLOWPAN_COMPRESSION_HC06        2
+#define SICSLOWPAN_COMPRESSION_IPV6        0 /* No compression */
+#define SICSLOWPAN_COMPRESSION_IPHC        1 /* RFC 6282 */
+#define SICSLOWPAN_COMPRESSION_6LORH       2 /* RFC 8025 for paging dispatch,
+              * draft-ietf-6lo-routin-dispatch-05 for 6LoRH. 6LoRH is not
+              * implemented yet -- only support for paging dispatch. */
 /** @} */
 
 /**
@@ -80,8 +84,12 @@
 #define SICSLOWPAN_DISPATCH_IPV6                    0x41 /* 01000001 = 65 */
 #define SICSLOWPAN_DISPATCH_HC1                     0x42 /* 01000010 = 66 */
 #define SICSLOWPAN_DISPATCH_IPHC                    0x60 /* 011xxxxx = ... */
+#define SICSLOWPAN_DISPATCH_IPHC_MASK               0xe0
 #define SICSLOWPAN_DISPATCH_FRAG1                   0xc0 /* 11000xxx */
 #define SICSLOWPAN_DISPATCH_FRAGN                   0xe0 /* 11100xxx */
+#define SICSLOWPAN_DISPATCH_FRAG_MASK               0xf8
+#define SICSLOWPAN_DISPATCH_PAGING                  0xf0 /* 1111xxxx */
+#define SICSLOWPAN_DISPATCH_PAGING_MASK             0xf0
 /** @} */
 
 /** \name HC1 encoding
@@ -144,6 +152,15 @@
 /* NHC_EXT_HDR */
 #define SICSLOWPAN_NHC_MASK                         0xF0
 #define SICSLOWPAN_NHC_EXT_HDR                      0xE0
+#define SICSLOWPAN_NHC_BIT                          0x01
+
+/* The header values */
+#define SICSLOWPAN_NHC_ETX_HDR_HBHO                 0x00
+#define SICSLOWPAN_NHC_ETX_HDR_ROUTING              0x01
+#define SICSLOWPAN_NHC_ETX_HDR_FRAG                 0x02
+#define SICSLOWPAN_NHC_ETX_HDR_DESTO                0x03
+#define SICSLOWPAN_NHC_ETX_HDR_MOH                  0x04
+#define SICSLOWPAN_NHC_ETX_HDR_IPV6                 0x07
 
 /**
  * \name LOWPAN_UDP encoding (works together with IPHC)

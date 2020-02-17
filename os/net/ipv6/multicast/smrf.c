@@ -47,18 +47,25 @@
 #include "net/ipv6/multicast/uip-mcast6-route.h"
 #include "net/ipv6/multicast/uip-mcast6-stats.h"
 #include "net/ipv6/multicast/smrf.h"
-#include "net/rpl/rpl.h"
+#include "net/routing/routing.h"
 #include "net/netstack.h"
+#include "net/packetbuf.h"
+#if ROUTING_CONF_RPL_LITE
+#include "net/routing/rpl-lite/rpl.h"
+#endif /* ROUTING_CONF_RPL_LITE */
+#if ROUTING_CONF_RPL_CLASSIC
+#include "net/routing/rpl-classic/rpl.h"
+#endif /* ROUTING_CONF_RPL_CLASSIC */
 #include <string.h>
 
 #define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 /*---------------------------------------------------------------------------*/
 /* Macros */
 /*---------------------------------------------------------------------------*/
 /* CCI */
-#define SMRF_FWD_DELAY()  NETSTACK_RDC.channel_check_interval()
+#define SMRF_FWD_DELAY()  (CLOCK_SECOND / 8)
 /* Number of slots in the next 500ms */
 #define SMRF_INTERVAL_COUNT  ((CLOCK_SECOND >> 2) / fwd_delay)
 /*---------------------------------------------------------------------------*/
@@ -70,10 +77,6 @@ static uip_buf_t mcast_buf;
 static uint8_t fwd_delay;
 static uint8_t fwd_spread;
 /*---------------------------------------------------------------------------*/
-/* uIPv6 Pointers */
-/*---------------------------------------------------------------------------*/
-#define UIP_IP_BUF        ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
-/*---------------------------------------------------------------------------*/
 static void
 mcast_fwd(void *p)
 {
@@ -81,7 +84,7 @@ mcast_fwd(void *p)
   uip_len = mcast_len;
   UIP_IP_BUF->ttl--;
   tcpip_output(NULL);
-  uip_clear_buf();
+  uipbuf_clear();
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t
@@ -101,15 +104,17 @@ in()
    */
   d = rpl_get_any_dag();
   if(!d) {
+    PRINTF("SMRF: No DODAG\n");
     UIP_MCAST6_STATS_ADD(mcast_dropped);
     return UIP_MCAST6_DROP;
   }
 
   /* Retrieve our preferred parent's LL address */
-  parent_ipaddr = rpl_get_parent_ipaddr(d->preferred_parent);
+  parent_ipaddr = rpl_parent_get_ipaddr(d->preferred_parent);
   parent_lladdr = uip_ds6_nbr_lladdr_from_ipaddr(parent_ipaddr);
 
   if(parent_lladdr == NULL) {
+    PRINTF("SMRF: No Parent found\n");
     UIP_MCAST6_STATS_ADD(mcast_dropped);
     return UIP_MCAST6_DROP;
   }
@@ -127,6 +132,7 @@ in()
 
   if(UIP_IP_BUF->ttl <= 1) {
     UIP_MCAST6_STATS_ADD(mcast_dropped);
+    PRINTF("SMRF: TTL too low\n");
     return UIP_MCAST6_DROP;
   }
 
@@ -174,6 +180,8 @@ in()
     }
     PRINTF("SMRF: %u bytes: fwd in %u [%u]\n",
            uip_len, fwd_delay, fwd_spread);
+  } else {
+    PRINTF("SMRF: Group unknown, dropping\n");
   }
 
   /* Done with this packet unless we are a member of the mcast group */

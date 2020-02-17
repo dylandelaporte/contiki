@@ -30,9 +30,9 @@
  */
 
 #include "contiki.h"
-#include "sys/energest.h"
 #include "sys/clock.h"
 #include "sys/etimer.h"
+#include "sys/energest.h"
 #include "rtimer-arch.h"
 #include "dev/watchdog.h"
 #include "isr_compat.h"
@@ -63,8 +63,6 @@ read_tar(void)
 /*---------------------------------------------------------------------------*/
 ISR(TIMERA1, timera1)
 {
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
-
   watchdog_start();
 
   if(TAIV == 2) {
@@ -106,8 +104,6 @@ ISR(TIMERA1, timera1)
     }*/
 
   watchdog_stop();
-
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 clock_time_t

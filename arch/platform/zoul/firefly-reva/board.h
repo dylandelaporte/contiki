@@ -33,7 +33,7 @@
  * \addtogroup zoul-platforms
  * @{
  *
- * \defgroup firefly-reva Firefly platform
+ * \addtogroup firefly
  *
  * The Zolertia Firefly is the most down-to-core development platform, exposing
  * the Zoul core functionalities and features, with a slick design to allow a
@@ -98,28 +98,18 @@
  * @{
  */
 /*---------------------------------------------------------------------------*/
-/* Some files include leds.h before us, so we need to get rid of defaults in
- * leds.h before we provide correct definitions */
-#undef LEDS_GREEN
-#undef LEDS_YELLOW
-#undef LEDS_BLUE
-#undef LEDS_RED
-#undef LEDS_CONF_ALL
+#define LEDS_ARCH_L1_PORT GPIO_D_NUM
+#define LEDS_ARCH_L1_PIN  5
+#define LEDS_ARCH_L2_PORT GPIO_D_NUM
+#define LEDS_ARCH_L2_PIN  4
+#define LEDS_ARCH_L3_PORT GPIO_D_NUM
+#define LEDS_ARCH_L3_PIN  3
 
-/* In leds.h the LEDS_BLUE is defined by LED_YELLOW definition */
-#define LEDS_GREEN    (1 << 4) /**< LED1 (Green) -> PD4 */
-#define LEDS_BLUE     (1 << 3) /**< LED2 (Blue)  -> PD3 */
-#define LEDS_RED      (1 << 5) /**< LED3 (Red)   -> PD5 */
+#define LEDS_CONF_RED     1
+#define LEDS_CONF_GREEN   2
+#define LEDS_CONF_BLUE    4
 
-#define LEDS_CONF_ALL (LEDS_GREEN | LEDS_BLUE | LEDS_RED)
-
-#define LEDS_LIGHT_BLUE (LEDS_GREEN | LEDS_BLUE) /**< Green + Blue (24)       */
-#define LEDS_YELLOW     (LEDS_GREEN | LEDS_RED)  /**< Green + Red  (48)       */
-#define LEDS_PURPLE     (LEDS_BLUE  | LEDS_RED)  /**< Blue + Red   (40)       */
-#define LEDS_WHITE      LEDS_ALL                 /**< Green + Blue + Red (56) */
-
-/* Notify various examples that we have LEDs */
-#define PLATFORM_HAS_LEDS        1
+#define LEDS_CONF_COUNT   3
 /** @} */
 /*---------------------------------------------------------------------------*/
 /** \name USB configuration
@@ -272,7 +262,7 @@
  */
 #ifdef PLATFORM_CONF_WITH_BUTTON
 #if (PLATFORM_CONF_WITH_BUTTON && (ADC_SENSORS_ADC6_PIN == 3))
-#error "The ADC6 (PA3) and user button cannot be enabled at the same time" 
+#error "The ADC6 (PA3) and user button cannot be enabled at the same time"
 #else
 #define PLATFORM_HAS_BUTTON  (PLATFORM_CONF_WITH_BUTTON && \
                               !(ADC_SENSORS_ADC6_PIN == 3))

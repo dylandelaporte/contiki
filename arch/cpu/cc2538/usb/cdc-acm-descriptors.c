@@ -38,7 +38,7 @@
  * with the only change being the values for VID and PID
  */
 #include "descriptors.h"
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "cdc.h"
 #include "usb-arch.h"
 
@@ -161,7 +161,7 @@ const struct configuration_st {
 
   };
 
-const struct usb_st_configuration_descriptor const *configuration_head =
-(struct usb_st_configuration_descriptor const *)&configuration_block;
+const struct usb_st_configuration_descriptor* const configuration_head =
+(const struct usb_st_configuration_descriptor*)&configuration_block;
 
 /** @} */

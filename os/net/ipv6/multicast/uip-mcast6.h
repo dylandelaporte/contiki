@@ -30,11 +30,11 @@
  */
 
 /**
- * \addtogroup uip6
+ * \addtogroup uip
  * @{
  */
 /**
- * \defgroup uip6-multicast IPv6 Multicast Forwarding
+ * \defgroup uip-multicast IPv6 Multicast Forwarding
  *
  *   We currently support 2 engines:
  *   - 'Stateless Multicast RPL Forwarding' (SMRF)
@@ -59,12 +59,13 @@
 #ifndef UIP_MCAST6_H_
 #define UIP_MCAST6_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "net/ipv6/multicast/uip-mcast6-engines.h"
 #include "net/ipv6/multicast/uip-mcast6-route.h"
 #include "net/ipv6/multicast/smrf.h"
 #include "net/ipv6/multicast/esmrf.h"
 #include "net/ipv6/multicast/roll-tm.h"
+#include "net/ipv6/multicast/mpl.h"
 
 #include <string.h>
 /*---------------------------------------------------------------------------*/
@@ -144,7 +145,7 @@ struct uip_mcast6_driver {
  */
 #define uip_mcast6_get_address_scope(a) ((a)->u8[1] & 0x0F)
 /*---------------------------------------------------------------------------*/
-/* Configure multicast and core/net to play nicely with the selected engine */
+/* Configure multicast and os/net to play nicely with the selected engine */
 #if UIP_MCAST6_ENGINE
 
 /* Enable Multicast hooks in the uip6 core */
@@ -164,6 +165,10 @@ struct uip_mcast6_driver {
 #elif UIP_MCAST6_ENGINE == UIP_MCAST6_ENGINE_ESMRF
 #define RPL_WITH_MULTICAST     1
 #define UIP_MCAST6             esmrf_driver
+
+#elif UIP_MCAST6_ENGINE == UIP_MCAST6_ENGINE_MPL
+#define RPL_WITH_MULTICAST     0
+#define UIP_MCAST6             mpl_driver
 
 #else
 #error "Multicast Enabled with an Unknown Engine."

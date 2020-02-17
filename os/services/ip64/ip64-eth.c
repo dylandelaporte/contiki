@@ -29,7 +29,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "ip64-eth.h"
+#include "ip64/ip64-eth.h"
 
 #include <string.h>
 

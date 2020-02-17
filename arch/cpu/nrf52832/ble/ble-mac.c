@@ -44,10 +44,10 @@
 #include "nrf_soc.h"
 #include "iot_defines.h"
 
-#include "net/mac/nullmac.h"
+#include "net/mac/nullmac/nullmac.h"
 #include "net/netstack.h"
-#include "net/ip/uip.h"
-#include "net/ip/tcpip.h"
+#include "net/ipv6/uip.h"
+#include "net/ipv6/tcpip.h"
 #include "net/packetbuf.h"
 #include "net/netstack.h"
 #include "net/linkaddr.h"
@@ -257,7 +257,7 @@ PROCESS_THREAD(ble_ipsp_process, ev, data)
       packetbuf_set_addr(PACKETBUF_ADDR_SENDER, (const linkaddr_t *)input_packet.src.identifier);
       packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &linkaddr_node_addr);
       busy_rx = 0;
-      NETSTACK_LLSEC.input();
+      NETSTACK_NETWORK.input();
     }
   }
 
@@ -314,7 +314,6 @@ send_packet(mac_callback_t sent, void *ptr)
     for(i = 0; i < BLE_MAC_MAX_INTERFACE_NUM; i++) {
       if(interfaces[i].handle.cid != 0 && interfaces[i].handle.conn_handle != 0) {
         ret = send_to_peer(&interfaces[i].handle);
-        watchdog_periodic();
       }
     }
   } else if((handle = find_handle(dest)) != NULL) {
@@ -326,7 +325,6 @@ send_packet(mac_callback_t sent, void *ptr)
   if(ret) {
     busy_tx = 1;
     while(busy_tx) {
-      watchdog_periodic();
       sd_app_evt_wait();
     }
     mac_call_sent_callback(sent, ptr, MAC_TX_OK, 1);
@@ -342,15 +340,15 @@ on(void)
 }
 /*---------------------------------------------------------------------------*/
 static int
-off(int keep_radio_on)
+off(void)
 {
   return 1;
 }
 /*---------------------------------------------------------------------------*/
-static unsigned short
-channel_check_interval(void)
+static int
+max_payload(void)
 {
-  return 0;
+  return PACKETBUF_SIZE;
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -378,7 +376,7 @@ const struct mac_driver ble_ipsp_mac_driver = {
   NULL,
   on,
   off,
-  channel_check_interval,
+  max_payload
 };
 /*---------------------------------------------------------------------------*/
 /**

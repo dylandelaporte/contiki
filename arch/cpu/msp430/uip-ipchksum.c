@@ -35,7 +35,7 @@
  *         uIP checksum calculation for MSP430
  */
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 
 #define asmv(arg) __asm__ __volatile__(arg)
 /*---------------------------------------------------------------------------*/
@@ -51,7 +51,7 @@ uint16_t
 uip_ipchksum(void)
 {
   /* Assumes proper alignement of uip_buf. */
-  uint16_t *p = (uint16_t *)&uip_buf[UIP_LLH_LEN];
+  uint16_t *p = (uint16_t *)UIP_IP_BUF;
   register uint16_t sum;
 
   sum = p[0];

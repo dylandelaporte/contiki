@@ -52,7 +52,9 @@ The memory is organized as:
 Each page can be individually programmed (bits are programmed from 1 to 0). The device is 
 sector or bulk erasable (bits are erased from 0 to 1) but not page erasable
 */
-#define COFFEE_XMEM_TOTAL_SIZE_KB       2048UL  //Total size of the External Flash Memory in the Z1
+
+/* Total size of the External Flash Memory in the Z1 */
+#define COFFEE_XMEM_TOTAL_SIZE_KB       2048UL  
 
 /* Coffee configuration parameters. */
 #define COFFEE_SECTOR_SIZE		65536UL  
@@ -81,4 +83,4 @@ sector or bulk erasable (bits are erased from 0 to 1) but not page erasable
 /* Coffee types. */
 typedef int16_t coffee_page_t;
 
-#endif /* !COFFEE_ARCH_H */
+#endif /* !CFS_COFFEE_ARCH_H */

@@ -35,9 +35,9 @@
 #ifndef IP64_ARP_H
 #define IP64_ARP_H
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 
-#include "ip64-eth.h"
+#include "ip64/ip64-eth.h"
 
 
 /* The uip_arp_init() function must be called before any of the other

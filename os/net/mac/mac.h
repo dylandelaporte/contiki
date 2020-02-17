@@ -40,9 +40,17 @@
 #ifndef MAC_H_
 #define MAC_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "dev/radio.h"
 
+/**
+ *\brief The default channel for IEEE 802.15.4 networks.
+ */
+#ifdef IEEE802154_CONF_DEFAULT_CHANNEL
+#define IEEE802154_DEFAULT_CHANNEL           IEEE802154_CONF_DEFAULT_CHANNEL
+#else /* IEEE802154_CONF_DEFAULT_CHANNEL */
+#define IEEE802154_DEFAULT_CHANNEL           26
+#endif /* IEEE802154_CONF_DEFAULT_CHANNEL */
 
 typedef void (* mac_callback_t)(void *ptr, int status, int transmissions);
 
@@ -57,20 +65,20 @@ struct mac_driver {
   /** Initialize the MAC driver */
   void (* init)(void);
 
-  /** Send a packet from the Rime buffer  */
+  /** Send a packet from the packetbuf  */
   void (* send)(mac_callback_t sent_callback, void *ptr);
 
   /** Callback for getting notified of incoming packet. */
   void (* input)(void);
-  
+
   /** Turn the MAC layer on. */
   int (* on)(void);
 
   /** Turn the MAC layer off. */
-  int (* off)(int keep_radio_on);
+  int (* off)(void);
 
-  /** Returns the channel check interval, expressed in clock_time_t ticks. */
-  unsigned short (* channel_check_interval)(void);
+  /** Read out estimated max payload size based on payload in packetbuf */
+  int (* max_payload)(void);
 };
 
 /* Generic MAC return values. */

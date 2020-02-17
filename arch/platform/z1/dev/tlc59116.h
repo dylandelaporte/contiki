@@ -99,20 +99,20 @@ void tlc59116_led(uint8_t led, uint8_t pwm);
 /* Application definitions, change if required by application. */
 
 /* Suggested defaults according to the data sheet etc */
-#define TLC59116_MODE1_DEFAULT   0x00   // Default (no sub or all call) + OSC on
-#define TLC59116_MODE2_DEFAULT   0x00   // Default (output change on stop)
+#define TLC59116_MODE1_DEFAULT   0x00   /* Default (no sub or all call) + OSC on */
+#define TLC59116_MODE2_DEFAULT   0x00   /* Default (output change on stop) */
 
-#define TLC59116_LEDOUT_PWM      0xAA   // LDRx = 01 -> PWM; 4 leds per reg: 01010101b -> 0xAA
+#define TLC59116_LEDOUT_PWM      0xAA   /* LDRx = 01 -> PWM; 4 leds per reg: 01010101b -> 0xAA */
 
 /* -------------------------------------------------------------------------- */
 /* Reference definitions, should not be changed */
 /* TLC59116 slave address */
-#define TLC59116_ADDR            0x60   //7bit adress, 8bit write adress: 0xC0
-                                        //address with all address pins pulled to ground
+#define TLC59116_ADDR            0x60   /* 7bit adress, 8bit write adress: 0xC0 */
+                                        /* address with all address pins pulled to ground */
 /* TLC59116 registers */
 #define TLC59116_MODE1           0x00
 #define TLC59116_MODE2           0x01
-#define TLC59116_PWM0_AUTOINCR   0xA2   //auto increment address for first pwm register
+#define TLC59116_PWM0_AUTOINCR   0xA2   /* auto increment address for first pwm register */
 #define TLC59116_PWM0            0x02
 #define TLC59116_PWM1            0x03
 #define TLC59116_PWM2            0x04

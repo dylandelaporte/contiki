@@ -36,45 +36,15 @@
 #include <string.h>
 
 #include "contiki.h"
-
-#if defined(__AVR__)
-#include <avr/io.h>
-#endif
+#include "sys/energest.h"
 
 #include "dev/leds.h"
-#include "dev/spi.h"
+#include "dev/spi-legacy.h"
 #include "cc2420.h"
 #include "cc2420_const.h"
 
 #include "net/packetbuf.h"
-#include "net/rime/rimestats.h"
 #include "net/netstack.h"
-
-#define WITH_SEND_CCA 1
-
-#ifndef CC2420_CONF_CHANNEL
-#define CC2420_CONF_CHANNEL 26
-#endif /* CC2420_CONF_CHANNEL */
-
-#ifndef CC2420_CONF_CCA_THRESH
-#define CC2420_CONF_CCA_THRESH -45
-#endif /* CC2420_CONF_CCA_THRESH */
-
-#ifndef CC2420_CONF_AUTOACK
-#define CC2420_CONF_AUTOACK 0
-#endif /* CC2420_CONF_AUTOACK */
-
-#define CHECKSUM_LEN        2
-#define FOOTER_LEN          2
-#define FOOTER1_CRC_OK      0x80
-#define FOOTER1_CORRELATION 0x7f
-
-#ifdef CC2420_CONF_RSSI_OFFSET
-#define RSSI_OFFSET CC2420_CONF_RSSI_OFFSET
-#else /* CC2420_CONF_RSSI_OFFSET */
-/* The RSSI_OFFSET is approximate -45 (see CC2420 specification) */
-#define RSSI_OFFSET -45
-#endif /* CC2420_CONF_RSSI_OFFSET */
 
 enum write_ram_order {
   /* Begin with writing the first given byte */
@@ -126,9 +96,6 @@ static const struct output_config output_power[] = {
 
 void cc2420_arch_init(void);
 
-/* XXX hack: these will be made as Chameleon packet attributes */
-rtimer_clock_t cc2420_time_of_arrival, cc2420_time_of_departure;
-
 int cc2420_authority_level_of_sender;
 
 volatile uint8_t cc2420_sfd_counter;
@@ -136,6 +103,13 @@ volatile uint16_t cc2420_sfd_start_time;
 volatile uint16_t cc2420_sfd_end_time;
 
 static volatile uint16_t last_packet_timestamp;
+
+/*
+ * The maximum number of bytes this driver can accept from the MAC layer for
+ * transmission or will deliver to the MAC layer after reception. Includes
+ * the MAC header and payload, but not the FCS.
+ */
+#define MAX_PAYLOAD_LEN (127 - CHECKSUM_LEN)
 /*---------------------------------------------------------------------------*/
 PROCESS(cc2420_process, "CC2420 driver");
 /*---------------------------------------------------------------------------*/
@@ -147,6 +121,7 @@ PROCESS(cc2420_process, "CC2420 driver");
 #define CORR_THR(n) (((n) & 0x1f) << 6)
 #define FIFOP_THR(n) ((n) & 0x7f)
 #define RXBPF_LOCUR (1 << 13);
+#define TX_MODE (3 << 2)
 
 int cc2420_on(void);
 int cc2420_off(void);
@@ -167,6 +142,8 @@ static void set_frame_filtering(uint8_t enable);
 static void set_poll_mode(uint8_t enable);
 static void set_send_on_cca(uint8_t enable);
 static void set_auto_ack(uint8_t enable);
+
+static void set_test_mode(uint8_t enable, uint8_t modulated);
 
 signed char cc2420_last_rssi;
 uint8_t cc2420_last_correlation;
@@ -189,7 +166,11 @@ get_value(radio_param_t param, radio_value_t *value)
   }
   switch(param) {
   case RADIO_PARAM_POWER_MODE:
-    *value = receive_on ? RADIO_POWER_MODE_ON : RADIO_POWER_MODE_OFF;
+    if((getreg(CC2420_MDMCTRL1) & TX_MODE) & 0x08) {
+      *value = RADIO_POWER_MODE_CARRIER_ON;
+    } else {
+      *value = receive_on ? RADIO_POWER_MODE_ON : RADIO_POWER_MODE_OFF;
+    }
     return RADIO_RESULT_OK;
   case RADIO_PARAM_CHANNEL:
     *value = cc2420_get_channel();
@@ -250,6 +231,9 @@ get_value(radio_param_t param, radio_value_t *value)
   case RADIO_CONST_TXPOWER_MAX:
     *value = OUTPUT_POWER_MAX;
     return RADIO_RESULT_OK;
+  case RADIO_CONST_MAX_PAYLOAD_LEN:
+    *value = (radio_value_t)MAX_PAYLOAD_LEN;
+    return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
   }
@@ -268,6 +252,11 @@ set_value(radio_param_t param, radio_value_t value)
     }
     if(value == RADIO_POWER_MODE_OFF) {
       cc2420_off();
+      return RADIO_RESULT_OK;
+    }
+    if(value == RADIO_POWER_MODE_CARRIER_ON ||
+       value == RADIO_POWER_MODE_CARRIER_OFF) {
+      set_test_mode((value == RADIO_POWER_MODE_CARRIER_ON), 0);
       return RADIO_RESULT_OK;
     }
     return RADIO_RESULT_INVALID_VALUE;
@@ -368,7 +357,7 @@ static uint16_t
 getreg(enum cc2420_register regname)
 {
   uint16_t value;
-  
+
   CC2420_SPI_ENABLE();
   SPI_WRITE(regname | 0x40);
   value = (uint8_t)SPI_RXBUF;
@@ -379,11 +368,11 @@ getreg(enum cc2420_register regname)
   SPI_WAITFOREORx();
   value |= SPI_RXBUF;
   CC2420_SPI_DISABLE();
-  
+
   return value;
 }
 /*---------------------------------------------------------------------------*/
-/** 
+/**
  * Writes to a register.
  * Note: the SPI_WRITE(0) seems to be needed for getting the
  * write reg working on the Z1 / MSP430X platform
@@ -404,7 +393,7 @@ static void
 read_ram(uint8_t *buffer, uint16_t adr, uint16_t count)
 {
   uint8_t i;
-  
+
   CC2420_SPI_ENABLE();
   SPI_WRITE(0x80 | ((adr) & 0x7f));
   SPI_WRITE((((adr) >> 1) & 0xc0) | 0x20);
@@ -423,7 +412,7 @@ write_ram(const uint8_t *buffer,
     enum write_ram_order order)
 {
   uint8_t i;
-  
+
   CC2420_SPI_ENABLE();
   SPI_WRITE_FAST(0x80 | (adr & 0x7f));
   SPI_WRITE_FAST((adr >> 1) & 0xc0);
@@ -444,7 +433,7 @@ static void
 write_fifo_buf(const uint8_t *buffer, uint16_t count)
 {
   uint8_t i;
-  
+
   CC2420_SPI_ENABLE();
   SPI_WRITE_FAST(CC2420_TXFIFO);
   for(i = 0; i < count; i++) {
@@ -459,12 +448,12 @@ static uint8_t
 get_status(void)
 {
   uint8_t status;
-  
+
   CC2420_SPI_ENABLE();
   SPI_WRITE(CC2420_SNOP);
   status = SPI_RXBUF;
   CC2420_SPI_DISABLE();
-  
+
   return status;
 }
 /*---------------------------------------------------------------------------*/
@@ -472,7 +461,7 @@ static void
 getrxdata(uint8_t *buffer, int count)
 {
   uint8_t i;
-  
+
   CC2420_SPI_ENABLE();
   SPI_WRITE(CC2420_RXFIFO | 0x40);
   (void) SPI_RXBUF;
@@ -575,9 +564,9 @@ static void
 set_key(const uint8_t *key)
 {
   GET_LOCK();
-  
+
   write_ram(key, CC2420RAM_KEY0, 16, WRITE_RAM_REVERSE);
-  
+
   RELEASE_LOCK();
 }
 /*---------------------------------------------------------------------------*/
@@ -585,17 +574,17 @@ static void
 encrypt(uint8_t *plaintext_and_result)
 {
   GET_LOCK();
-  
+
   write_ram(plaintext_and_result,
       CC2420RAM_SABUF,
       16,
       WRITE_RAM_IN_ORDER);
-  
+
   strobe(CC2420_SAES);
   while(get_status() & BV(CC2420_ENC_BUSY));
-  
+
   read_ram(plaintext_and_result, CC2420RAM_SABUF, 16);
-  
+
   RELEASE_LOCK();
 }
 /*---------------------------------------------------------------------------*/
@@ -657,7 +646,7 @@ cc2420_init(void)
   reg &= ~(1 << 13);
   setreg(CC2420_TXCTRL, reg);*/
 
-  
+
   /* Change default values as recomended in the data sheet, */
   /* correlation threshold = 20, RX bandpass filter = 1.3uA. */
   setreg(CC2420_MDMCTRL1, CORR_THR(20));
@@ -671,7 +660,7 @@ cc2420_init(void)
   init_security();
 
   cc2420_set_pan_addr(0xffff, 0x0000, NULL);
-  cc2420_set_channel(CC2420_CONF_CHANNEL);
+  cc2420_set_channel(IEEE802154_DEFAULT_CHANNEL);
   cc2420_set_cca_threshold(CC2420_CONF_CCA_THRESH);
 
   flushrx();
@@ -685,17 +674,13 @@ cc2420_init(void)
 static int
 cc2420_transmit(unsigned short payload_len)
 {
-  int i, txpower;
-  
-  GET_LOCK();
+  int i;
 
-  txpower = 0;
-  if(packetbuf_attr(PACKETBUF_ATTR_RADIO_TXPOWER) > 0) {
-    /* Remember the current transmission power */
-    txpower = cc2420_get_txpower();
-    /* Set the specified transmission power */
-    set_txpower(packetbuf_attr(PACKETBUF_ATTR_RADIO_TXPOWER) - 1);
+  if(payload_len > MAX_PAYLOAD_LEN) {
+    return RADIO_TX_ERR;
   }
+
+  GET_LOCK();
 
   /* The TX FIFO can only hold one packet. Make sure to not overrun
    * FIFO by waiting for transmission to start here and synchronizing
@@ -719,18 +704,6 @@ cc2420_transmit(unsigned short payload_len)
   }
   for(i = LOOP_20_SYMBOLS; i > 0; i--) {
     if(CC2420_SFD_IS_1) {
-#if PACKETBUF_WITH_PACKET_TYPE
-      {
-        rtimer_clock_t sfd_timestamp;
-        sfd_timestamp = cc2420_sfd_start_time;
-        if(packetbuf_attr(PACKETBUF_ATTR_PACKET_TYPE) ==
-           PACKETBUF_ATTR_PACKET_TYPE_TIMESTAMP) {
-          /* Write timestamp to last two bytes of packet in TXFIFO. */
-          write_ram((uint8_t *) &sfd_timestamp, CC2420RAM_TXFIFO + payload_len - 1, 2, WRITE_RAM_IN_ORDER);
-        }
-      }
-#endif /* PACKETBUF_WITH_PACKET_TYPE */
-
       if(!(get_status() & BV(CC2420_TX_ACTIVE))) {
         /* SFD went high but we are not transmitting. This means that
            we just started receiving a packet, so we drop the
@@ -746,9 +719,6 @@ cc2420_transmit(unsigned short payload_len)
 	 accurate measurement of the transmission time.*/
       wait_for_transmission();
 
-#ifdef ENERGEST_CONF_LEVELDEVICE_LEVELS
-      ENERGEST_OFF_LEVEL(ENERGEST_TYPE_TRANSMIT,cc2420_get_txpower());
-#endif
       ENERGEST_OFF(ENERGEST_TYPE_TRANSMIT);
       if(receive_on) {
 	ENERGEST_ON(ENERGEST_TYPE_LISTEN);
@@ -758,11 +728,6 @@ cc2420_transmit(unsigned short payload_len)
 	off();
       }
 
-      if(packetbuf_attr(PACKETBUF_ATTR_RADIO_TXPOWER) > 0) {
-        /* Restore the transmission power */
-        set_txpower(txpower & 0xff);
-      }
-
       RELEASE_LOCK();
       return RADIO_TX_OK;
     }
@@ -770,13 +735,7 @@ cc2420_transmit(unsigned short payload_len)
 
   /* If we send with cca (cca_on_send), we get here if the packet wasn't
      transmitted because of other channel activity. */
-  RIMESTATS_ADD(contentiondrop);
   PRINTF("cc2420: do_send() transmission never started\n");
-
-  if(packetbuf_attr(PACKETBUF_ATTR_RADIO_TXPOWER) > 0) {
-    /* Restore the transmission power */
-    set_txpower(txpower & 0xff);
-  }
 
   RELEASE_LOCK();
   return RADIO_TX_COLLISION;
@@ -786,12 +745,14 @@ static int
 cc2420_prepare(const void *payload, unsigned short payload_len)
 {
   uint8_t total_len;
-  
+
+  if(payload_len > MAX_PAYLOAD_LEN) {
+    return RADIO_TX_ERR;
+  }
+
   GET_LOCK();
 
   PRINTF("cc2420: sending %d bytes\n", payload_len);
-
-  RIMESTATS_ADD(lltx);
 
   /* Wait for any previous transmission to finish. */
   /*  while(status() & BV(CC2420_TX_ACTIVE));*/
@@ -802,7 +763,7 @@ cc2420_prepare(const void *payload, unsigned short payload_len)
   total_len = payload_len + CHECKSUM_LEN;
   write_fifo_buf(&total_len, 1);
   write_fifo_buf(payload, payload_len);
-  
+
   RELEASE_LOCK();
   return 0;
 }
@@ -880,7 +841,7 @@ cc2420_set_channel(int c)
   channel = c;
 
   f = 5 * (c - 11) + 357 + 0x4000;
-  
+
   /* Wait for any transmission to end. */
   wait_for_transmission();
 
@@ -902,10 +863,10 @@ cc2420_set_pan_addr(unsigned pan,
                     const uint8_t *ieee_addr)
 {
   GET_LOCK();
-  
+
   write_ram((uint8_t *) &pan, CC2420RAM_PANID, 2, WRITE_RAM_IN_ORDER);
   write_ram((uint8_t *) &addr, CC2420RAM_SHORTADDR, 2, WRITE_RAM_IN_ORDER);
-  
+
   if(ieee_addr != NULL) {
     write_ram(ieee_addr, CC2420RAM_IEEEADDR, 8, WRITE_RAM_REVERSE);
   }
@@ -940,10 +901,10 @@ PROCESS_THREAD(cc2420_process, ev, data)
     packetbuf_clear();
     packetbuf_set_attr(PACKETBUF_ATTR_TIMESTAMP, last_packet_timestamp);
     len = cc2420_read(packetbuf_dataptr(), PACKETBUF_SIZE);
-    
+
     packetbuf_set_datalen(len);
-    
-    NETSTACK_RDC.input();
+
+    NETSTACK_MAC.input();
   }
 
   PROCESS_END();
@@ -958,22 +919,21 @@ cc2420_read(void *buf, unsigned short bufsize)
   if(!CC2420_FIFOP_IS_1) {
     return 0;
   }
-  
+
   GET_LOCK();
 
   getrxdata(&len, 1);
 
   if(len > CC2420_MAX_PACKET_LEN) {
     /* Oops, we must be out of sync. */
-    RIMESTATS_ADD(badsynch);
   } else if(len <= FOOTER_LEN) {
-    RIMESTATS_ADD(tooshort);
+    /* Packet too short */
   } else if(len - FOOTER_LEN > bufsize) {
-    RIMESTATS_ADD(toolong);
+    /* Packet too long */
   } else {
     getrxdata((uint8_t *) buf, len - FOOTER_LEN);
     getrxdata(footer, FOOTER_LEN);
-    
+
     if(footer[1] & FOOTER1_CRC_OK) {
       cc2420_last_rssi = footer[0] + RSSI_OFFSET;
       cc2420_last_correlation = footer[1] & FOOTER1_CORRELATION;
@@ -984,10 +944,7 @@ cc2420_read(void *buf, unsigned short bufsize)
         packetbuf_set_attr(PACKETBUF_ATTR_RSSI, cc2420_last_rssi);
         packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, cc2420_last_correlation);
       }
-
-      RIMESTATS_ADD(llrx);
     } else {
-      RIMESTATS_ADD(badcrc);
       len = FOOTER_LEN;
     }
 
@@ -1004,11 +961,11 @@ cc2420_read(void *buf, unsigned short bufsize)
         }
       }
     }
-    
+
     RELEASE_LOCK();
     return len - FOOTER_LEN;
   }
-  
+
   flushrx();
   RELEASE_LOCK();
   return 0;
@@ -1041,7 +998,7 @@ cc2420_rssi(void)
   if(locked) {
     return 0;
   }
-  
+
   GET_LOCK();
 
   if(!receive_on) {
@@ -1191,5 +1148,47 @@ static void
 set_send_on_cca(uint8_t enable)
 {
   send_on_cca = enable;
+}
+/*---------------------------------------------------------------------------*/
+/* Enable or disable radio test mode emmiting modulated or unmodulated
+ * (carrier) signal. See datasheet page 55.
+ */
+static uint16_t prev_MDMCTRL1, prev_DACTST;
+static uint8_t was_on;
+
+static void
+set_test_mode(uint8_t enable, uint8_t modulated)
+{
+  radio_value_t mode;
+  get_value(RADIO_PARAM_POWER_MODE, &mode);
+
+  if(enable) {
+    if(mode == RADIO_POWER_MODE_CARRIER_ON) {
+      return;
+    }
+    was_on = (mode == RADIO_POWER_MODE_ON);
+    off();
+    prev_MDMCTRL1 = getreg(CC2420_MDMCTRL1);
+    setreg(CC2420_MDMCTRL1, 0x050C);
+    if(!modulated) {
+      prev_DACTST = getreg(CC2420_DACTST);
+      setreg(CC2420_DACTST, 0x1800);
+    }
+    /* actually starts the test mode */
+    strobe(CC2420_STXON);
+  } else {
+    if(mode != RADIO_POWER_MODE_CARRIER_ON) {
+      return;
+    }
+    strobe(CC2420_SRFOFF);
+    if(!modulated) {
+      setreg(CC2420_DACTST, prev_DACTST);
+    }
+    setreg(CC2420_MDMCTRL1, prev_MDMCTRL1);
+    /* actually stops the carrier */
+    if(was_on) {
+      on();
+    }
+  }
 }
 /*---------------------------------------------------------------------------*/

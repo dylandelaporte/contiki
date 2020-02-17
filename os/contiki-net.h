@@ -38,20 +38,16 @@
 
 #include "net/ip/tcpip.h"
 #include "net/ip/uip.h"
-#include "net/ipv4/uip-fw.h"
-#include "net/ipv4/uip-fw-drv.h"
-#include "net/ipv4/uip_arp.h"
 #include "net/ip/uiplib.h"
 #include "net/ip/uip-udp-packet.h"
 #include "net/ip/simple-udp.h"
 #include "net/ip/uip-nameserver.h"
+#include "net/routing/routing.h"
 
 #if NETSTACK_CONF_WITH_IPV6
 #include "net/ipv6/uip-icmp6.h"
 #include "net/ipv6/uip-ds6.h"
 #endif /* NETSTACK_CONF_WITH_IPV6 */
-
-#include "net/ip/resolv.h"
 
 #include "net/ip/psock.h"
 

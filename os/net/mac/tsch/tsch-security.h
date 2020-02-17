@@ -30,34 +30,29 @@
  *
  */
 
+/**
+ * \addtogroup tsch
+ * @{
+ * \file
+ *	TSCH security
+*/
+
 #ifndef __TSCH_SECURITY_H__
 #define __TSCH_SECURITY_H__
 
 /********** Includes **********/
 
 #include "contiki.h"
-#include "net/mac/tsch/tsch-asn.h"
-#include "net/mac/tsch/tsch-private.h"
-#include "net/mac/frame802154.h"
-#include "net/llsec/llsec802154.h"
-#include "net/mac/frame802154e-ie.h"
+#include "net/mac/framer/frame802154.h"
+#include "net/mac/framer/frame802154e-ie.h"
+#include "net/mac/llsec802154.h"
 
-/******** Configuration *******/
+/********** Configurarion *********/
 
 /* To enable TSCH security:
  * - set LLSEC802154_CONF_ENABLED
  * - set LLSEC802154_CONF_USES_EXPLICIT_KEYS
- * - unset LLSEC802154_CONF_USES_FRAME_COUNTER
  * */
-
-#if LLSEC802154_ENABLED && !LLSEC802154_USES_EXPLICIT_KEYS
-#error LLSEC802154_ENABLED set but LLSEC802154_USES_EXPLICIT_KEYS unset
-#endif /* LLSEC802154_ENABLED */
-#if LLSEC802154_ENABLED && LLSEC802154_USES_FRAME_COUNTER
-// TSCH does no need anti-reply supression, since it the ASN rather than frame
-//      counter to construct the Nonce
-#error LLSEC802154_ENABLED set but LLSEC802154_USES_FRAME_COUNTER set
-#endif /* LLSEC802154_ENABLED */
 
 /* K1, defined in 6TiSCH minimal, is well-known (offers no security) and used for EBs only */
 #ifdef TSCH_SECURITY_CONF_K1
@@ -139,6 +134,7 @@
 
 /************ Types ***********/
 
+/* AES-128 key */
 typedef uint8_t aes_key[16];
 
 /********** Functions *********/
@@ -181,4 +177,11 @@ unsigned int tsch_security_parse_frame(const uint8_t *hdr, int hdrlen,
                                        const linkaddr_t *sender,
                                        struct tsch_asn_t *asn);
 
+/**
+ * \brief Set packetbuf (or eackbuf) attributes depending on a given frame type
+ * \param frame_type The frame type (FRAME802154_BEACONFRAME etc.)
+ */
+void tsch_security_set_packetbuf_attr(uint8_t frame_type);
+
 #endif /* __TSCH_SECURITY_H__ */
+/** @} */

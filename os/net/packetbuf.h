@@ -32,29 +32,30 @@
 
 /**
  * \file
- *         Header file for the Rime buffer (packetbuf) management
+ *         Header file for the Packet buffer (packetbuf) management
  * \author
  *         Adam Dunkels <adam@sics.se>
  */
 
 /**
- * \addtogroup rime
+ * \addtogroup net
  * @{
  */
 
 /**
- * \defgroup packetbuf Rime buffer management
+ * \defgroup packetbuf Packet buffer
  * @{
  *
- * The packetbuf module does Rime's buffer management.
+ * The packetbuf module does Contiki's buffer management.
  */
 
 #ifndef PACKETBUF_H_
 #define PACKETBUF_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "net/linkaddr.h"
-#include "net/llsec/llsec802154.h"
+#include "net/mac/llsec802154.h"
+#include "net/mac/csma/csma-security.h"
 #include "net/mac/tsch/tsch-conf.h"
 
 /**
@@ -135,20 +136,6 @@ uint16_t packetbuf_remaininglen(void);
  * \param len  The length of the data
  */
 void packetbuf_set_datalen(uint16_t len);
-
-/**
- * \brief      Compact the packetbuf
- *
- *             This function compacts the packetbuf by copying the data
- *             portion of the packetbuf so that becomes consecutive to
- *             the header.
- *
- *             This function is called by the Rime code before a
- *             packet is to be sent by a device driver. This assures
- *             that the entire packet is consecutive in memory.
- *
- */
-void packetbuf_compact(void);
 
 /**
  * \brief      Copy from external data into the packetbuf
@@ -237,16 +224,16 @@ enum {
   PACKETBUF_ATTR_LINK_QUALITY,
   PACKETBUF_ATTR_RSSI,
   PACKETBUF_ATTR_TIMESTAMP,
-  PACKETBUF_ATTR_RADIO_TXPOWER,
-  PACKETBUF_ATTR_LISTEN_TIME,
-  PACKETBUF_ATTR_TRANSMIT_TIME,
   PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS,
   PACKETBUF_ATTR_MAC_SEQNO,
   PACKETBUF_ATTR_MAC_ACK,
-  PACKETBUF_ATTR_IS_CREATED_AND_SECURED,
+  PACKETBUF_ATTR_MAC_METADATA,
+  PACKETBUF_ATTR_MAC_NO_SRC_ADDR,
+  PACKETBUF_ATTR_MAC_NO_DEST_ADDR,
 #if TSCH_WITH_LINK_SELECTOR
   PACKETBUF_ATTR_TSCH_SLOTFRAME,
   PACKETBUF_ATTR_TSCH_TIMESLOT,
+  PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET,
 #endif /* TSCH_WITH_LINK_SELECTOR */
 
   /* Scope 1 attributes: used between two neighbors only. */
@@ -268,6 +255,11 @@ enum {
         //    ommits default security value
         PACKETBUF_ATTR_SECURITY_LEVEL_DROP = 0x80,
 #endif /* LLSEC802154_USES_AUX_HEADER */
+#if LLSEC802154_USES_EXPLICIT_KEYS
+  PACKETBUF_ATTR_KEY_ID_MODE,
+  PACKETBUF_ATTR_KEY_INDEX,
+#endif /* LLSEC802154_USES_EXPLICIT_KEYS */
+
 #if LLSEC802154_USES_FRAME_COUNTER
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_0_1,
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_2_3,
@@ -363,6 +355,8 @@ void              packetbuf_attr_copyfrom(struct packetbuf_attr *attrs,
 #define PACKETBUF_ATTR_BIT  1
 #define PACKETBUF_ATTR_BYTE 8
 #define PACKETBUF_ADDRSIZE (LINKADDR_SIZE * PACKETBUF_ATTR_BYTE)
+
+#define PACKETBUF_ATTR_SECURITY_LEVEL_DEFAULT 0xffff
 
 struct packetbuf_attrlist {
   uint8_t type;

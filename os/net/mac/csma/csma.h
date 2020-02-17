@@ -29,23 +29,67 @@
  * This file is part of the Contiki operating system.
  *
  */
+/**
+ * \addtogroup link-layer
+ * @{
+ *
+ * \defgroup csma Implementation of the 802.15.4 standard CSMA protocol
+ * @{
+*/
 
 /**
  * \file
- *         A MAC stack protocol that performs retransmissions when the
- *         underlying MAC layer has problems with collisions
+ *         The 802.15.4 standard CSMA protocol (nonbeacon-enabled)
  * \author
  *         Adam Dunkels <adam@sics.se>
+ *         Simon Duquennoy <simon.duquennoy@inria.fr>
  */
 
 #ifndef CSMA_H_
 #define CSMA_H_
 
+#include "contiki.h"
 #include "net/mac/mac.h"
+#include "net/packetbuf.h"
+#include "net/netstack.h"
 #include "dev/radio.h"
+
+#ifdef CSMA_CONF_SEND_SOFT_ACK
+#define CSMA_SEND_SOFT_ACK CSMA_CONF_SEND_SOFT_ACK
+#else /* CSMA_CONF_SEND_SOFT_ACK */
+#define CSMA_SEND_SOFT_ACK 0
+#endif /* CSMA_CONF_SEND_SOFT_ACK */
+
+#ifdef CSMA_CONF_ACK_WAIT_TIME
+#define CSMA_ACK_WAIT_TIME CSMA_CONF_ACK_WAIT_TIME
+#else /* CSMA_CONF_ACK_WAIT_TIME */
+#define CSMA_ACK_WAIT_TIME                      RTIMER_SECOND / 2500
+#endif /* CSMA_CONF_ACK_WAIT_TIME */
+
+#ifdef CSMA_CONF_AFTER_ACK_DETECTED_WAIT_TIME
+#define CSMA_AFTER_ACK_DETECTED_WAIT_TIME CSMA_CONF_AFTER_ACK_DETECTED_WAIT_TIME
+#else /* CSMA_CONF_AFTER_ACK_DETECTED_WAIT_TIME */
+#define CSMA_AFTER_ACK_DETECTED_WAIT_TIME       RTIMER_SECOND / 1500
+#endif /* CSMA_CONF_AFTER_ACK_DETECTED_WAIT_TIME */
+
+#define CSMA_ACK_LEN 3
+
+/* just a default - with LLSEC, etc */
+#define CSMA_MAC_MAX_HEADER 21
+
 
 extern const struct mac_driver csma_driver;
 
-const struct mac_driver *csma_init(const struct mac_driver *r);
+/* CSMA security framer functions */
+int csma_security_create_frame(void);
+int csma_security_parse_frame(void);
+
+/* key management for CSMA */
+int csma_security_set_key(uint8_t index, const uint8_t *key);
+
 
 #endif /* CSMA_H_ */
+/**
+ * @}
+ * @}
+ */

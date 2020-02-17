@@ -39,17 +39,16 @@
 #define __ORCHESTRA_H__
 
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-conf.h"
-#include "net/mac/tsch/tsch-schedule.h"
 #include "orchestra-conf.h"
 
 /* The structure of an Orchestra rule */
 struct orchestra_rule {
   void (* init)(uint16_t slotframe_handle);
   void (* new_time_source)(const struct tsch_neighbor *old, const struct tsch_neighbor *new);
-  int  (* select_packet)(uint16_t *slotframe, uint16_t *timeslot);
+  int  (* select_packet)(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset);
   void (* child_added)(const linkaddr_t *addr);
   void (* child_removed)(const linkaddr_t *addr);
+  const char *name;
 };
 
 struct orchestra_rule eb_per_time_source;
@@ -64,7 +63,7 @@ extern int orchestra_parent_knows_us;
 void orchestra_init(void);
 /* Callbacks requied for Orchestra to operate */
 /* Set with #define TSCH_CALLBACK_PACKET_READY orchestra_callback_packet_ready */
-void orchestra_callback_packet_ready(void);
+int orchestra_callback_packet_ready(void);
 /* Set with #define TSCH_CALLBACK_NEW_TIME_SOURCE orchestra_callback_new_time_source */
 void orchestra_callback_new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new);
 /* Set with #define NETSTACK_CONF_ROUTING_NEIGHBOR_ADDED_CALLBACK orchestra_callback_child_added */

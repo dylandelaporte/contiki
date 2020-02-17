@@ -37,50 +37,40 @@
 #include "net/link-stats.h"
 #include <stdio.h>
 
-#undef DEBUG
-#define DEBUG 0
-#if DEBUG
-#define PRINTF(...) printf(__VA_ARGS__)
-#else
-#define PRINTF(...)
-#endif
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "Link Stats"
+#define LOG_LEVEL LOG_LEVEL_MAC
 
-/* Half time for the freshness counter, in minutes */
-#define FRESHNESS_HALF_LIFE             20
+/* Maximum value for the Tx count counter */
+#define TX_COUNT_MAX                    32
+
+/* Statistics with no update in FRESHNESS_EXPIRATION_TIMEOUT is not fresh */
+#define FRESHNESS_EXPIRATION_TIME       (10 * 60 * (clock_time_t)CLOCK_SECOND)
+/* Half time for the freshness counter */
+#define FRESHNESS_HALF_LIFE             (15 * 60 * (clock_time_t)CLOCK_SECOND)
 /* Statistics are fresh if the freshness counter is FRESHNESS_TARGET or more */
 #define FRESHNESS_TARGET                 4
 /* Maximum value for the freshness counter */
 #define FRESHNESS_MAX                   16
-/* Statistics with no update in FRESHNESS_EXPIRATION_TIMEOUT is not fresh */
-#define FRESHNESS_EXPIRATION_TIME       (10 * 60 * (clock_time_t)CLOCK_SECOND)
 
 /* EWMA (exponential moving average) used to maintain statistics over time */
-#define EWMA_SCALE            100
-#define EWMA_ALPHA             15
-#define EWMA_BOOTSTRAP_ALPHA   30
+#define EWMA_SCALE                     100
+#define EWMA_ALPHA                      10
+#define EWMA_BOOTSTRAP_ALPHA            25
 
 /* ETX fixed point divisor. 128 is the value used by RPL (RFC 6551 and RFC 6719) */
-#define ETX_DIVISOR     LINK_STATS_ETX_DIVISOR
-/* Number of Tx used to update the ETX EWMA in case of no-ACK */
-#define ETX_NOACK_PENALTY                   10
+#define ETX_DIVISOR                     LINK_STATS_ETX_DIVISOR
+/* In case of no-ACK, add ETX_NOACK_PENALTY to the real Tx count, as a penalty */
+#define ETX_NOACK_PENALTY               12
 /* Initial ETX value */
-#define ETX_INIT                             2
+#define ETX_DEFAULT                      2
 
 /* Per-neighbor link statistics table */
 NBR_TABLE(struct link_stats, link_stats);
 
-/* Called every FRESHNESS_HALF_LIFE minutes */
+/* Called at a period of FRESHNESS_HALF_LIFE */
 struct ctimer periodic_timer;
-
-/* Used to initialize ETX before any transmission occurs. In order to
- * infer the initial ETX from the RSSI of previously received packets, use: */
-/* #define LINK_STATS_CONF_INIT_ETX(stats) guess_etx_from_rssi(stats) */
-
-#ifdef LINK_STATS_CONF_INIT_ETX
-#define LINK_STATS_INIT_ETX(stats) LINK_STATS_CONF_INIT_ETX(stats)
-#else /* LINK_STATS_INIT_ETX */
-#define LINK_STATS_INIT_ETX(stats) (ETX_INIT * ETX_DIVISOR)
-#endif /* LINK_STATS_INIT_ETX */
 
 /*---------------------------------------------------------------------------*/
 /* Returns the neighbor's link stats */
@@ -88,6 +78,13 @@ const struct link_stats *
 link_stats_from_lladdr(const linkaddr_t *lladdr)
 {
   return nbr_table_get_from_lladdr(link_stats, lladdr);
+}
+/*---------------------------------------------------------------------------*/
+/* Returns the neighbor's address given a link stats item */
+const linkaddr_t *
+link_stats_get_lladdr(const struct link_stats *stat)
+{
+  return nbr_table_get_lladdr(link_stats, stat);
 }
 /*---------------------------------------------------------------------------*/
 /* Are the statistics fresh? */
@@ -99,12 +96,13 @@ link_stats_is_fresh(const struct link_stats *stats)
       && stats->freshness >= FRESHNESS_TARGET;
 }
 /*---------------------------------------------------------------------------*/
+#if LINK_STATS_INIT_ETX_FROM_RSSI
 uint16_t
 guess_etx_from_rssi(const struct link_stats *stats)
 {
   if(stats != NULL) {
     if(stats->rssi == 0) {
-      return ETX_INIT * ETX_DIVISOR;
+      return ETX_DEFAULT * ETX_DIVISOR;
     } else {
       /* A rough estimate of PRR from RSSI, as a linear function where:
        *      RSSI >= -60 results in PRR of 1
@@ -127,14 +125,17 @@ guess_etx_from_rssi(const struct link_stats *stats)
   }
   return 0xffff;
 }
+#endif /* LINK_STATS_INIT_ETX_FROM_RSSI */
 /*---------------------------------------------------------------------------*/
 /* Packet sent callback. Updates stats for transmissions to lladdr */
 void
 link_stats_packet_sent(const linkaddr_t *lladdr, int status, int numtx)
 {
   struct link_stats *stats;
+#if !LINK_STATS_ETX_FROM_PACKET_COUNT
   uint16_t packet_etx;
   uint8_t ewma_alpha;
+#endif /* !LINK_STATS_ETX_FROM_PACKET_COUNT */
 
   if(status != MAC_TX_OK && status != MAC_TX_NOACK) {
     /* Do not penalize the ETX when collisions or transmission errors occur. */
@@ -143,10 +144,19 @@ link_stats_packet_sent(const linkaddr_t *lladdr, int status, int numtx)
 
   stats = nbr_table_get_from_lladdr(link_stats, lladdr);
   if(stats == NULL) {
+    /* If transmission failed, do not add the neighbor, as the neighbor might not exist anymore */
+    if(status != MAC_TX_OK) {
+      return;
+    }
+
     /* Add the neighbor */
     stats = nbr_table_add_lladdr(link_stats, lladdr, NBR_TABLE_REASON_LINK_STATS, NULL);
     if(stats != NULL) {
-      stats->etx = LINK_STATS_INIT_ETX(stats);
+#if LINK_STATS_INIT_ETX_FROM_RSSI
+      stats->etx = guess_etx_from_rssi(stats);
+#else /* LINK_STATS_INIT_ETX_FROM_RSSI */
+      stats->etx = ETX_DEFAULT * ETX_DIVISOR;
+#endif /* LINK_STATS_INIT_ETX_FROM_RSSI */
     } else {
       return; /* No space left, return */
     }
@@ -156,14 +166,49 @@ link_stats_packet_sent(const linkaddr_t *lladdr, int status, int numtx)
   stats->last_tx_time = clock_time();
   stats->freshness = MIN(stats->freshness + numtx, FRESHNESS_MAX);
 
+#if LINK_STATS_PACKET_COUNTERS
+  /* Update paket counters */
+  stats->cnt_current.num_packets_tx += numtx;
+  if(status == MAC_TX_OK) {
+    stats->cnt_current.num_packets_acked++;
+  }
+#endif
+
+  /* Add penalty in case of no-ACK */
+  if(status == MAC_TX_NOACK) {
+    numtx += ETX_NOACK_PENALTY;
+  }
+
+#if LINK_STATS_ETX_FROM_PACKET_COUNT
+  /* Compute ETX from packet and ACK count */
+  /* Halve both counter after TX_COUNT_MAX */
+  if(stats->tx_count + numtx > TX_COUNT_MAX) {
+    stats->tx_count /= 2;
+    stats->ack_count /= 2;
+  }
+  /* Update tx_count and ack_count */
+  stats->tx_count += numtx;
+  if(status == MAC_TX_OK) {
+    stats->ack_count++;
+  }
+  /* Compute ETX */
+  if(stats->ack_count > 0) {
+    stats->etx = ((uint16_t)stats->tx_count * ETX_DIVISOR) / stats->ack_count;
+  } else {
+    stats->etx = (uint16_t)MAX(ETX_NOACK_PENALTY, stats->tx_count) * ETX_DIVISOR;
+  }
+#else /* LINK_STATS_ETX_FROM_PACKET_COUNT */
+  /* Compute ETX using an EWMA */
+
   /* ETX used for this update */
-  packet_etx = ((status == MAC_TX_NOACK) ? ETX_NOACK_PENALTY : numtx) * ETX_DIVISOR;
+  packet_etx = numtx * ETX_DIVISOR;
   /* ETX alpha used for this update */
   ewma_alpha = link_stats_is_fresh(stats) ? EWMA_ALPHA : EWMA_BOOTSTRAP_ALPHA;
 
   /* Compute EWMA and update ETX */
   stats->etx = ((uint32_t)stats->etx * (EWMA_SCALE - ewma_alpha) +
       (uint32_t)packet_etx * ewma_alpha) / EWMA_SCALE;
+#endif /* LINK_STATS_ETX_FROM_PACKET_COUNT */
 }
 /*---------------------------------------------------------------------------*/
 /* Packet input callback. Updates statistics for receptions on a given link */
@@ -180,7 +225,14 @@ link_stats_input_callback(const linkaddr_t *lladdr)
     if(stats != NULL) {
       /* Initialize */
       stats->rssi = packet_rssi;
-      stats->etx = LINK_STATS_INIT_ETX(stats);
+#if LINK_STATS_INIT_ETX_FROM_RSSI
+      stats->etx = guess_etx_from_rssi(stats);
+#else /* LINK_STATS_INIT_ETX_FROM_RSSI */
+      stats->etx = ETX_DEFAULT * ETX_DIVISOR;
+#endif /* LINK_STATS_INIT_ETX_FROM_RSSI */
+#if LINK_STATS_PACKET_COUNTERS
+      stats->cnt_current.num_packets_rx = 1;
+#endif
     }
     return;
   }
@@ -188,9 +240,39 @@ link_stats_input_callback(const linkaddr_t *lladdr)
   /* Update RSSI EWMA */
   stats->rssi = ((int32_t)stats->rssi * (EWMA_SCALE - EWMA_ALPHA) +
       (int32_t)packet_rssi * EWMA_ALPHA) / EWMA_SCALE;
+
+#if LINK_STATS_PACKET_COUNTERS
+  stats->cnt_current.num_packets_rx++;
+#endif
 }
 /*---------------------------------------------------------------------------*/
-/* Periodic timer called every FRESHNESS_HALF_LIFE minutes */
+#if LINK_STATS_PACKET_COUNTERS
+/*---------------------------------------------------------------------------*/
+static void
+print_and_update_counters(void)
+{
+  struct link_stats *stats;
+
+  for(stats = nbr_table_head(link_stats); stats != NULL;
+      stats = nbr_table_next(link_stats, stats)) {
+
+    struct link_packet_counter *c = &stats->cnt_current;
+
+    LOG_INFO("num packets: tx=%u ack=%u rx=%u to=",
+             c->num_packets_tx, c->num_packets_acked, c->num_packets_rx);
+    LOG_INFO_LLADDR(link_stats_get_lladdr(stats));
+    LOG_INFO_("\n");
+
+    stats->cnt_total.num_packets_tx += stats->cnt_current.num_packets_tx;
+    stats->cnt_total.num_packets_acked += stats->cnt_current.num_packets_acked;
+    stats->cnt_total.num_packets_rx += stats->cnt_current.num_packets_rx;
+    memset(&stats->cnt_current, 0, sizeof(stats->cnt_current));
+  }
+}
+/*---------------------------------------------------------------------------*/
+#endif /* LINK_STATS_PACKET_COUNTERS */
+/*---------------------------------------------------------------------------*/
+/* Periodic timer called at a period of FRESHNESS_HALF_LIFE */
 static void
 periodic(void *ptr)
 {
@@ -200,6 +282,22 @@ periodic(void *ptr)
   for(stats = nbr_table_head(link_stats); stats != NULL; stats = nbr_table_next(link_stats, stats)) {
     stats->freshness >>= 1;
   }
+
+#if LINK_STATS_PACKET_COUNTERS
+  print_and_update_counters();
+#endif
+}
+/*---------------------------------------------------------------------------*/
+/* Resets link-stats module */
+void
+link_stats_reset(void)
+{
+  struct link_stats *stats;
+  stats = nbr_table_head(link_stats);
+  while(stats != NULL) {
+    nbr_table_remove(link_stats, stats);
+    stats = nbr_table_next(link_stats, stats);
+  }
 }
 /*---------------------------------------------------------------------------*/
 /* Initializes link-stats module */
@@ -207,6 +305,5 @@ void
 link_stats_init(void)
 {
   nbr_table_register(link_stats, NULL);
-  ctimer_set(&periodic_timer, 60 * (clock_time_t)CLOCK_SECOND * FRESHNESS_HALF_LIFE,
-      periodic, NULL);
+  ctimer_set(&periodic_timer, FRESHNESS_HALF_LIFE, periodic, NULL);
 }

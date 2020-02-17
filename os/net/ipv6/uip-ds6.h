@@ -1,5 +1,5 @@
 /**
- * \addtogroup uip6
+ * \addtogroup uip
  * @{
  */
 
@@ -42,12 +42,12 @@
 #ifndef UIP_DS6_H_
 #define UIP_DS6_H_
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 #include "sys/stimer.h"
 /* The size of uip_ds6_addr_t depends on UIP_ND6_DEF_MAXDADNS. Include uip-nd6.h to define it. */
 #include "net/ipv6/uip-nd6.h"
-#include "net/ipv6/uip-ds6-route.h"
 #include "net/ipv6/uip-ds6-nbr.h"
+#include "net/ipv6/uip-ds6-route.h"
 
 /*--------------------------------------------------*/
 /** Configuration. For all tables (Neighbor cache, Prefix List, Routing Table,
@@ -165,7 +165,7 @@
 /** \brief General DS6 definitions */
 /** Period for uip-ds6 periodic task*/
 #ifndef UIP_DS6_CONF_PERIOD
-#define UIP_DS6_PERIOD   (CLOCK_SECOND/10)
+#define UIP_DS6_PERIOD   (60 * CLOCK_SECOND)
 #else
 #define UIP_DS6_PERIOD UIP_DS6_CONF_PERIOD
 #endif
@@ -176,7 +176,7 @@
 /*--------------------------------------------------*/
 
 #if UIP_CONF_IPV6_QUEUE_PKT
-#include "net/ip/uip-packetqueue.h"
+#include "net/ipv6/uip-packetqueue.h"
 #endif                          /*UIP_CONF_QUEUE_PKT */
 
 /** \brief A prefix list entry */
@@ -225,20 +225,6 @@ typedef struct uip_ds6_maddr {
   uint8_t isused;
   uip_ipaddr_t ipaddr;
 } uip_ds6_maddr_t;
-
-/* only define the callback if RPL is active */
-#if UIP_CONF_IPV6_RPL
-#ifndef UIP_CONF_DS6_NEIGHBOR_STATE_CHANGED
-#define UIP_CONF_DS6_NEIGHBOR_STATE_CHANGED rpl_ipv6_neighbor_callback
-#endif /* UIP_CONF_DS6_NEIGHBOR_STATE_CHANGED */
-#endif /* UIP_CONF_IPV6_RPL */
-
-#if UIP_CONF_IPV6_RPL
-#ifndef UIP_CONF_DS6_LINK_NEIGHBOR_CALLBACK
-#define UIP_CONF_DS6_LINK_NEIGHBOR_CALLBACK rpl_link_neighbor_callback
-#endif /* UIP_CONF_DS6_NEIGHBOR_STATE_CHANGED */
-#endif /* UIP_CONF_IPV6_RPL */
-
 
 /** \brief  Interface structure (contains all the interface variables) */
 typedef struct uip_ds6_netif {
@@ -310,6 +296,22 @@ uip_ds6_prefix_t *uip_ds6_prefix_lookup(uip_ipaddr_t *ipaddr,
                                         uint8_t ipaddrlen);
 uint8_t uip_ds6_is_addr_onlink(uip_ipaddr_t *ipaddr);
 
+/**
+ * \brief Retrieve the Default IPv6 prefix
+ * \retval A pointer to the default prefix
+ */
+const uip_ip6addr_t *uip_ds6_default_prefix(void);
+
+/**
+ * \brief Set the Default IPv6 prefix
+ * \param prefix A pointer to the new default prefix
+ *
+ * uip_ds6_init() will set the default prefix to UIP_DS6_DEFAULT_PREFIX
+ * unless this function here has been called beforehand to set a new default
+ * prefix.
+ */
+void uip_ds6_set_default_prefix(const uip_ip6addr_t *prefix);
+
 /** @} */
 
 /** \name Unicast address list basic routines */
@@ -343,6 +345,9 @@ uip_ds6_aaddr_t *uip_ds6_aaddr_lookup(uip_ipaddr_t *ipaddr);
 
 /** \brief set the last 64 bits of an IP address based on the MAC address */
 void uip_ds6_set_addr_iid(uip_ipaddr_t *ipaddr, uip_lladdr_t *lladdr);
+
+/** \brief Build a link-layer address from an IPv6 address based on its UUID64 */
+void uip_ds6_set_lladdr_from_iid(uip_lladdr_t *lladdr, const uip_ipaddr_t *ipaddr);
 
 /** \brief Get the number of matching bits of two addresses */
 uint8_t get_match_length(uip_ipaddr_t *src, uip_ipaddr_t *dst);

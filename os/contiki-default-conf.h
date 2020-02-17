@@ -95,6 +95,22 @@
 #define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
 #endif /* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE */
 
+/* Link-layer options
+ */
+
+/* IEEE802154_CONF_PANID defines the default PAN ID for IEEE 802.15.4 networks */
+#ifndef IEEE802154_CONF_PANID
+#define IEEE802154_CONF_PANID 0xabcd
+#endif /* IEEE802154_CONF_PANID */
+
+/* IEEE802154_CONF_DEFAULT_CHANNEL defines the default channel for IEEE 802.15.4
+ * networks, for MAC layers without a channel selection or channel hopping
+ * mechanism. Current 802.15.4 MAC layers:
+ * - CSMA: uses IEEE802154_CONF_DEFAULT_CHANNEL
+ * - TSCH: uses its own TSCH_DEFAULT_HOPPING_SEQUENCE instead
+ */
+#ifndef IEEE802154_CONF_DEFAULT_CHANNEL
+#define IEEE802154_CONF_DEFAULT_CHANNEL 26
 /*---------------------------------------------------------------------------*/
 /* Packet buffer size options.
  *
@@ -116,6 +132,19 @@
  * project-specific configuration to save memory.
  */
 
+ /* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the maximum number of neighbors
+    that each node will be able to handle. */
+#ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
+#define NBR_TABLE_CONF_MAX_NEIGHBORS 16
+#endif /* NBR_TABLE_CONF_MAX_NEIGHBORS */
+
+/* NETSTACK_MAX_ROUTE_ENTRIES specifies the maximum number of entries
+   the routing module will handle. Applies to uIP routing tables if they are
+   used, or to RPL non-storing mode links instead */
+#ifndef NETSTACK_MAX_ROUTE_ENTRIES
+#define NETSTACK_MAX_ROUTE_ENTRIES 16
+#endif /* NETSTACK_MAX_ROUTE_ENTRIES */
+
 /* NETSTACK_CONF_WITH_IPV6 specifies whether or not IPv6 should be used. If IPv6
    is not used, IPv4 is used instead. */
 #ifndef NETSTACK_CONF_WITH_IPV6
@@ -135,11 +164,9 @@
 #define UIP_CONF_ROUTER 1
 #endif /* UIP_CONF_ROUTER */
 
-/* UIP_CONF_IPV6_RPL specifies if RPL is to be used for IPv6
-   routing. */
-#ifndef UIP_CONF_IPV6_RPL
-#define UIP_CONF_IPV6_RPL 1
-#endif /* UIP_CONF_IPV6_RPL */
+/* UIP_CONF_IPV6_RPL tells whether the RPL routing protocol is running,
+    whether implemented as RPL Lite or RPL Classic */
+#define UIP_CONF_IPV6_RPL (ROUTING_CONF_RPL_LITE || ROUTING_CONF_RPL_CLASSIC)
 
 /* If RPL is enabled also enable the RPL NBR Policy */
 #if UIP_CONF_IPV6_RPL
@@ -166,6 +193,12 @@
 #define UIP_CONF_UDP 1
 #endif /* UIP_CONF_UDP */
 
+/* UIP_CONF_UDP_CONNS specifies the maximum number of
+   simultaneous UDP connections. */
+#ifndef UIP_CONF_UDP_CONNS
+#define UIP_CONF_UDP_CONNS 8
+#endif /* UIP_CONF_UDP_CONNS */
+
 /* UIP_CONF_MAX_CONNECTIONS specifies the maximum number of
    simultaneous TCP connections. */
 #ifndef UIP_CONF_MAX_CONNECTIONS
@@ -175,15 +208,18 @@
 /* UIP_CONF_TCP specifies if TCP support should be included or
    not. Disabling TCP saves memory. */
 #ifndef UIP_CONF_TCP
-#define UIP_CONF_TCP 1
+#define UIP_CONF_TCP 0
 #endif /* UIP_CONF_TCP */
 
-/* UIP_CONF_MAX_CONNECTIONS specifies the maximum number of
+/* UIP_CONF_TCP_CONNS specifies the maximum number of
    simultaneous TCP connections. */
-#ifndef UIP_CONF_MAX_CONNECTIONS
-#define UIP_CONF_MAX_CONNECTIONS 8
-#endif /* UIP_CONF_MAX_CONNECTIONS */
-
+#ifndef UIP_CONF_TCP_CONNS
+#if UIP_CONF_TCP
+#define UIP_CONF_TCP_CONNS 8
+#else /* UIP_CONF_TCP */
+#define UIP_CONF_TCP_CONNS 0
+#endif /* UIP_CONF_TCP */
+#endif /* UIP_CONF_TCP_CONNS */
 
 /* UIP_CONF_TCP_SPLIT enables a performance optimization hack, where
    each maximum-sized TCP segment is split into two, to avoid the
@@ -201,13 +237,17 @@
 /* UIP_CONF_ND6_SEND_RA enables standard IPv6 Router Advertisement.
  * We enable it by default when IPv6 is used without RPL. */
 #ifndef UIP_CONF_ND6_SEND_RA
-#define UIP_CONF_ND6_SEND_RA (NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL)
+#if (NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL)
+#define UIP_CONF_ND6_SEND_RA 1
+#else /* NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL */
+#define UIP_CONF_ND6_SEND_RA 0
+#endif /* NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL */
 #endif /* UIP_CONF_ND6_SEND_RA */
 
-/* UIP_CONF_ND6_SEND_NS enables standard IPv6 Neighbor Discovery Protocol.
-   We enable it by default when IPv6 is used without RPL.
+/* UIP_CONF_ND6_SEND_NS enables standard IPv6 Neighbor Discovery Protocol
+   (RFC 4861). We enable it by default when IPv6 is used without RPL.
    With RPL, the neighbor cache (link-local IPv6 <-> MAC address mapping)
-   is fed whenever receiving DIO and DAO messages. This is always sufficient
+   is fed whenever receiving DIO. This is often sufficient
    for RPL routing, i.e. to send to the preferred parent or any child.
    Link-local unicast to other neighbors may, however, not be possible if
    we never receive any DIO from them. This may happen if the link from the
@@ -215,13 +255,36 @@
    timer) or if the neighbor chooses not to transmit DIOs because it is
    a leaf node or for any reason. */
 #ifndef UIP_CONF_ND6_SEND_NS
-#define UIP_CONF_ND6_SEND_NS (NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL)
+#if (NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL)
+#define UIP_CONF_ND6_SEND_NS 1
+#else /* (NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL) */
+#define UIP_CONF_ND6_SEND_NS 0
+#endif /* (NETSTACK_CONF_WITH_IPV6 && !UIP_CONF_IPV6_RPL) */
 #endif /* UIP_CONF_ND6_SEND_NS */
+/* To speed up the neighbor cache construction,
+   enable UIP_CONF_ND6_AUTOFILL_NBR_CACHE. When a node does not the link-layer
+   address of a neighbor, it will infer it from the link-local IPv6, assuming
+   the node used autoconfiguration. Note that RPL uses its own freshness
+   mechanism to select whether neighbors are still usable as a parent
+   or not, regardless of the neighbor cache. Note that this is not
+   standard-compliant (RFC 4861), as neighbors will be added regardless of
+   their reachability and liveness. */
+#ifndef UIP_CONF_ND6_AUTOFILL_NBR_CACHE
+#if UIP_CONF_ND6_SEND_NS
+#define UIP_CONF_ND6_AUTOFILL_NBR_CACHE 0
+#else /* UIP_CONF_ND6_SEND_NS */
+#define UIP_CONF_ND6_AUTOFILL_NBR_CACHE 1
+#endif /* UIP_CONF_ND6_SEND_NS */
+#endif /* UIP_CONF_ND6_AUTOFILL_NBR_CACHE */
 /* UIP_CONF_ND6_SEND_NA allows to still comply with NDP even if the host does
    not perform NUD or DAD processes. By default it is activated so the host
    can still communicate with a full NDP peer. */
 #ifndef UIP_CONF_ND6_SEND_NA
-#define UIP_CONF_ND6_SEND_NA (NETSTACK_CONF_WITH_IPV6)
+#if NETSTACK_CONF_WITH_IPV6
+#define UIP_CONF_ND6_SEND_NA 1
+#else /* NETSTACK_CONF_WITH_IPV6 */
+#define UIP_CONF_ND6_SEND_NA 0
+#endif /* NETSTACK_CONF_WITH_IPV6 */
 #endif /* UIP_CONF_ND6_SEND_NS */
 
 /*---------------------------------------------------------------------------*/

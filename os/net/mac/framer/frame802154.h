@@ -44,7 +44,7 @@
  */
 
 /**
- *    \addtogroup net
+ *    \addtogroup link-layer
  *    @{
  */
 
@@ -65,7 +65,7 @@
 #ifndef FRAME_802154_H
 #define FRAME_802154_H
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "net/linkaddr.h"
 
 #ifdef IEEE802154_CONF_PANID
@@ -77,7 +77,13 @@
 #ifdef FRAME802154_CONF_VERSION
 #define FRAME802154_VERSION FRAME802154_CONF_VERSION
 #else /* FRAME802154_CONF_VERSION */
+/* Use frame v2 if TSCH is used, otherwise stick to v1 (more
+frame-filtering-friendly on some platforms) */
+#if MAC_CONF_WITH_TSCH
+#define FRAME802154_VERSION FRAME802154_IEEE802154_2015
+#else /* MAC_CONF_WITH_TSCH */
 #define FRAME802154_VERSION FRAME802154_IEEE802154_2006
+#endif /* MAC_CONF_WITH_TSCH */
 #endif /* FRAME802154_CONF_VERSION */
 
 #ifdef FRAME802154_CONF_SUPPR_SEQNO
@@ -111,7 +117,7 @@
 
 #define FRAME802154_IEEE802154_2003  (0x00)
 #define FRAME802154_IEEE802154_2006  (0x01)
-#define FRAME802154_IEEE802154E_2012 (0x02)
+#define FRAME802154_IEEE802154_2015  (0x02)
 
 #define FRAME802154_SECURITY_LEVEL_NONE        (0)
 #define FRAME802154_SECURITY_LEVEL_MIC_32      (1)

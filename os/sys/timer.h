@@ -39,15 +39,11 @@
  * Adam Dunkels <adam@sics.se>
  */
 
-/** \addtogroup sys
+/** \addtogroup timers
  * @{ */
 
 /**
  * \defgroup timer Timer library
- *
- * The Contiki kernel does not provide support for timed
- * events. Rather, an application that wants to use timers needs to
- * explicitly use the timer library.
  *
  * The timer library provides functions for setting, resetting and
  * restarting timers, and for checking if a timer has expired. An
@@ -88,12 +84,12 @@ struct timer {
   clock_time_t interval;
 };
 
-CCIF void timer_set(struct timer *t, clock_time_t interval);
+void timer_set(struct timer *t, clock_time_t interval);
 void timer_reset(struct timer *t);
 void timer_restart(struct timer *t);
+int timer_expired(struct timer *t);
+clock_time_t timer_remaining(struct timer *t);
 int timer_expired_at(const struct timer *t, clock_time_t at);
-CCIF int timer_expired(const struct timer *t);
-clock_time_t timer_remaining(const struct timer *t);
 int timer_cmp(const struct timer *t0, const struct timer *t1,
               clock_time_t cmp_pt);
 

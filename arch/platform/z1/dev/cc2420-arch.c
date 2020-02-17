@@ -30,7 +30,7 @@
 
 #include "contiki.h"
 #include "contiki-net.h"
-#include "dev/spi.h"
+#include "dev/spi-legacy.h"
 #include "cc2420.h"
 #include "isr_compat.h"
 
@@ -48,14 +48,12 @@
 
 /*---------------------------------------------------------------------------*/
 #if 0
-// this is now handled in the ADXL345 accelerometer code as it uses irq on port1 too.
+/* this is now handled in the ADXL345 accelerometer code as it uses irq on port1 too. */
 ISR(CC2420_IRQ, cc24240_port1_interrupt)
 {
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
   if(cc2420_interrupt()) {
     LPM4_EXIT;
   }
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 #endif
 /*---------------------------------------------------------------------------*/

@@ -1,5 +1,7 @@
 # $Id: Makefile.msp430,v 1.35 2011/01/19 07:30:31 adamdunkels Exp $
 
+COOJA_PATH ?= $(CONTIKI_NG_TOOLS_DIR)/cooja
+
 ifdef nodeid
 CFLAGS += -DNODEID=$(nodeid)
 endif
@@ -9,7 +11,7 @@ CFLAGS += -gstabs+
 .SUFFIXES:
 
 ### Define the CPU directory
-CONTIKI_CPU=$(CONTIKI)/cpu/msp430
+CONTIKI_CPU = $(CONTIKI_NG_RELOC_CPU_DIR)/msp430
 
 ### Define the source files we have in the MSP430 port
 
@@ -35,31 +37,19 @@ endif
 CONTIKI_CPU_DIRS = $(CONTIKI_CPU_FAM_DIR) . dev
 
 MSP430     = msp430.c flash.c clock.c leds.c leds-arch.c \
-             watchdog.c lpm.c rtimer-arch.c
-UIPDRIVERS = me.c me_tabs.c slip.c crc16.c
-ELFLOADER  = elfloader.c elfloader-msp430.c symtab.c
-
-ifndef CPU_HAS_MSP430X
-# include mtarch.c only in the non-large memory model case, because
-# the current implementation assumes 16-bit addresses (function pointers
-# stored as "unsigned short").
-MSP430 += mtarch.c
-endif
-
-ifeq ($(TARGET_MEMORY_MODEL),large)
-ELFLOADER = elfloader-msp430x.c symtab.c
-endif
+             watchdog.c lpm.c rtimer-arch.c int-master.c
+UIPDRIVERS = slip.c crc16.c
 
 CONTIKI_TARGET_SOURCEFILES += $(MSP430) \
-                              $(SYSAPPS) $(ELFLOADER) \
+                              $(SYSAPPS) \
                               $(UIPDRIVERS)
 
 CONTIKI_SOURCEFILES        += $(CONTIKI_TARGET_SOURCEFILES)
 
 ### Compiler definitions
 
-ifdef WERROR
-CFLAGSWERROR=-Werror
+ifeq ($(WERROR),1)
+CFLAGSWERROR= -Wall -Werror
 endif
 
 ifdef IAR
@@ -85,7 +75,7 @@ CFLAGSNO = --dlib_config "$(IAR_PATH)/LIB/DLIB/dl430xlfn.h" $(CFLAGSWERROR)
 # CFLAGSNO = --dlib_config $(IAR_PATH)/LIB/DLIB/dl430xlfn.h -Ohz --multiplier=32 --multiplier_location=4C0 --hw_workaround=CPU40 --core=430X $(CFLAGSWERROR) --data_model large --double=32
 endif
 
-LDFLAGSNO += -B -l contiki-$(TARGET).map -s __program_start
+LDFLAGSNO += -B -l $(CONTIKI_NG_PROJECT_MAP) -s __program_start
 # Stack and heap size in hex
 ifndef IAR_STACK_SIZE
  IAR_STACK_SIZE=300
@@ -117,11 +107,6 @@ $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
 ifeq ($(HOST_OS),Windows)
 	@$(FINALIZE_CYGWIN_DEPENDENCY)
 endif
-
-CUSTOM_RULE_C_TO_CO = 1
-$(BUILDDIR)/%.co: %.c | $(BUILDDIR)
-	$(TRACE_CC)
-	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE $< -o $@
 
 AROPTS = -o
 
@@ -180,9 +165,10 @@ ifndef CFLAGSNO
 CFLAGSNO = -Wall -mmcu=$(CC_MCU) $(CFLAGSWERROR)
 endif
 CFLAGS  += -Os -fno-strict-aliasing
-LDFLAGS += -mmcu=$(CC_MCU) -Wl,-Map=contiki-$(TARGET).map
+LDFLAGS += -mmcu=$(CC_MCU) -Wl,-Map=$(CONTIKI_NG_PROJECT_MAP)
 
 ### These flags can reduce the code size and RAM usage with up to 10%
+SMALL ?= 1
 ifeq ($(SMALL),1)
 CFLAGS += -ffunction-sections
 # CFLAGS += -fdata-sections
@@ -191,9 +177,15 @@ endif # SMALL
 
 endif # IAR
 
+# Define the `_stack` symbol used by the stack check library to be equal to `_end`
+LDFLAGS += -Wl,--defsym=_stack=_end
+
 CFLAGS  += $(CFLAGSNO)
 
 PROJECT_OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(CONTIKI_TARGET_MAIN:.c=.o)}
+
+### CPU-dependent cleanup files
+CLEAN += *.firmware *.ihex
 
 ### Compilation rules
 
@@ -201,61 +193,35 @@ PROJECT_OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(CONTIKI_TARGET_MAIN:.c=.o)}
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(STRIP) --strip-unneeded -g -x $@
 
-%.cm: %.co
-	$(LD) -i -r --unresolved-symbols=ignore-in-object-files -mmsp430x149 -o $@ $^
-	$(STRIP) --strip-unneeded -g -x $@
-
 %-stripped.o: %.o
 	$(STRIP) --strip-unneeded -g -x -o $@ $<
-
-%.o: ${CONTIKI_TARGET}/loader/%.S
-	$(TRACE_AS)
-	$(Q)$(AS) -o $(notdir $(<:.S=.o)) $<
 
 %.firmware:	%.${TARGET}
 	mv $< $@
 
 ifdef IAR
-%.ihex: %.co $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_LIB)
+%.ihex: %.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
 	$(LD) $(LDFLAGSNO) -Fintel-extended $(TARGET_STARTFILES) ${filter-out %.a,$^} ${filter %.a,$^} $(TARGET_LIBFILES) -o $@
 else
 %.ihex: %.$(TARGET)
 	$(OBJCOPY) $^ -O ihex $@
 endif
 
-$(CONTIKI)/tools/mspsim/build.xml:
+$(COOJA_PATH)/build.xml:
 	@echo '----------------'
-	@echo 'Could not find the MSPSim build file. Did you run "git submodule update --init"?'
+	@echo 'Could not find the COOJA build file. Did you run "git submodule update --init --recursive"?'
 	@echo '----------------'
 
-$(CONTIKI)/tools/mspsim/mspsim.jar: $(CONTIKI)/tools/mspsim/build.xml
-	(cd $(CONTIKI)/tools/mspsim && ant jar)
+$(COOJA_PATH)/mspsim/build.xml: $(COOJA_PATH)/build.xml
+	@echo '----------------'
+	@echo 'Could not find the MSPSim build file. Did you run "git submodule update --init --recursive"?'
+	@echo '----------------'
 
-%.mspsim:	%.${TARGET} ${CONTIKI}/tools/mspsim/mspsim.jar
-	java -jar ${CONTIKI}/tools/mspsim/mspsim.jar -platform=${TARGET} $<
+$(COOJA_PATH)/mspsim/mspsim.jar: $(COOJA_PATH)/mspsim/build.xml
+	(cd $(COOJA_PATH)/mspsim && ant jar)
 
-mspsim-maptable:	contiki-${TARGET}.map
-	java -classpath ${CONTIKI}/tools/mspsim/mspsim.jar se.sics.mspsim.util.MapTable $<
+%.mspsim:	%.${TARGET} ${COOJA_PATH}/mspsim/mspsim.jar
+	java -jar ${COOJA_PATH}/mspsim/mspsim.jar -platform=${TARGET} $<
 
-core-labels.o: core.${TARGET}
-	${CONTIKI}/tools/msp430-make-labels core.${TARGET} > core-labels.S
-	$(AS) -o $@ core-labels.S
-#	cp core-labels.o app/
-
-core-globals.o: core.${TARGET}
-	${CONTIKI}/tools/msp430-make-globals core.${TARGET} > core-globals.S
-	$(AS) -o $@ core-globals.S
-
-loader-init.o: ${CONTIKI_TARGET}/loader/loader-init.S
-	$(AS) -o $(notdir $(<:.S=.o)) $<
-# 	cp loader-init.o build-app/
-
-ifdef CORE
-.PHONY: symbols.c symbols.h
-symbols.c:
-	$(NM) $(CORE) | awk -f $(CONTIKI)/tools/mknmlist > symbols.c
-else
-symbols.c symbols.h:
-	cp ${CONTIKI}/tools/empty-symbols.c symbols.c
-	cp ${CONTIKI}/tools/empty-symbols.h symbols.h
-endif
+%.mspsim-maptable: %.$(TARGET)
+	java -classpath ${COOJA_PATH}/mspsim/mspsim.jar se.sics.mspsim.util.MapTable $(CONTIKI_NG_PROJECT_MAP)

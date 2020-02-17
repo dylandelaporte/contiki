@@ -39,7 +39,6 @@
 
 #include "sys/autostart.h"
 
-#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -53,7 +52,7 @@ void
 autostart_start(struct process * const processes[])
 {
   int i;
-  
+
   for(i = 0; processes[i] != NULL; ++i) {
     process_start(processes[i], NULL);
     PRINTF("autostart_start: starting process '%s'\n", processes[i]->name);
@@ -64,7 +63,7 @@ void
 autostart_exit(struct process * const processes[])
 {
   int i;
-  
+
   for(i = 0; processes[i] != NULL; ++i) {
     process_exit(processes[i]);
     PRINTF("autostart_exit: stopping process '%s'\n", processes[i]->name);

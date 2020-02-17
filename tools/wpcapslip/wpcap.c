@@ -113,8 +113,7 @@ static int (* pcap_sendpacket)(struct pcap *, unsigned char *, int);
 
 #define ARP_HWTYPE_ETH 1
 
-#include "net/ip/uip.h"
-#include "net/ipv4/uip_arp.h"
+#include "net/ipv6/uip.h"
 
 struct ethip_hdr {
   struct uip_eth_hdr ethhdr;
@@ -452,7 +451,7 @@ arp_out(struct ethip_hdr *iphdr, int len)
       arphdr->protolen = 4;
       arphdr->ethhdr.type = UIP_HTONS(UIP_ETHTYPE_ARP);
 
-      /*      uip_appdata = &uip_buf[UIP_TCPIP_HLEN + UIP_LLH_LEN];*/
+      /*      uip_appdata = &uip_buf[UIP_IPTCPH_LEN];*/
 
       return sizeof(struct arp_hdr);
     }

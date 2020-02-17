@@ -35,7 +35,7 @@
  * \file
  * Implementation of low power modes ofr the cc2538
  */
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "sys/energest.h"
 #include "sys/process.h"
 #include "dev/sys-ctrl.h"
@@ -51,18 +51,6 @@
 
 #if LPM_CONF_ENABLE != 0
 /*---------------------------------------------------------------------------*/
-#if ENERGEST_CONF_ON
-static unsigned long irq_energest = 0;
-
-#define ENERGEST_IRQ_SAVE(a) do { \
-    a = energest_type_time(ENERGEST_TYPE_IRQ); } while(0)
-#define ENERGEST_IRQ_RESTORE(a) do { \
-    energest_type_set(ENERGEST_TYPE_IRQ, a); } while(0)
-#else
-#define ENERGEST_IRQ_SAVE(a) do {} while(0)
-#define ENERGEST_IRQ_RESTORE(a) do {} while(0)
-#endif
-/*---------------------------------------------------------------------------*/
 /*
  * Deep Sleep thresholds in rtimer ticks (~30.5 usec)
  *
@@ -73,7 +61,7 @@ static unsigned long irq_energest = 0;
 #define DEEP_SLEEP_PM1_THRESHOLD    10
 #define DEEP_SLEEP_PM2_THRESHOLD    100
 /*---------------------------------------------------------------------------*/
-#define assert_wfi() do { asm("wfi"::); } while(0)
+#define assert_wfi() do { __asm("wfi"::); } while(0)
 /*---------------------------------------------------------------------------*/
 #if LPM_CONF_STATS
 rtimer_clock_t lpm_stats[3];
@@ -130,9 +118,6 @@ enter_pm0(void)
 {
   ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_LPM);
 
-  /* We are only interested in IRQ energest while idle or in LPM */
-  ENERGEST_IRQ_RESTORE(irq_energest);
-
   /* Remember the current time so we can keep stats when we wake up */
   if(LPM_CONF_STATS) {
     sleep_enter_time = RTIMER_NOW();
@@ -142,9 +127,6 @@ enter_pm0(void)
 
   /* We reach here when the interrupt context that woke us up has returned */
   LPM_STATS_ADD(0, RTIMER_NOW() - sleep_enter_time);
-
-  /* Remember IRQ energest for next pass */
-  ENERGEST_IRQ_SAVE(irq_energest);
 
   ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
 }
@@ -230,13 +212,14 @@ lpm_exit()
   /* Restore system clock to the 32 MHz XOSC */
   select_32_mhz_xosc();
 
+  if((REG(SYS_CTRL_PMCTL) & SYS_CTRL_PMCTL_PM3) == SYS_CTRL_PMCTL_PM1) {
+    ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
+  } else {
+    ENERGEST_SWITCH(ENERGEST_TYPE_DEEP_LPM, ENERGEST_TYPE_CPU);
+  }
+
   /* Restore PMCTL to PM0 for next pass */
   REG(SYS_CTRL_PMCTL) = SYS_CTRL_PMCTL_PM0;
-
-  /* Remember IRQ energest for next pass */
-  ENERGEST_IRQ_SAVE(irq_energest);
-
-  ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -307,10 +290,6 @@ lpm_enter()
     REG(SYS_CTRL_PMCTL) = SYS_CTRL_PMCTL_PM1;
   }
 
-  /* We are only interested in IRQ energest while idle or in LPM */
-  ENERGEST_IRQ_RESTORE(irq_energest);
-  ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_LPM);
-
   /* Remember the current time so we can keep stats when we wake up */
   if(LPM_CONF_STATS) {
     sleep_enter_time = RTIMER_NOW();
@@ -333,11 +312,13 @@ lpm_enter()
 
     REG(SYS_CTRL_PMCTL) = SYS_CTRL_PMCTL_PM0;
 
-    /* Remember IRQ energest for next pass */
-    ENERGEST_IRQ_SAVE(irq_energest);
-    ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
   } else {
     /* All clear. Assert WFI and drop to PM1/2. This is now un-interruptible */
+    if((REG(SYS_CTRL_PMCTL) & SYS_CTRL_PMCTL_PM3) == SYS_CTRL_PMCTL_PM1) {
+      ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_LPM);
+    } else {
+      ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_DEEP_LPM);
+    }
     assert_wfi();
   }
 

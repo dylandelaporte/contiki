@@ -31,6 +31,14 @@
 #ifndef ASSERT_H_
 #define ASSERT_H_
 
+#include "sys/cc.h"
+
+#ifdef ASSERT_CONF_RETURNS
+#define ASSERT_RETURNS ASSERT_CONF_RETURNS
+#else
+#define ASSERT_RETURNS 0
+#endif
+
 #ifdef __cplusplus
 extern "C"{
 #endif /* !__cplusplus */
@@ -40,8 +48,12 @@ extern "C"{
 #define assert(e) ((void)0)
 #else
 #define assert(e) ((e) ? (void)0 : _xassert(__FILE__, __LINE__))
+#if ASSERT_RETURNS
 void _xassert(const char *, int);
-#endif
+#else
+void _xassert(const char *, int) CC_NORETURN;
+#endif /* ASSERT_RETURNS */
+#endif /* NDEBUG */
 
 #ifndef CTASSERT                /* Allow lint to override */
 #define CTASSERT(x)             _CTASSERT(x, __LINE__)

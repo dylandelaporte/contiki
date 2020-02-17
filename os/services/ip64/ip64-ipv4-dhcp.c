@@ -31,16 +31,16 @@
  */
 #include "contiki.h"
 #include "contiki-net.h"
-#include "ip64-dhcpc.h"
+#include "ip64/ip64-dhcpc.h"
 
-#include "ip64.h"
-#include "ip64-eth.h"
-#include "ip64-addr.h"
+#include "ip64/ip64.h"
+#include "ip64/ip64-eth.h"
+#include "ipv6/ip64-addr.h"
 
 #include <stdio.h>
 
 #define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 PROCESS(ip64_ipv4_dhcp_process, "IPv4 DHCP");
 

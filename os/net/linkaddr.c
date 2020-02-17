@@ -32,7 +32,7 @@
 
 /**
  * \file
- *         Functions for manipulating Rime addresses
+ *         Functions for manipulating link-layer addresses
  * \author
  *         Adam Dunkels <adam@sics.se>
  */
@@ -48,9 +48,11 @@
 linkaddr_t linkaddr_node_addr;
 #if LINKADDR_SIZE == 2
 const linkaddr_t linkaddr_null = { { 0, 0 } };
-#elif LINKADDR_SIZE == 8
+#else /*LINKADDR_SIZE == 2*/
+#if LINKADDR_SIZE == 8
 const linkaddr_t linkaddr_null = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-#elif LINKADDR_SIZE == 6
+#endif /*LINKADDR_SIZE == 8*/
+#if LINKADDR_SIZE == 6
 const linkaddr_t linkaddr_null = { { 0, 0, 0, 0, 0, 0 } };
 #elif LINKADDR_SIZE == 4
 const linkaddr_t linkaddr_null = { { 0, 0, 0, 0 } };

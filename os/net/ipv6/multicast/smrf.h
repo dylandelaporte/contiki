@@ -30,7 +30,7 @@
  */
 
 /**
- * \addtogroup uip6-multicast
+ * \addtogroup uip-multicast
  * @{
  */
 /**
@@ -50,7 +50,7 @@
 #ifndef SMRF_H_
 #define SMRF_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 
 #include <stdint.h>
 /*---------------------------------------------------------------------------*/
@@ -69,18 +69,6 @@
 #else
 #define SMRF_MAX_SPREAD 4
 #endif
-/*---------------------------------------------------------------------------*/
-/* Stats datatype */
-/*---------------------------------------------------------------------------*/
-struct smrf_stats {
-  uint16_t mcast_in_unique;
-  uint16_t mcast_in_all;        /* At layer 3 */
-  uint16_t mcast_in_ours;       /* Unique and we are a group member */
-  uint16_t mcast_fwd;           /* Forwarded by us but we are not the seed */
-  uint16_t mcast_out;           /* We are the seed */
-  uint16_t mcast_bad;
-  uint16_t mcast_dropped;
-};
 /*---------------------------------------------------------------------------*/
 #endif /* SMRF_H_ */
 /*---------------------------------------------------------------------------*/
