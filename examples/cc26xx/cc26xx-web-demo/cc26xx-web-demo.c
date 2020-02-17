@@ -40,7 +40,6 @@
 #include "contiki.h"
 #include "contiki-net.h"
 #include "rest-engine.h"
-#include "board-peripherals.h"
 #include "lib/sensors.h"
 #include "lib/list.h"
 #include "sys/process.h"
@@ -56,6 +55,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../../arch/platform/cc26x0-cc13x0/srf06/board-peripherals.h"
 #include "ti-lib.h"
 /*---------------------------------------------------------------------------*/
 PROCESS_NAME(cetic_6lbr_client_process);

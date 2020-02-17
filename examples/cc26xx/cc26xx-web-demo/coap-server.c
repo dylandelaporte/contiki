@@ -38,13 +38,14 @@
 #include "contiki.h"
 #include "contiki-net.h"
 #include "rest-engine.h"
-#include "board-peripherals.h"
 #include "rf-core/rf-ble.h"
 #include "cc26xx-web-demo.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "../../../arch/platform/cc26x0-cc13x0/srf06/board-peripherals.h"
 /*---------------------------------------------------------------------------*/
 /* Common resources */
 extern resource_t res_leds;

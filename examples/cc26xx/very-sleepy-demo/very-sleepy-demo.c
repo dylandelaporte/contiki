@@ -36,7 +36,6 @@
 #include "dev/watchdog.h"
 #include "button-sensor.h"
 #include "batmon-sensor.h"
-#include "board-peripherals.h"
 #include "net/netstack.h"
 #include "net/ipv6/uip-ds6-nbr.h"
 #include "net/ipv6/uip-ds6-route.h"
@@ -50,6 +49,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "../../../arch/platform/cc26x0-cc13x0/srf06/board-peripherals.h"
 /*---------------------------------------------------------------------------*/
 /* Normal mode duration params in seconds */
 #define NORMAL_OP_DURATION_DEFAULT 10
