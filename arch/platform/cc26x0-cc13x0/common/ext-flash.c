@@ -36,13 +36,14 @@
  * Sensortag/LaunchPad External Flash Driver
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
-#include "ext-flash.h"
-#include "ti-lib.h"
-#include "board-spi.h"
+#include "../../cc26x0-cc13x0/common/ext-flash.h"
 
+#include "contiki.h"
+#include "ti-lib.h"
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "../../cc26x0-cc13x0/common/board-spi.h"
 /*---------------------------------------------------------------------------*/
 /* Instruction codes */
 

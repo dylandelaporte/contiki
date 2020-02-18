@@ -51,7 +51,7 @@
 #ifndef RF_CORE_H_
 #define RF_CORE_H_
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "driverlib/rf_common_cmd.h"
 
 #include <stdint.h>
@@ -94,6 +94,58 @@
 #define RF_CORE_PROP_BIAS_MODE RF_CORE_CONF_PROP_BIAS_MODE
 #else
 #define RF_CORE_PROP_BIAS_MODE RF_CORE_BIAS_MODE_EXTERNAL
+#endif
+/*---------------------------------------------------------------------------*/
+/* RF-Front End RAT resyncing strategy provides mechanisms for RAT sync monitoring
+ *  and resyncing
+ *  0 :    resync only on rf-core propety setup
+ *  1 :    validate RF-timestamp in window of current operation, and resync if violate
+ * */
+#ifdef RF_CORE_CONF_HFOSC_STARTUP_TOUS
+#define RF_CORE_HFOSC_STARTUP_TOUS    RF_CORE_CONF_HFOSC_STARTUP_TOUS
+#else
+//#define RF_CORE_HFOSC_STARTUP_TOUS    1000
+#endif
+/*---------------------------------------------------------------------------*/
+/*
+ * RF Front-End IRQ polling mode setup
+ * Not Defined : polling mode enabled by driver.set_value(RADIO_PARAM_RX_MODE)
+ * 0 :           only ISR mode use.
+ * 1 :           only Poling mode use.
+ */
+#ifdef RF_CORE_CONF_POLL_MODE
+#define RF_CORE_POLL_MODE RF_CORE_CONF_POLL_MODE
+#endif
+/*---------------------------------------------------------------------------*/
+/*
+ * RF Front-End pending() api style
+ * 0 :  old behaviour - pending() return count of received packets in que.
+ * 1 :  pending() return count of packets ready for read.
+ * 2 :  read_frame(..) - scan packets que for any finished packet. This helps when
+ *          for some reason RFcore skip some slot, leave it in PENDING state.
+ */
+#define RF_CORE_PENDING_RECEIVED    0
+#define RF_CORE_PENDING_READS       1
+#define RF_CORE_PENDING_READSANY    2
+#ifdef RF_CORE_CONF_PENDING
+#define RF_CORE_PENDING RF_CORE_CONF_PENDING
+#else
+#define RF_CORE_PENDING     RF_CORE_PENDING_RECEIVED
+#endif
+
+
+/*---------------------------------------------------------------------------*/
+/* RF-Front End RAT resyncing strategy provides mechanisms for RAT sync monitoring
+ *  and resyncing
+ *  0 :    resync only on rf-core propety setup
+ *  1 :    validate RF-timestamp in window of current operation, and resync if violate
+ * */
+#define RF_CORE_RAT_SYNC_PROP      0
+#define RF_CORE_RAT_SYNC_AGRESSIVE 1
+#ifdef RF_CORE_CONF_RAT_SYNC_STYLE
+#define PROP_MODE_RAT_SYNC_STYLE    RF_CORE_CONF_RAT_SYNC_STYLE
+#else
+#define PROP_MODE_RAT_SYNC_STYLE    RF_CORE_RAT_SYNC_PROP
 #endif
 /*---------------------------------------------------------------------------*/
 #define RF_CORE_CMD_ERROR                     0
@@ -447,19 +499,20 @@ uint8_t rf_core_boot(void);
 /**
  * \brief Setup RF core interrupts
  */
-void rf_core_setup_interrupts(void);
+void rf_core_setup_interrupts(bool poll_mode);
 
 /**
  * \brief Enable interrupt on command done.
  * \param fg set true to enable irq on foreground command done and false for
  * background commands or if not in ieee mode.
+ * \param poll_mode true if the driver is in poll mode
  *
  * This is used within TX routines in order to be able to sleep the CM3 and
  * wake up after TX has finished
  *
  * \sa rf_core_cmd_done_dis()
  */
-void rf_core_cmd_done_en(bool fg);
+void rf_core_cmd_done_en(bool fg, bool poll_mode);
 
 /**
  * \brief Disable the LAST_CMD_DONE and LAST_FG_CMD_DONE interrupts.
@@ -468,7 +521,7 @@ void rf_core_cmd_done_en(bool fg);
  *
  * \sa rf_core_cmd_done_en()
  */
-void rf_core_cmd_done_dis(void);
+void rf_core_cmd_done_dis(bool poll_mode);
 
 /**
  * \brief Returns a pointer to the most recent proto-dependent Radio Op

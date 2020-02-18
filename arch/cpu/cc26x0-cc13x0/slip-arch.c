@@ -29,18 +29,34 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
+/**
+ * \addtogroup cc26xx-char-io
+ * @{
+ *
+ * \file
+ * Arch-specific SLIP functions for the CC13xx/CC26xx
+ */
+/*---------------------------------------------------------------------------*/
+#include "contiki-conf.h"
 #include "dev/cc26xx-uart.h"
 #include "dev/slip.h"
 /*---------------------------------------------------------------------------*/
+/**
+ * \brief Write a byte over SLIP
+ * \param c the byte
+ */
 void
 slip_arch_writeb(unsigned char c)
 {
   cc26xx_uart_write_byte(c);
 }
 /*---------------------------------------------------------------------------*/
+/**
+ * \brief Initialise the arch-specific SLIP driver
+ * \param ubr Ignored for the cc26xx
+ */
 void
-slip_arch_init()
+slip_arch_init(unsigned long ubr)
 {
   /*
    * Enable an input handler. In doing so, the driver will make sure that UART
@@ -49,3 +65,5 @@ slip_arch_init()
   cc26xx_uart_set_input(slip_input_byte);
 }
 /*---------------------------------------------------------------------------*/
+
+/** @} */

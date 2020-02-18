@@ -64,13 +64,14 @@
 #include "sys/node-id.h"
 #include "lib/random.h"
 #include "lib/sensors.h"
-#include "button-sensor.h"
 #include "dev/serial-line.h"
 #include "net/mac/frame802154.h"
 
 #include "driverlib/driverlib_release.h"
 
 #include <stdio.h>
+
+#include "../cc26x0-cc13x0/srf06/button-sensor.h"
 /*---------------------------------------------------------------------------*/
 unsigned short node_id = 0;
 /*---------------------------------------------------------------------------*/

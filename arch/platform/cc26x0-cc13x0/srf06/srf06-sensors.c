@@ -38,11 +38,13 @@
  */
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
-#include "srf06/als-sensor.h"
-
 #include <string.h>
+
+#include "../../cc26x0-cc13x0/srf06/als-sensor.h"
+#include "../../cc26x0-cc13x0/srf06/button-sensor.h"
 /*---------------------------------------------------------------------------*/
 /** \brief Exports a global symbol to be used by the sensor API */
-SENSORS(&als_sensor);
+SENSORS(&button_select_sensor, &button_left_sensor, &button_right_sensor,
+        &button_up_sensor, &button_down_sensor, &als_sensor);
 /*---------------------------------------------------------------------------*/
 /** @} */

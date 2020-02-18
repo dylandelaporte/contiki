@@ -52,6 +52,9 @@
 #ifndef TI_LIB_H_
 #define TI_LIB_H_
 /*---------------------------------------------------------------------------*/
+/* Include ROM API */
+#include "ti-lib-rom.h"
+/*---------------------------------------------------------------------------*/
 /* aon_batmon.h */
 #include "driverlib/aon_batmon.h"
 
@@ -393,6 +396,8 @@
 #define ti_lib_pwr_ctrl_source_get(...)         PowerCtrlSourceGet(__VA_ARGS__)
 #define ti_lib_pwr_ctrl_reset_source_get(...)   PowerCtrlResetSourceGet(__VA_ARGS__)
 #define ti_lib_pwr_ctrl_reset_source_clear(...) PowerCtrlResetSourceClear(__VA_ARGS__)
+#define ti_lib_pwr_ctrl_io_freeze_enable(...)   PowerCtrlIOFreezeEnable(__VA_ARGS__)
+#define ti_lib_pwr_ctrl_io_freeze_disable(...)  PowerCtrlIOFreezeDisable(__VA_ARGS__)
 /*---------------------------------------------------------------------------*/
 /* rfc.h */
 #include "driverlib/rfc.h"

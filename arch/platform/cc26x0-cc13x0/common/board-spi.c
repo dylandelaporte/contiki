@@ -36,13 +36,14 @@
  * Board-specific SPI driver common to the Sensortag and LaunchPad
  */
 /*---------------------------------------------------------------------------*/
+#include "../../cc26x0-cc13x0/common/board-spi.h"
+
 #include "contiki.h"
 #include "ti-lib.h"
-#include "board-spi.h"
-#include "board.h"
 #include <lpm.h>
 
 #include <stdbool.h>
+#include "../../cc26x0-cc13x0/srf06/cc13xx/board.h"
 
 #ifndef BOARD_SPI_LPM
 #define BOARD_SPI_LPM BOARD_SPI_LPM_NONE

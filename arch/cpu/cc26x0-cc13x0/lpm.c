@@ -41,7 +41,7 @@
  */
 /*---------------------------------------------------------------------------*/
 #include "prcm.h"
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "ti-lib.h"
 #include "lpm.h"
 #include "sys/energest.h"
@@ -56,6 +56,18 @@
 #include <string.h>
 #include <stdbool.h>
 /*---------------------------------------------------------------------------*/
+#if ENERGEST_CONF_ON
+static unsigned long irq_energest = 0;
+
+#define ENERGEST_IRQ_SAVE(a) do { \
+    a = energest_type_time(ENERGEST_TYPE_IRQ); } while(0)
+#define ENERGEST_IRQ_RESTORE(a) do { \
+    energest_type_set(ENERGEST_TYPE_IRQ, a); } while(0)
+#else
+#define ENERGEST_IRQ_SAVE(a) do {} while(0)
+#define ENERGEST_IRQ_RESTORE(a) do {} while(0)
+#endif
+/*---------------------------------------------------------------------------*/
 LIST(modules_list);
 /*---------------------------------------------------------------------------*/
 /* PDs that may stay on in deep sleep */
@@ -65,16 +77,15 @@ LIST(modules_list);
  * Don't consider standby mode if the next AON RTC event is scheduled to fire
  * in less than STANDBY_MIN_DURATION rtimer ticks
  */
-#define STANDBY_MIN_DURATION  (RTIMER_SECOND / 100) /* 10.0 ms */
+#define STANDBY_MIN_DURATION (RTIMER_SECOND / 100) /* 10.0 ms */
 
 /* Wake up this much time earlier before the next rtimer */
-#define SLEEP_GUARD_TIME      (RTIMER_SECOND / 1000) /* 1.0 ms */
+#define SLEEP_GUARD_TIME (RTIMER_SECOND / 1000) /* 1.0 ms */
 
-/* Maximum allowed sleep-time, must be shorter than watchdog timeout */
 #define MAX_SLEEP_TIME        RTIMER_SECOND
-
-/* Minimal safe sleep-time */
 #define MIN_SAFE_SCHEDULE     8u
+// about 300us
+#define WAKE_UP_FROM_DEEP_SCHEDULE   (RTIMER_SECOND / 3000)
 /*---------------------------------------------------------------------------*/
 /* Prototype of a function in clock.c. Called every time we come out of DS */
 void clock_update(void);
@@ -274,15 +285,16 @@ check_next_etimer(rtimer_clock_t now, rtimer_clock_t *next_etimer, bool *next_et
 
   /* Find out the time of the next etimer */
   if(etimer_pending()) {
-    int32_t until_next_etimer = (int32_t)etimer_next_expiration_time() - (int32_t)clock_time();
+    int32_t until_next_etimer = etimer_next_expiration_time() - clock_time();
     if(until_next_etimer < 1) {
       max_pm = MIN(max_pm, LPM_MODE_AWAKE);
     } else {
-      *next_etimer_set = true;
-      *next_etimer = soc_rtc_last_isr_time() + (until_next_etimer * (RTIMER_SECOND / CLOCK_SECOND));
-      if(RTIMER_CLOCK_LT(*next_etimer, now + STANDBY_MIN_DURATION)) {
+      rtimer_clock_t next_rt = soc_rtc_last_isr_time() + (until_next_etimer * (RTIMER_SECOND / CLOCK_SECOND));
+      if(RTIMER_CLOCK_LT(next_rt, (now + STANDBY_MIN_DURATION) )) {
         max_pm = MIN(max_pm, LPM_MODE_SLEEP);
       }
+      *next_etimer_set = true;
+      *next_etimer = next_rt;
     }
   }
 
@@ -365,7 +377,8 @@ setup_sleep_mode(void)
       /* Schedule the next system wakeup due to etimer.
        * No need to compare the `next_etimer` to `now` here as this branch
        * is only entered when there's sufficient time for deep sleeping. */
-      soc_rtc_schedule_one_shot(AON_RTC_CH1, next_etimer);
+     //prefetch
+      soc_rtc_schedule_one_shot(AON_RTC_CH1, next_etimer-WAKE_UP_FROM_DEEP_SCHEDULE);
     } else {
       /* Use the farthest possible wakeup time */
       soc_rtc_schedule_one_shot(AON_RTC_CH1, now - 1);
