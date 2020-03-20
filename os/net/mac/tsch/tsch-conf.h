@@ -416,6 +416,14 @@
 
 /* A custom feature allowing upper layers to assign packets to
  * a specific slotframe and link */
+// 1 - enables PACKETBUF_ATTR_TSCH_SLOTFRAME/TIMESLOT attributes
+#define  TSCH_LINK_SELECTOR_ENABLED 1
+// 2 - enbles this attributes for received packets.
+//      it costs more memory for receiving packets atributes.
+#define  TSCH_LINK_SELECTOR_ENABLEDRX 2
+
+/* A custom feature allowing upper layers to assign packets to
+ * a specific slotframe and link */
 #ifdef TSCH_CONF_WITH_LINK_SELECTOR
 #define TSCH_WITH_LINK_SELECTOR TSCH_CONF_WITH_LINK_SELECTOR
 #else /* TSCH_CONF_WITH_LINK_SELECTOR */
@@ -486,19 +494,6 @@
 #define TSCH_PACKET_EACK_WITH_DEST_ADDR 1 /* Include destination address
 by default, useful in case of duplicate seqno */
 #endif
-
-/* A custom feature allowing upper layers to assign packets to
- * a specific slotframe and link */
-// 1 - enables PACKETBUF_ATTR_TSCH_SLOTFRAME/TIMESLOT attributes
-#define  TSCH_LINK_SELECTOR_ENABLED 1
-// 2 - enbles this attributes for received packets
-#define  TSCH_LINK_SELECTOR_ENABLEDRX 2
-
-#ifdef TSCH_CONF_WITH_LINK_SELECTOR
-#define TSCH_WITH_LINK_SELECTOR TSCH_CONF_WITH_LINK_SELECTOR
-#else /* TSCH_CONF_WITH_LINK_SELECTOR */
-#define TSCH_WITH_LINK_SELECTOR 0
-#endif /* TSCH_CONF_WITH_LINK_SELECTOR */
 
 /* Estimate the drift of the time-source neighbor and compensate for it? */
 #ifdef TSCH_CONF_ADAPTIVE_TIMESYNC

@@ -111,6 +111,7 @@
  */
 #ifndef IEEE802154_CONF_DEFAULT_CHANNEL
 #define IEEE802154_CONF_DEFAULT_CHANNEL 26
+#endif /* IEEE802154_CONF_DEF_CHANNEL */
 /*---------------------------------------------------------------------------*/
 /* Packet buffer size options.
  *
@@ -166,7 +167,9 @@
 
 /* UIP_CONF_IPV6_RPL tells whether the RPL routing protocol is running,
     whether implemented as RPL Lite or RPL Classic */
+#ifndef UIP_CONF_IPV6_RPL
 #define UIP_CONF_IPV6_RPL (ROUTING_CONF_RPL_LITE || ROUTING_CONF_RPL_CLASSIC)
+#endif
 
 /* If RPL is enabled also enable the RPL NBR Policy */
 #if UIP_CONF_IPV6_RPL

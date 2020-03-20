@@ -499,7 +499,7 @@ uint8_t rf_core_boot(void);
 /**
  * \brief Setup RF core interrupts
  */
-void rf_core_setup_interrupts(bool poll_mode);
+void rf_core_setup_interrupts(void);
 
 /**
  * \brief Enable interrupt on command done.
@@ -512,7 +512,7 @@ void rf_core_setup_interrupts(bool poll_mode);
  *
  * \sa rf_core_cmd_done_dis()
  */
-void rf_core_cmd_done_en(bool fg, bool poll_mode);
+void rf_core_cmd_done_en(bool fg);
 
 /**
  * \brief Disable the LAST_CMD_DONE and LAST_FG_CMD_DONE interrupts.
@@ -521,7 +521,7 @@ void rf_core_cmd_done_en(bool fg, bool poll_mode);
  *
  * \sa rf_core_cmd_done_en()
  */
-void rf_core_cmd_done_dis(bool poll_mode);
+void rf_core_cmd_done_dis(void);
 
 /**
  * \brief Returns a pointer to the most recent proto-dependent Radio Op

@@ -17,16 +17,6 @@ include $(CONTIKI)/Makefile.identify-target
 ### Include Makefile.tools to pull in targets that allow us to build tools dir
 include $(CONTIKI)/Makefile.tools
 
-ifeq ($(TARGET),)
-  -include Makefile.target
-  ifeq ($(TARGET),)
-    ${info TARGET not defined, using target 'native'}
-    TARGET=native
-  else
-    ${info using saved target '$(TARGET)'}
-  endif
-endif
-
 ifeq ($(DEFINES),)
   -include Makefile.$(TARGET).defines
   ifneq ($(DEFINES),)
@@ -50,22 +40,6 @@ ifdef CI
     V = 1
   endif
 endif
-
-usage:
-	@echo "make MAKETARGETS... [TARGET=(TARGET)] [savetarget] [targets]"
-
-targets:
-	@ls -1 $(CONTIKI)/platform $(TARGETDIRS) | grep -v CVS
-
-savetarget:
-	-@rm -f Makefile.target
-	@echo "saving Makefile.target"
-	@echo >Makefile.target "TARGET = $(TARGET)"
-
-savedefines:
-	-@rm -f Makefile.$(TARGET).defines
-	@echo "saving Makefile.$(TARGET).defines"
-	@echo >Makefile.$(TARGET).defines "DEFINES = $(DEFINES)"
 
 BUILD_DIR = build
 BUILD_DIR_TARGET = $(BUILD_DIR)/$(TARGET)
@@ -105,14 +79,12 @@ endif
 
 define oname
 ${patsubst %.c,%.o, \
+${patsubst %.cpp,%.o, \
 ${patsubst %.S,%.o, \
 ${patsubst %.s,%.o, \
 $(1) \
-}}}
+}}}}
 endef
-
-CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
-PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
 
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
@@ -128,6 +100,7 @@ else
   ifneq (1, ${words $(target_makefile)})
     ${error More than one TARGET Makefile found: $(target_makefile)}
   endif
+  $(info target make by $(target_makefile) )
   include $(target_makefile)
 endif
 
@@ -161,7 +134,13 @@ endif # $(BOARD) not empty
 PLATFORM_ACTION ?= build
 
 $(BUILDDIR):
-	mkdir -p $@
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
+
+# Provide path for *.map file
+$(BUILD_DIR_BOARD): | $(BUILDDIR)
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
 
 # Provide way to create $(OBJECTDIR) if it has been removed by make clean
 $(OBJECTDIR): | $(BUILDDIR)
@@ -300,6 +279,7 @@ endif
 ### Include application makefiles
 
 ifdef APPS
+  $(info apps: $(APPDS))
   APPDS = ${wildcard ${foreach DIR, $(APPDIRS), ${addprefix $(DIR)/, $(APPS)}}} \
              ${wildcard ${addprefix $(CONTIKI)/apps/, $(APPS)} \
              ${addprefix $(CONTIKI)/platform/$(TARGET)/apps/, $(APPS)} \
@@ -313,14 +293,12 @@ endif
 
 ifdef MODULES
   UNIQUEMODULES = $(call uniq,$(MODULES))
+  $(info modules: $(UNIQUEMODULES))
   MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(UNIQUEMODULES)}}
   MODULES_SOURCES = ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.c}}}
   MODULES_SOURCES += ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
   CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
   APPDS += $(MODULEDIRS)
-endif
-
-CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
 
 # Include module-specific makefiles
 MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${notdir $(d)}}}
@@ -342,25 +320,27 @@ ifneq ($(MODULES_IMACROS),)
   CFLAGS += ${foreach d, $(MODULES_IMACROS), -imacros $(d)}
 endif
 
+endif
+
 ### Verbosity control. Use  make V=1  to get verbose builds.
 
 ifeq ($(V),1)
-  TRACE_CC =
-  TRACE_CCX=
-  TRACE_LD =
-  TRACE_AR =
-  TRACE_AS =
-  TRACE_OBJCOPY  =
-  TRACE_OBJDUMP  =
-  TRACE_MKDIR =
-  TRACE_CP =
+  TRACE_CC = @echo "  CC       " $< "-->" $@
+  TRACE_CCX= @echo "  C++      " $< "-->" $@
+  TRACE_LD = @echo "  LD       " "-->" $@
+  TRACE_AR = @echo "  AR       " "-->" $@
+  TRACE_AS = @echo "  AS       " $< "-->" $@
+  TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
+  TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
+  TRACE_MKDIR = @echo "  MKDIR    " $@
+  TRACE_CP       = @echo "  CP       " $< "-->" $@
   Q=
 else
-  TRACE_CC = @echo "  CC       " $<
-  TRACE_CCX= @echo "  C++      " $<
+  TRACE_CC = @echo "  CC       " $< "-->" $@
+  TRACE_CCX= @echo "  C++      " $< "-->" $@
   TRACE_LD = @echo "  LD       " $@
   TRACE_AR = @echo "  AR       " $@
-  TRACE_AS = @echo "  AS       " $<
+  TRACE_AS = @echo "  AS       " $<  "-->" $@
   TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
   TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
   TRACE_MKDIR = @echo "  MKDIR    " $@
@@ -381,12 +361,12 @@ CONTIKI_CPU_DIRS_CONCAT    = ${addprefix $(CONTIKI_CPU)/, \
                                $(CONTIKI_CPU_DIRS)}
 
 SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
-
-             $(CONTIKI_CPU_DIRS_CONCAT) $(CONTIKIDIRS) $(APPDS) $(EXTERNALDIRS) ${dir $(target_makefile)}
+             $(CONTIKI_CPU_DIRS_CONCAT) $(MODULEDIRS) $(EXTERNALDIRS) $(APPDS)
 
 vpath %.c $(SOURCEDIRS)
 vpath %.cpp $(SOURCEDIRS)
 vpath %.S $(SOURCEDIRS)
+vpath %.s $(SOURCEDIRS)
 vpath %.o $(OBJECTDIR)
 
 CFLAGS += ${addprefix -I,$(SOURCEDIRS) $(CONTIKI)}
@@ -407,6 +387,14 @@ endif
 CFLAGS_CPU ?=
 CPPFLAGS := ${CPPFLAGS} ${CFLAGS}
 CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
+
+ifeq ($(V),1)
+$(info contiki objects: $(CONTIKI_SOURCEFILES))
+$(info project objects: $(PROJECT_SOURCEFILES))
+endif
+
+CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
+PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
 
 ### Automatic dependency generation
 
@@ -498,27 +486,27 @@ $(OBJECTDIR)/%.e: %.c | $(OBJECTDIR)
 endif
 
 ifndef CUSTOM_RULE_C_TO_O
-%.o: %.c
+%.o: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.cpp
+%.o: %.cpp | $(BUILD_DIR_BOARD)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -c $< -o $@
 endif
 
 ifndef CUSTOM_RULE_C_TO_S
-%.s: %.c
+%.s: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -S $< -o $@
 endif
 
 ifndef CUSTOM_RULE_C_TO_E
-%.e: %.c
+%.e: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -E $< -o $@
 
-$(BUILDDIR)/%.co: %.cpp | $(BUILDDIR)
+$(BUILDDIR)/%.co: %.cpp | $(BUILDDIR) $(BUILD_DIR_BOARD)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 endif
@@ -536,6 +524,10 @@ endif
 ifndef LD
   LD = $(CC)
 endif
+
+$(info build in $(BUILD_DIR))
+$(info board in $(BUILD_DIR_BOARD))
+$(info objects in $(OBJECTDIR))
 
 ifndef CUSTOM_RULE_LINK
 $(BUILD_DIR_BOARD)/%.$(TARGET): %.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
@@ -630,6 +622,6 @@ else
 # Match-anything pattern rule to allow the project makefiles to
 # abstract from the actual binary name. It needs to contain some
 # command in order to be a rule, not just a prerequisite.
-%: $(BUILDDIR)/%.$(TARGET)
-	@
+%: %.$(TARGET)
+	@echo "prepared for $@ prerequesites $(BUILDDIR)/%.$(TARGET) "
 endif

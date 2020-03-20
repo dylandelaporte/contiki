@@ -166,7 +166,7 @@ struct rtimer {
 /**
  * TODO: we need to document meanings of these symbols.
  */
-enum {
+typedef enum {
   RTIMER_OK, /**< rtimer task is scheduled successfully */
   RTIMER_ERR_FULL,
   RTIMER_ERR_TIME,
