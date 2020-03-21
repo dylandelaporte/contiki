@@ -40,7 +40,7 @@
 #ifndef COAP_OBSERVING_CLIENT_H_
 #define COAP_OBSERVING_CLIENT_H_
 
-#include "er-coap.h"
+#include "coap.h"
 #include "er-coap-transactions.h"
 
 #ifndef COAP_OBSERVE_CLIENT

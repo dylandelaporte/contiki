@@ -31,58 +31,56 @@
 
 /**
  * \file
- *      CoAP module for observing resources (draft-ietf-core-observe-11).
+ *      CoAP implementation for the REST Engine.
  * \author
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#ifndef COAP_OBSERVE_H_
-#define COAP_OBSERVE_H_
+#ifndef ER_COAP_ENGINE_H_
+#define ER_COAP_ENGINE_H_
 
-#include "er-coap.h"
+#include "coap.h"
+#include "pt.h"
 #include "er-coap-transactions.h"
-#include "stimer.h"
+#include "er-coap-observe.h"
+#include "er-coap-separate.h"
+#include "er-coap-observe-client.h"
 
-#define COAP_OBSERVER_URL_LEN 20
+#define SERVER_LISTEN_PORT      UIP_HTONS(COAP_SERVER_PORT)
 
-typedef struct coap_observable {
-  uint32_t observe_clock;
-  struct stimer orphan_timer;
-  list_t observers;
-  coap_packet_t notification;
-  uint8_t buffer[COAP_MAX_PACKET_SIZE + 1];
-} coap_observable_t;
+typedef coap_packet_t rest_request_t;
+typedef coap_packet_t rest_response_t;
 
-typedef struct coap_observer {
-  struct coap_observer *next;   /* for LIST */
+void coap_init_engine(void);
 
-  char url[COAP_OBSERVER_URL_LEN];
-  uip_ipaddr_t addr;
-  uint16_t port;
-  uint8_t token_len;
-  uint8_t token[COAP_TOKEN_LEN];
-  uint16_t last_mid;
+/*---------------------------------------------------------------------------*/
+/*- Client Part -------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+struct request_state_t {
+  struct pt pt;
+  struct process *process;
+  coap_transaction_t *transaction;
+  coap_packet_t *response;
+  uint32_t block_num;
+};
 
-  int32_t obs_counter;
+typedef void (*blocking_response_handler)(void *response);
 
-  struct etimer retrans_timer;
-  uint8_t retrans_counter;
-} coap_observer_t;
+PT_THREAD(coap_blocking_request
+            (struct request_state_t *state, process_event_t ev,
+            uip_ipaddr_t *remote_ipaddr, uint16_t remote_port,
+            coap_packet_t *request,
+            blocking_response_handler request_callback));
 
-list_t coap_get_observers(void);
-void coap_remove_observer(coap_observer_t *o);
-int coap_remove_observer_by_client(uip_ipaddr_t *addr, uint16_t port);
-int coap_remove_observer_by_token(uip_ipaddr_t *addr, uint16_t port,
-                                  uint8_t *token, size_t token_len);
-int coap_remove_observer_by_uri(uip_ipaddr_t *addr, uint16_t port,
-                                const char *uri);
-int coap_remove_observer_by_mid(uip_ipaddr_t *addr, uint16_t port,
-                                uint16_t mid);
+#define COAP_BLOCKING_REQUEST(server_addr, server_port, request, chunk_handler) \
+  { \
+    static struct request_state_t request_state; \
+    PT_SPAWN(process_pt, &request_state.pt, \
+             coap_blocking_request(&request_state, ev, \
+                                   server_addr, server_port, \
+                                   request, chunk_handler) \
+             ); \
+  }
+/*---------------------------------------------------------------------------*/
 
-void coap_notify_observers(resource_t *resource);
-void coap_notify_observers_sub(resource_t *resource, const char *subpath);
-
-void coap_observe_handler(resource_t *resource, void *request,
-                          void *response);
-
-#endif /* COAP_OBSERVE_H_ */
+#endif /* ER_COAP_ENGINE_H_ */
