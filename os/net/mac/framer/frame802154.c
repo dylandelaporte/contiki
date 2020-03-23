@@ -138,9 +138,6 @@ frame802154_set_pan_id(uint16_t pan_id)
 void
 frame802154_has_panid(frame802154_fcf_t *fcf, int *has_src_pan_id, int *has_dest_pan_id)
 {
-  int src_pan_id = 0;
-  int dest_pan_id = 0;
-
   if(fcf == NULL) {
     return;
   }

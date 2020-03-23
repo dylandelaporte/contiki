@@ -68,6 +68,8 @@
 #define LIST_H_
 
 #include <stdbool.h>
+#include "contiki-conf.h"
+
 
 #define LIST_CONCAT2(s1, s2) s1##s2
 #define LIST_CONCAT(s1, s2) LIST_CONCAT2(s1, s2)

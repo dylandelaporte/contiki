@@ -53,6 +53,9 @@
 /** \brief 802.15.4e link types. LINK_TYPE_ADVERTISING_ONLY is an extra one: for EB-only links. */
 enum link_type { LINK_TYPE_NORMAL, LINK_TYPE_ADVERTISING, LINK_TYPE_ADVERTISING_ONLY };
 
+// TSCH slot frame handle id type
+typedef uint8_t tsch_sf_h;
+
 /** \brief An IEEE 802.15.4-2015 TSCH link (also called cell or slot) */
 struct tsch_link {
   /* Links are stored as a list: "next" must be the first field */
@@ -139,7 +142,9 @@ enum tsch_timeslot_timing_elements {
   tsch_ts_max_ack,
   tsch_ts_max_tx,
   tsch_ts_timeslot_length,
+  tsch_ts_rfon_prepslot_guard,
   tsch_ts_elements_count, /* Not a timing element */
+  tsch_ts_netwide_count = tsch_ts_timeslot_length, /* Not a timing element */
 };
 
 /** \brief TSCH timeslot timing elements in rtimer ticks */

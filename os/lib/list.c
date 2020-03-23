@@ -44,12 +44,14 @@
  * \addtogroup list
  * @{
  */
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "lib/list.h"
 
 #include <string.h>
 /*---------------------------------------------------------------------------*/
+#ifndef NULL
 #define NULL 0
+#endif
 
 struct list {
   struct list *next;

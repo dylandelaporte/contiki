@@ -303,7 +303,7 @@ frame80215e_create_ie_tsch_timeslot(uint8_t *buf, int len,
     buf[2] = ies->ie_tsch_timeslot_id;
     if(ies->ie_tsch_timeslot_id != 0) {
       int i;
-      for(i = 0; i < tsch_ts_elements_count; i++) {
+      for(i = 0; i < tsch_ts_netwide_count; i++) {
         WRITE16(buf + 3 + 2 * i, ies->ie_tsch_timeslot[i]);
       }
     }

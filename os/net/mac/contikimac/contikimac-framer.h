@@ -40,7 +40,7 @@
 #ifndef CONTIKIMAC_FRAMER_H_
 #define CONTIKIMAC_FRAMER_H_
 
-#include "net/mac/framer.h"
+#include "net/mac/framer/framer.h"
 
 extern const struct framer contikimac_framer;
 

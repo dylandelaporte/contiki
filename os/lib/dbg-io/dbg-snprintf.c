@@ -8,8 +8,8 @@ struct FmtBuffer
   size_t left;
 };
 
-static StrFormatResult
-buffer_str(void *user_data, const char *data, unsigned int len)
+static
+strformat_result buffer_str(void *user_data, const char *data, unsigned int len)
 {
   struct FmtBuffer *buffer = (struct FmtBuffer*)user_data;
   if (len >= buffer->left) {
@@ -36,7 +36,7 @@ int snprintf(char *str, size_t size, const char *format, ...)
 int vsnprintf(char *str, size_t size, const char *format, va_list ap)
 {
   struct FmtBuffer buffer;
-  StrFormatContext ctxt;
+  strformat_context_t ctxt;
   int res;
   ctxt.write_str = buffer_str;
   ctxt.user_data = &buffer;
