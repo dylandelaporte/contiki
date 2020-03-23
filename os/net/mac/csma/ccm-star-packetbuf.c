@@ -38,10 +38,10 @@
  *         Konrad Krentz <konrad.krentz@gmail.com>
  */
 
-#include "llsec/ccm-star-packetbuf.h"
+#include "ccm-star-packetbuf.h"
 #include "net/linkaddr.h"
 #include "net/packetbuf.h"
-#include "net/llsec/llsec802154.h"
+#include "net/mac/llsec802154.h"
 #include <string.h>
 
 #if LLSEC802154_USES_AUX_HEADER && LLSEC802154_USES_FRAME_COUNTER

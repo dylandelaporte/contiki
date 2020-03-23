@@ -37,7 +37,7 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#include "net/mac/csma.h"
+#include "csma.h"
 #include "net/packetbuf.h"
 #include "net/queuebuf.h"
 

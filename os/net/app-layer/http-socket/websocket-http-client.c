@@ -31,7 +31,7 @@
 
 #include "websocket-http-client.h"
 #include "net/ip/uiplib.h"
-#include "net/ip/resolv.h"
+#include "services/resolv/resolv.h"
 
 #include "ip64-addr.h"
 
