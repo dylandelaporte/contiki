@@ -32,9 +32,9 @@
 #include "contiki.h"
 #include "contiki-net.h"
 
-#include "net/rpl/rpl.h"
-#include "net/rpl/rpl-private.h"
-#include "net/rpl/rpl-dag-root.h"
+#include "net/routing/rpl-classic/rpl.h"
+#include "net/routing/rpl-classic/rpl-private.h"
+#include "net/routing/rpl-classic/rpl-dag-root.h"
 
 #include <string.h>
 

@@ -42,8 +42,8 @@
  * @{
  */
 
-#include "net/rpl/rpl.h"
-#include "net/rpl/rpl-private.h"
+#include "net/routing/rpl-classic/rpl.h"
+#include "net/routing/rpl-classic/rpl-private.h"
 #include "net/nbr-table.h"
 #include "net/link-stats.h"
 
