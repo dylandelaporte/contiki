@@ -158,14 +158,12 @@ endif
 HAS_STACK = 0
 ifeq ($(CONTIKI_WITH_IPV4),1)
   HAS_STACK = 1
-  CFLAGS += -DNETSTACK_CONF_WITH_IPV4=1
-  MODULES += os/net/ipv4 os/net/ip
+  MAKE_NET ?= MAKE_NET_IPV4
 endif
 
 ifeq ($(CONTIKI_WITH_RIME),1)
   HAS_STACK = 1
-  CFLAGS += -DNETSTACK_CONF_WITH_RIME=1 
-  MODULES += os/net/rime
+  MAKE_NET ?= MAKE_NET_RIME
 endif
 
 # Make IPv6 the default stack
@@ -176,16 +174,15 @@ endif
 endif
 
 ifeq ($(CONTIKI_WITH_IPV6),1)
-  CFLAGS += -DNETSTACK_CONF_WITH_IPV6=1
+  MAKE_NET ?= MAKE_NET_IPV6
   ifneq ($(CONTIKI_WITH_RPL),0)
   	CONTIKI_WITH_RPL = 1
   endif
-  MODULES += os/net/ipv6 os/net/ip
 endif
 
 ifeq ($(CONTIKI_WITH_RPL),1)
     CFLAGS += -DUIP_CONF_IPV6_RPL=1
-    MODULES += os/net/rpl
+    MAKE_ROUTING ?= MAKE_ROUTING_RPL_LITE
 else
     CFLAGS += -DUIP_CONF_IPV6_RPL=0
 endif
@@ -231,6 +228,8 @@ endif
 MAKE_NET_NULLNET = 0
 MAKE_NET_IPV6 = 1
 MAKE_NET_OTHER = 2
+MAKE_NET_IPV4 = 3
+MAKE_NET_RIME = 4
 
 # Make IPv6 the default stack
 MAKE_NET ?= MAKE_NET_IPV6
@@ -242,7 +241,17 @@ endif
 
 ifeq ($(MAKE_NET),MAKE_NET_IPV6)
   CFLAGS += -DNETSTACK_CONF_WITH_IPV6=1
-  MODULES += $(CONTIKI_NG_NET_DIR)/ipv6
+  MODULES += $(CONTIKI_NG_NET_DIR)/ipv6 $(CONTIKI_NG_NET_DIR)/ip
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_IPV4)
+  CFLAGS += -DNETSTACK_CONF_WITH_IPV4=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/ipv4 $(CONTIKI_NG_NET_DIR)/ip
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_RIME)
+  CFLAGS += -DNETSTACK_CONF_WITH_RIME=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/rime
 endif
 
 ifeq ($(MAKE_NET),MAKE_NET_OTHER)

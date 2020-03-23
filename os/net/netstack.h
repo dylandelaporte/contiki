@@ -66,6 +66,8 @@
 #else /* NETSTACK_CONF_NETWORK */
 #if NETSTACK_CONF_WITH_IPV6
 #define NETSTACK_NETWORK sicslowpan_driver
+#elif NETSTACK_CONF_WITH_RIME
+#define NETSTACK_NETWORK rime_driver
 #elif NETSTACK_CONF_WITH_NULLNET
 #define NETSTACK_NETWORK nullnet_driver
 #else
