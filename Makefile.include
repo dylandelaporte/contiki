@@ -269,10 +269,10 @@ ifeq ($(V),1)
   TRACE_CP =
   Q=
 else
-  TRACE_CC = @echo "  CC       " $<
+  TRACE_CC = @echo "  CC       " $< "-->" $@
   TRACE_LD = @echo "  LD       " $@
   TRACE_AR = @echo "  AR       " $@
-  TRACE_AS = @echo "  AS       " $<
+  TRACE_AS = @echo "  AS       " $< "-->" $@
   TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
   TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
   TRACE_MKDIR = @echo "  MKDIR    " $@
