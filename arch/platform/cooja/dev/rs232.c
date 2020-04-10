@@ -88,12 +88,6 @@ rs232_print(char *message)
     simSerialSendFlag = 1;
 }
 /*-----------------------------------------------------------------------------------*/
-void
-slip_arch_writeb(unsigned char c)
-{
-    rs232_send(c);
-}
-/*-----------------------------------------------------------------------------------*/
 static void
 doInterfaceActionsBeforeTick(void)
 {
@@ -119,7 +113,8 @@ doInterfaceActionsBeforeTick(void)
     for (i=0; i < simSerialReceivingLength; i++) {
       serial_line_input_byte(simSerialReceivingData[i]);
     }
-    serial_line_input_byte(0x0a);
+    // intrude \n,  why this is here?
+    //serial_line_input_byte(0x0a);
   }
 
   simSerialReceivingLength = 0;
