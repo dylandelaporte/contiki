@@ -107,8 +107,8 @@
 #define RTIMER_GUARD RTIMER_GUARD_TIME
 #else
 /* By default: check that rtimer runs at >=32kHz and use a guard time of 10us */
-#if RTIMER_SECOND < (32 * 1024)
-#error "TSCH: RTIMER_SECOND < (32 * 1024)"
+#if RTIMER_SECOND < (8 * 1024)
+#error "TSCH: RTIMER_SECOND < (8 * 1024)"
 #endif
 #if CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64
 /* Use 0 usec guard time for Cooja Mote with a 1 MHz Rtimer*/
