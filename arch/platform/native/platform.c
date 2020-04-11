@@ -111,6 +111,7 @@
 #define SELECT_STDIN 1
 #endif
 /** @} */
+
 /*---------------------------------------------------------------------------*/
 
 static const struct select_callback *select_callback[SELECT_MAX];
@@ -127,21 +128,26 @@ int
 select_set_callback(int fd, const struct select_callback *callback)
 {
   int i;
-  if(fd >= 0 && fd < SELECT_MAX) {
-    /* Check that the callback functions are set */
-    if(callback != NULL &&
-       (callback->set_fd == NULL || callback->handle_fd == NULL)) {
-      callback = NULL;
-    }
+  if (callback == NULL)
+      return -1;
+  /* Check that the callback functions are set */
+  if ((callback->set_fd == NULL || callback->handle_fd == NULL))
+      fd = -1;
 
-    select_callback[fd] = callback;
-
-    /* Update fd max */
-    if(callback != NULL) {
-      if(fd > select_max) {
-        select_max = fd;
+  if (fd < 0){
+      //drop callback from list;
+      for(i = select_max; i >= 0; --i) {
+        if(select_callback[i] == NULL)
+            continue;
+        if ( (select_callback[i]->set_fd == callback->set_fd)
+           ||(select_callback[i]->handle_fd == callback->handle_fd)
+           )
+        {
+            select_callback[i] = NULL;
+        }
       }
-    } else {
+
+      /* Update fd max */
       select_max = 0;
       for(i = SELECT_MAX - 1; i > 0; i--) {
         if(select_callback[i] != NULL) {
@@ -149,11 +155,24 @@ select_set_callback(int fd, const struct select_callback *callback)
           break;
         }
       }
-    }
-    return 1;
+      return 1;
   }
+
+  for(i = select_max; i >= 0; --i) {
+    if(select_callback[i] == NULL) {
+        select_callback[i] = callback;
+        return 1;
+    }
+  }
+  if (select_max < SELECT_MAX){
+      select_max++;
+      select_callback[select_max] = callback;
+      return 1;
+  }
+
   return 0;
 }
+
 /*---------------------------------------------------------------------------*/
 #if SELECT_STDIN
 static int
@@ -311,12 +330,15 @@ platform_main_loop()
     FD_ZERO(&fdw);
     maxfd = 0;
     for(i = 0; i <= select_max; i++) {
-      if(select_callback[i] != NULL && select_callback[i]->set_fd(&fdr, &fdw)) {
-        maxfd = i;
+      if (select_callback[i] != NULL)
+      {
+          int fd = select_callback[i]->set_fd(&fdr, &fdw);
+          if (maxfd < fd)
+              maxfd = fd;
       }
     }
 
-    retval = select(maxfd + 1, &fdr, &fdw, NULL, &tv);
+    retval = select(maxfd+1, &fdr, &fdw, NULL, &tv);
     if(retval < 0) {
       if(errno != EINTR) {
         perror("select");
