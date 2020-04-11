@@ -64,6 +64,8 @@
 #include "net/ipv6/uip-debug.h"
 #include "net/queuebuf.h"
 
+#include "platform-native.h"
+
 #if NETSTACK_CONF_WITH_IPV6
 #include "net/ipv6/uip-ds6.h"
 #endif /* NETSTACK_CONF_WITH_IPV6 */

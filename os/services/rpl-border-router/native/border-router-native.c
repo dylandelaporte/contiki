@@ -41,6 +41,7 @@
 #include "contiki.h"
 #include "contiki-net.h"
 
+#include "platform.h"
 #include "net/routing/routing.h"
 #include "rpl-border-router.h"
 #include "cmd.h"
@@ -59,10 +60,6 @@ extern long slip_sent;
 extern long slip_received;
 
 static uint8_t mac_set;
-
-extern int contiki_argc;
-extern char **contiki_argv;
-extern const char *slip_config_ipaddr;
 
 CMD_HANDLERS(border_router_cmd_handler);
 
