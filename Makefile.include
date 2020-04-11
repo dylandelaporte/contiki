@@ -412,10 +412,14 @@ ifndef LD
 endif
 
 ifndef CUSTOM_RULE_LINK
-$(BUILD_DIR_BOARD)/%.$(TARGET): %.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
+$(BUILD_DIR_BOARD)/%.$(TARGET): $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(TARGET_LIBFILES) -o $@
+
+# this objects need for debuger, and need for quick rebuild
+.PRECIOUS: $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) 
+
 endif
 
 %.$(TARGET): $(BUILD_DIR_BOARD)/%.$(TARGET)
