@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, Swedish Institute of Computer Science.
+ * Copyright (c) 2017, RISE SICS
+ * Copyright (c) 2020, alexrayne <alexraynepe196@gmail.com>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,45 +26,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * This file is part of the Contiki operating system.
- *
  */
 
-/**
- * \file
- *         A brief description of what this file is.
- * \author
- *         Adam Dunkels <adam@sics.se>
- */
+/* use a non-default network driver */
+// override default native tun6_network
+#define NETSTACK_CONF_NETWORK sicslowpan_driver
 
-#ifndef RTIMER_ARCH_H_
-#define RTIMER_ARCH_H_
-
-#include "contiki.h"
-
-#ifndef RTIMER_ARCH_SECOND
-#ifdef RTIMER_CONF_ARCH_SECOND
-#define RTIMER_ARCH_SECOND RTIMER_CONF_ARCH_SECOND
-#else
-#define RTIMER_ARCH_SECOND CLOCK_CONF_SECOND
-#endif
-#endif
-
-
-#define rtimer_arch_now() clock_time()
-
-#define US_TO_RTIMERTICKS(US)  (((US) >= 0 ?                        \
-                               (((int32_t)(US) * (RTIMER_ARCH_SECOND) + 500000) / 1000000L) :      \
-                                ((int32_t)(US) * (RTIMER_ARCH_SECOND) - 500000) / 1000000L))
-
-#define RTIMERTICKS_TO_US(T)   ((T) >= 0 ?                     \
-                               (((int32_t)(T) * 1000000L + (RTIMER_ARCH_SECOND)) / (RTIMER_ARCH_SECOND)) : \
-                               ((int32_t)(T) * 1000000L - (RTIMER_ARCH_SECOND)) / (RTIMER_ARCH_SECOND))
-
-/* A 64-bit version because the 32-bit one cannot handle T >= 4295 ticks.
-   Intended only for positive values of T. */
-#define RTIMERTICKS_TO_US_64(T)  ((uint32_t)(((uint64_t)(T) * 1000000 + (RTIMER_ARCH_SECOND)) / (RTIMER_ARCH_SECOND)))
-
-
-#endif /* RTIMER_ARCH_H_ */
+//native use it to enable default gateaway fd00::1 path to net
+//@sa platform.c
+#define UIP_CONF_IP_GATEAWAY    0

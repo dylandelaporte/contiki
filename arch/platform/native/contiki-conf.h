@@ -62,6 +62,19 @@ typedef unsigned int uip_stats_t;
 #define UIP_CONF_BYTE_ORDER      UIP_LITTLE_ENDIAN
 #endif
 
+#ifdef NETSTACK_CONF_H
+
+/* These header overrides the below default configuration */
+#define NETSTACK__QUOTEME(s) NETSTACK_QUOTEME(s)
+#define NETSTACK_QUOTEME(s) #s
+#include NETSTACK__QUOTEME(NETSTACK_CONF_H)
+
+#else /* NETSTACK_CONF_H */
+
+/* Default network config */
+
+#endif /* NETSTACK_CONF_H */
+
 #if NETSTACK_CONF_WITH_IPV6
 
 #ifndef NETSTACK_CONF_NETWORK

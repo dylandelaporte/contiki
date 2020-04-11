@@ -266,6 +266,14 @@ set_global_address(void)
 int contiki_argc = 0;
 char **contiki_argv;
 /*---------------------------------------------------------------------------*/
+#ifndef __WEAK
+#define __WEAK __attribute__((weak))
+#endif
+__WEAK __NOINLINE
+void board_init(void){
+
+}
+//---------------------------------------------------------------------------
 void
 platform_process_args(int argc, char**argv)
 {
@@ -329,6 +337,7 @@ platform_main_loop()
 #if SELECT_STDIN
   select_set_callback(STDIN_FILENO, &stdin_fd);
 #endif /* SELECT_STDIN */
+  board_init();
   while(1) {
     fd_set fdr;
     fd_set fdw;

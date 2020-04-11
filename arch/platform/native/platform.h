@@ -37,4 +37,16 @@ int select_set_callback(int fd, const struct select_callback *callback);
 
 
 
+#ifndef __NOINLINE
+#define __NOINLINE __attribute__((noinline))
+#endif
+/*
+ * @brief - board depenent startup
+ * These functions must be provided externally
+ */
+__NOINLINE
+void board_init(void);
+
+
+
 #endif /* ARCH_PLATFORM_NATIVE_PLATFORM_NATIVE_H_ */
