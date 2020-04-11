@@ -110,6 +110,19 @@
 #else
 #define SELECT_STDIN 1
 #endif
+
+
+/*
+ * native use to enable default gateaway fd00::1 path to net
+ * TODO it keep enabled for back-campatibily. but in most embedded targets
+ *      it should be off
+ */
+#ifndef UIP_CONF_IP_GATEAWAY
+#define UIP_IP_GATEAWAY 1
+#else
+#define UIP_IP_GATEAWAY UIP_CONF_IP_GATEAWAY
+#endif
+
 /** @} */
 
 /*---------------------------------------------------------------------------*/
@@ -240,10 +253,13 @@ set_global_address(void)
   LOG_INFO_6ADDR(&ipaddr);
   LOG_INFO_("\n");
 
+#if UIP_IP_GATEAWAY
   /* set the PREFIX::1 address to the IF */
   uip_ip6addr_copy(&ipaddr, default_prefix);
   ipaddr.u8[15] = 1;
   uip_ds6_defrt_add(&ipaddr, 0);
+#endif
+
 }
 #endif
 /*---------------------------------------------------------------------------*/
