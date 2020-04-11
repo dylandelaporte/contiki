@@ -45,11 +45,7 @@
 #include <sys/select.h>
 #endif
 
-struct select_callback {
-  int  (* set_fd)(fd_set *fdr, fd_set *fdw);
-  void (* handle_fd)(fd_set *fdr, fd_set *fdw);
-};
-int select_set_callback(int fd, const struct select_callback *callback);
+#include <platform-native.h>
 
 #define CC_CONF_REGISTER_ARGS          1
 #define CC_CONF_FUNCTION_POINTER_ARGS  1
@@ -65,6 +61,19 @@ typedef unsigned int uip_stats_t;
 #ifndef UIP_CONF_BYTE_ORDER
 #define UIP_CONF_BYTE_ORDER      UIP_LITTLE_ENDIAN
 #endif
+
+#ifdef NETSTACK_CONF_H
+
+/* These header overrides the below default configuration */
+#define NETSTACK__QUOTEME(s) NETSTACK_QUOTEME(s)
+#define NETSTACK_QUOTEME(s) #s
+#include NETSTACK__QUOTEME(NETSTACK_CONF_H)
+
+#else /* NETSTACK_CONF_H */
+
+/* Default network config */
+
+#endif /* NETSTACK_CONF_H */
 
 #if NETSTACK_CONF_WITH_IPV6
 

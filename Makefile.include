@@ -245,10 +245,22 @@ MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${not
 ### them twice.
 MODULES_INCLUDED_FIRST_PASS := $(MODULES_INCLUDES)
 include $(MODULES_INCLUDED_FIRST_PASS)
+$(info modules 1st pass $(MODULES_INCLUDED_FIRST_PASS) )
 
 # Iterate once more: include the modules added from the previous include.
 # Only works with one level of nested module inclusion.
-include $(filter-out $(MODULES_INCLUDED_FIRST_PASS),$(MODULES_INCLUDES))
+MODULES_INCLUDED_SECOND_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             , $(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_SECOND_PASS)
+$(info modules 2nd pass  $(MODULES_INCLUDED_SECOND_PASS) )
+
+# Iterate once more: include the modules added from the previous include.
+# Only works with one level of nested module inclusion.
+MODULES_INCLUDED_3_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             $(MODULES_INCLUDED_SECOND_PASS) \
+                                             ,$(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_3_PASS)
+$(info modules 3rd pass $(MODULES_INCLUDED_3_PASS) )
 
 # C-include module-specific macros using -imacros
 MODULES_IMACROS = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/module-macros.h}}
