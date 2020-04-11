@@ -40,6 +40,7 @@
 #include "contiki.h"
 #include "net/ipv6/uip.h"
 #include <stdio.h>
+#include "slip-config.h"
 
 int border_router_cmd_handler(const uint8_t *data, int len);
 void write_to_slip(const uint8_t *buf, int len);
