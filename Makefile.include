@@ -60,6 +60,13 @@ CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
 CFLAGS += -Wno-unused-const-variable
 
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
 ifeq ($(WERROR),1)
@@ -324,6 +331,14 @@ ifneq ($(RELSTR),)
 CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-NG-$(RELSTR)\"
 else
 CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-NG\"
+endif
+
+
+### drop excluded objects
+
+ifneq ("$(SOURCE_EXCLUDE)","")
+CONTIKI_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(CONTIKI_SOURCEFILES))
+PROJECT_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(PROJECT_SOURCEFILES))
 endif
 
 ### Automatic dependency generation
