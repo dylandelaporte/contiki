@@ -1,7 +1,10 @@
 CONTIKI_PROJECT ?= msf-node msf-root
 all: $(CONTIKI_PROJECT)
 
-PLATFORMS_EXCLUDE = sky z1 nrf52dk native simplelink
+PLATFORMS_EXCLUDE = sky z1 nrf52dk simplelink
+ifeq ("$(BOARD)","")
+PLATFORMS_EXCLUDE += native
+endif
 
 ifdef APP_SEND_INTERVAL
 CFLAGS += -DAPP_SEND_INTERVAL=$(APP_SEND_INTERVAL)
