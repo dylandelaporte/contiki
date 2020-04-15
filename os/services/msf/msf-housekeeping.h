@@ -85,23 +85,5 @@ void msf_housekeeping_resolve_inconsistency(const linkaddr_t *peer_addr);
  * \param cell A pointer to a negotiated cell to delete
  */
 void msf_housekeeping_delete_cell_later(tsch_link_t *cell);
-
-/**
- * \brief Show scheduled negotiated cells in the shell
- * \param output A pointer to shell_output_func
- */
-void msf_housekeeping_show_negotiated_cells(shell_output_func output);
-
-/**
- * \brief Show scheduled automated cells in the shell
- * \param output A pointer to shell_output_func
- */
-void msf_housekeeping_show_autonomous_cells(shell_output_func output);
-
-/**
- * \brief Show MSF counters in the shell
- * \param output A pointer to shell_output_func
- */
-void msf_housekeeping_show_counters(shell_output_func output);
 #endif /* !_MSF_HOUSEKEEPING_H_ */
 /** @} */
