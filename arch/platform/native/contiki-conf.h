@@ -45,7 +45,7 @@
 #include <sys/select.h>
 #endif
 
-#include <platform-native.h>
+#include <platform.h>
 
 #define CC_CONF_REGISTER_ARGS          1
 #define CC_CONF_FUNCTION_POINTER_ARGS  1

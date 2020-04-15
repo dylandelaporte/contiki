@@ -54,7 +54,7 @@
 
 #include "dev/serial-line.h"
 #include "serial-fd.h"
-#include "platform-native.h"
+#include "platform.h"
 #include "services/rpl-border-router/native/slip-config.h"
 
 #ifndef BAUDRATE
