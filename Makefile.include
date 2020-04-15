@@ -60,6 +60,13 @@ CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
 CFLAGS += -Wno-unused-const-variable
 
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
 ifeq ($(WERROR),1)
