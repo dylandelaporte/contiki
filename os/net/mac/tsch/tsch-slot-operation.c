@@ -986,6 +986,8 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 /*---------------------------------------------------------------------------*/
 /* Protothread for slot operation, called from rtimer interrupt
  * and scheduled from tsch_schedule_slot_operation */
+extern struct tsch_link *signaling_link;
+
 static
 PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
 {
@@ -1015,6 +1017,16 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       /* Reset drift correction */
       drift_correction = 0;
       is_drift_correction_used = 0;
+
+      (void)signaling_link; // hide unused warning if no TSCH_CALLBACK_LINK_SIGNAL
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+      if ( (current_link->link_options & (LINK_OPTION_SIGNAL | LINK_OPTION_SIGNAL_ONCE)) != 0 ){
+          // current link need signal;
+          TSCH_CALLBACK_LINK_SIGNAL(signaling_link);
+          current_link->link_options &= ~LINK_OPTION_SIGNAL_ONCE;
+      }
+#endif
+
       /* Get a packet ready to be sent */
       current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
       /* There is no packet to send, and this link does not have Rx flag. Instead of doing
@@ -1022,8 +1034,13 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       if(current_packet == NULL && !(current_link->link_options & LINK_OPTION_RX) && backup_link != NULL) {
         current_link = backup_link;
         current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+        backup_link->link_options  &= ~LINK_OPTION_SIGNAL_ONCE;
+#endif
       }
+
       is_active_slot = current_packet != NULL || (current_link->link_options & LINK_OPTION_RX);
+
       if(is_active_slot) {
         /* If we are in a burst, we stick to current channel instead of
          * doing channel hopping, as per IEEE 802.15.4-2015 */

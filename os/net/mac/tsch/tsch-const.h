@@ -55,6 +55,17 @@
 #define LINK_OPTION_SHARED          4
 #define LINK_OPTION_TIME_KEEPING    8
 
+//> signals TSCH_CALLBACK_LINK_SIGNAL on slot time
+//   this signal is not overlaps by more prioritysed links
+#define LINK_OPTION_SIGNAL           0x100
+//> same as _SIGNAL, but automatic clears after signaling
+//  but this option clears only on active link
+//  this use by scheduler as temporary flag, for selected active link
+#define LINK_OPTION_SIGNAL_ONCE      0x200
+
+
+
+
 /* Default IEEE 802.15.4e hopping sequences, obtained from https://gist.github.com/twatteyne/2e22ee3c1a802b685695 */
 /* 16 channels, sequence length 16 */
 #define TSCH_HOPPING_SEQUENCE_16_16 (uint8_t[]){ 16, 17, 23, 18, 26, 15, 25, 22, 19, 11, 12, 13, 24, 14, 20, 21 }

@@ -143,6 +143,13 @@ void TSCH_CALLBACK_NEW_TIME_SOURCE(const struct tsch_neighbor *old, const struct
 int TSCH_CALLBACK_PACKET_READY(void);
 #endif
 
+// called by TSCH scheduler every time link is activated, and there is link with
+//  LINK_OPTION_SIGNAL[_XXX] in same time-slot
+//  @arg signaling_link - provided last checked link with signaling request
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+void TSCH_CALLBACK_LINK_SIGNAL(struct tsch_link * signaling_link);
+#endif
+
 /***** External Variables *****/
 
 /* Are we coordinator of the TSCH network? */

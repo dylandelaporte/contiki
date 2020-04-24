@@ -386,10 +386,16 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
 
 /*---------------------------------------------------------------------------*/
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
+// used by tsch_slot_operation
+struct tsch_link *signaling_link = NULL;
+
 struct tsch_link *
 tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset,
     struct tsch_link **backup_link)
 {
+    // signaling link has seen at time_to_curr_best
+    signaling_link                = NULL;
+
   uint16_t time_to_curr_best = 0;
   struct tsch_link *curr_best = NULL;
   struct tsch_link *curr_backup = NULL; /* Keep a back link in case the current link
@@ -411,6 +417,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
         if(curr_best == NULL || time_to_timeslot < time_to_curr_best) {
           time_to_curr_best = time_to_timeslot;
           curr_best = l;
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+          if ( (l->link_options & (LINK_OPTION_SIGNAL|LINK_OPTION_SIGNAL_ONCE)) != 0) {
+              signaling_link = l;
+          }
+          else
+              signaling_link    = NULL;
+#endif
           curr_backup = NULL;
         } else if(time_to_timeslot == time_to_curr_best) {
           struct tsch_link *new_best = NULL;
@@ -449,6 +462,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
           if(new_best != NULL) {
             curr_best = new_best;
           }
+
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+          if ( (l->link_options & (LINK_OPTION_SIGNAL|LINK_OPTION_SIGNAL_ONCE)) != 0) {
+              signaling_link = l;
+          }
+#endif
+
         }
 
         l = list_item_next(l);
@@ -462,6 +482,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
   if(backup_link != NULL) {
     *backup_link = curr_backup;
   }
+
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+  // since need to signal
+  if (signaling_link != NULL)
+      curr_best->link_options |= LINK_OPTION_SIGNAL_ONCE;
+#endif
+
   return curr_best;
 }
 /*---------------------------------------------------------------------------*/
