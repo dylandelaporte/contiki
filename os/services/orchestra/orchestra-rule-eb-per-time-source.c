@@ -40,6 +40,14 @@
 #include "orchestra.h"
 #include "net/packetbuf.h"
 
+#include "sys/log.h"
+#define LOG_MODULE "ORCHESTRA"
+#ifdef LOG_LEVEL_ORCHESRTA
+#define LOG_LEVEL LOG_LEVEL_ORCHESRTA
+#else
+#define LOG_LEVEL LOG_LEVEL_NONE
+#endif
+
 static uint16_t slotframe_handle = 0;
 static uint16_t channel_offset = 0;
 static struct tsch_slotframe *sf_eb;
@@ -66,6 +74,10 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
     if(timeslot != NULL) {
       *timeslot = get_node_timeslot(&linkaddr_node_addr);
     }
+    LOG_DBG("EB ");
+    if(timeslot != NULL)
+        LOG_INFO_(" -> slot%d", *timeslot);
+    LOG_INFO_(" ch+%d\n", ORCHESTRA_EB_CHANNEL_OFFSET);
     return 1;
   }
   return 0;
@@ -76,6 +88,10 @@ new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new
 {
   uint16_t old_ts = old != NULL ? get_node_timeslot(&old->addr) : 0xffff;
   uint16_t new_ts = new != NULL ? get_node_timeslot(&new->addr) : 0xffff;
+
+  LOG_INFO("change TS to ");
+  LOG_INFO_LLADDR(&new->addr);
+  LOG_INFO_(" -> slot%d ch+%d\n", new_ts, ORCHESTRA_EB_CHANNEL_OFFSET);
 
   if(new_ts == old_ts) {
     return;

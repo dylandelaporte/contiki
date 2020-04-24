@@ -48,6 +48,15 @@
 #include "orchestra.h"
 #include "net/packetbuf.h"
 
+#include "sys/log.h"
+#define LOG_MODULE "ORCHESTRA"
+#ifdef LOG_LEVEL_ORCHESRTA
+#define LOG_LEVEL LOG_LEVEL_ORCHESRTA
+#else
+#define LOG_LEVEL LOG_LEVEL_NONE
+#endif
+
+
 /*
  * The body of this rule should be compiled only when "nbr_routes" is available,
  * otherwise a link error causes build failure. "nbr_routes" is compiled if
@@ -102,6 +111,8 @@ add_uc_links(const linkaddr_t *linkaddr)
     uint16_t timeslot_rx = get_node_pair_timeslot(linkaddr, &linkaddr_node_addr);
     uint16_t timeslot_tx = get_node_pair_timeslot(&linkaddr_node_addr, linkaddr);
 
+    LOG_INFO("add uc rx:%d tx:%d ch+%d\n", timeslot_rx, timeslot_tx, local_channel_offset);
+
     /* Add Tx link */
     tsch_schedule_add_link(sf_unicast, LINK_OPTION_TX | LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &tsch_broadcast_address,
                            timeslot_tx, local_channel_offset, 0);
@@ -119,6 +130,7 @@ remove_uc_links(const linkaddr_t *linkaddr)
     uint16_t timeslot_rx = get_node_pair_timeslot(linkaddr, &linkaddr_node_addr);
     uint16_t timeslot_tx = get_node_pair_timeslot(&linkaddr_node_addr, linkaddr);
 
+    LOG_INFO("remove uc rx:%d tx:%d ch+%d\n", timeslot_rx, timeslot_tx, local_channel_offset);
     tsch_schedule_remove_link_by_timeslot(sf_unicast,
                                           timeslot_rx, local_channel_offset);
     tsch_schedule_remove_link_by_timeslot(sf_unicast,
@@ -155,6 +167,13 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
     if(channel_offset != NULL) {
       *channel_offset = get_node_channel_offset(dest);
     }
+    LOG_DBG("Link for ");
+    LOG_INFO_LLADDR(dest);
+    if(timeslot != NULL)
+        LOG_INFO_(" -> slot%d", *timeslot);
+    if (channel_offset != NULL)
+        LOG_INFO_(" ch+%d", *channel_offset);
+    LOG_INFO_("\n");
     return 1;
   }
   return 0;
@@ -166,6 +185,11 @@ new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new
   if(new != old) {
     const linkaddr_t *old_addr = old != NULL ? &old->addr : NULL;
     const linkaddr_t *new_addr = new != NULL ? &new->addr : NULL;
+
+    LOG_INFO("change TS to ");
+    LOG_INFO_LLADDR(new_addr);
+    LOG_INFO_("\n");
+
     if(new_addr != NULL) {
       linkaddr_copy(&orchestra_parent_linkaddr, new_addr);
     } else {
