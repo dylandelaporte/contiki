@@ -47,6 +47,7 @@
 #include "contiki.h"
 #include "orchestra.h"
 #include "net/packetbuf.h"
+#include "orchestra-rule-unicast-link-based.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "ORCHESTRA"
@@ -65,12 +66,15 @@
 #if UIP_MAX_ROUTES != 0
 
 static uint16_t slotframe_handle = 0;
-static uint16_t local_channel_offset;
-static struct tsch_slotframe *sf_unicast;
+
+uint16_t                orchestra_unb_link_based_choffs;
+struct tsch_slotframe*  orchestra_unb_link_based_sf;
+
+#define local_channel_offset    orchestra_unb_link_based_choffs
+#define sf_unicast              orchestra_unb_link_based_sf
 
 /*---------------------------------------------------------------------------*/
-static uint16_t
-get_node_pair_timeslot(const linkaddr_t *from, const linkaddr_t *to)
+uint16_t get_node_pair_timeslot(const linkaddr_t *from, const linkaddr_t *to)
 {
   if(from != NULL && to != NULL && ORCHESTRA_UNICAST_PERIOD > 0) {
     return ORCHESTRA_LINKADDR_HASH2(from, to) % ORCHESTRA_UNICAST_PERIOD;
@@ -114,12 +118,18 @@ add_uc_links(const linkaddr_t *linkaddr)
     LOG_INFO("add uc rx:%d tx:%d ch+%d\n", timeslot_rx, timeslot_tx, local_channel_offset);
 
     /* Add Tx link */
+    struct tsch_link* tx_link =
     tsch_schedule_add_link(sf_unicast, LINK_OPTION_TX | LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &tsch_broadcast_address,
                            timeslot_tx, local_channel_offset, 0);
     /* Add Rx link */
+    struct tsch_link* rx_link =
     tsch_schedule_add_link(sf_unicast, LINK_OPTION_RX, LINK_TYPE_NORMAL, &tsch_broadcast_address,
                            timeslot_rx, local_channel_offset, 0);
 
+    (void)tx_link;(void)rx_link;
+#ifdef ORCHESTRA_UNB_LINKBASE_ADD_UC_PAIR
+    ORCHESTRA_UNB_LINKBASE_ADD_UC_PAIR(linkaddr, tx_link, rx_link);
+#endif
   }
 }
 /*---------------------------------------------------------------------------*/
