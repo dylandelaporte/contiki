@@ -54,6 +54,7 @@
 #include "net/queuebuf.h"
 #include "net/mac/tsch/tsch.h"
 #include <string.h>
+#include "tsch-log.h"
 
 /* Log configuration */
 #include "sys/log.h"
@@ -352,6 +353,13 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
       /* Drop packet */
       tsch_queue_remove_packet_from_queue(n);
       in_queue = 0;
+      TSCH_LOG_ADD(tsch_log_message,
+                      snprintf(log->message, sizeof(log->message)
+                              , "retransmition fail seq%d -># %x.%x.%x.%x"
+                              , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
+                              , n->addr.u16[0], n->addr.u16[1], n->addr.u16[2], n->addr.u16[3]
+                              )
+                  );
     }
     /* Update CSMA state in the unicast case */
     if(is_unicast) {

@@ -384,6 +384,10 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
   return a;
 }
 
+
+
+#include "project-trace.h"
+
 /*---------------------------------------------------------------------------*/
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
 // used by tsch_slot_operation
@@ -402,6 +406,7 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
   turns out useless when the time comes. For instance, for a Tx-only link, if there is
   no outgoing packet in queue. In that case, run the backup link instead. The backup link
   must have Rx flag set. */
+  trace_droplink_off();
   if(!tsch_is_locked()) {
     struct tsch_slotframe *sf = list_head(slotframe_list);
     /* For each slotframe, look for the earliest occurring link */
@@ -417,6 +422,7 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
         if(curr_best == NULL || time_to_timeslot < time_to_curr_best) {
           time_to_curr_best = time_to_timeslot;
           curr_best = l;
+          trace_droplink_off();
 #ifdef TSCH_CALLBACK_LINK_SIGNAL
           if ( (l->link_options & (LINK_OPTION_SIGNAL|LINK_OPTION_SIGNAL_ONCE)) != 0) {
               signaling_link = l;
@@ -456,6 +462,36 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset
             if(new_best != curr_best && (curr_best->link_options & LINK_OPTION_RX)) { /* Does curr_best have Rx flag? */
               curr_backup = curr_best;
             }
+          }
+
+          if ( (new_best != NULL) )
+          {
+              if ( new_best != curr_best )
+              if ((curr_best->link_options & LINK_OPTION_TRACE_DROP) != 0) {
+              trace_droplink_on();
+              TSCH_LOG_ADD(tsch_log_message,
+                              snprintf(log->message, sizeof(log->message)
+                                      , "override sf.t:%x(%x)/ sf.t:%x(%x)"
+                                      , (curr_best->slotframe_handle<<16) | curr_best->timeslot
+                                      , curr_best->link_options
+                                      , (new_best->slotframe_handle<<16) | new_best->timeslot
+                                      , new_best->link_options
+                                      )
+                          );
+              }
+          }
+          else if ((l->link_options & LINK_OPTION_TRACE_DROP) != 0)
+          {
+              trace_droplink_on();
+              TSCH_LOG_ADD(tsch_log_message,
+                              snprintf(log->message, sizeof(log->message)
+                                      , "miss sf.t:%x(%x)/ sf.t:%x(%x)"
+                                      , (l->slotframe_handle<<16) | l->timeslot
+                                      , l->link_options
+                                      , (curr_best->slotframe_handle<<16) | curr_best->timeslot
+                                      , curr_best->link_options
+                                      )
+                          );
           }
 
           /* Maintain curr_best */

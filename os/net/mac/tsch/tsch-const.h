@@ -63,6 +63,9 @@
 //  this use by scheduler as temporary flag, for selected active link
 #define LINK_OPTION_SIGNAL_ONCE      0x200
 
+//> log when link is droped by more best
+#define LINK_OPTION_TRACE_DROP       0x1000
+
 
 
 
