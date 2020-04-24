@@ -428,12 +428,40 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
     int is_shared_link = link != NULL && link->link_options & LINK_OPTION_SHARED;
     if(n != NULL) {
       int16_t get_index = ringbufindex_peek_get(&n->tx_ringbuf);
+
+      if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
+      {
+          TSCH_LOG_ADD(tsch_log_message,
+                          snprintf(log->message, sizeof(log->message)
+                                  , "check packets[%d] ->:%x (!%d)"
+                                  , ringbufindex_elements(&n->tx_ringbuf)
+                                  , (int)n->addr.u16[0]
+                                  , tsch_queue_backoff_expired(n)
+                                  )
+                      );
+          if ((get_index > 0) && !tsch_queue_backoff_expired(n)){
+              trace_backoff_on();
+          }
+      }
+
       if(get_index != -1 &&
           !(is_shared_link && !tsch_queue_backoff_expired(n))) {    /* If this is a shared link,
                                                                     make sure the backoff has expired */
 #if TSCH_WITH_LINK_SELECTOR
-        int packet_attr_slotframe = queuebuf_attr(n->tx_array[get_index]->qb, PACKETBUF_ATTR_TSCH_SLOTFRAME);
-        int packet_attr_timeslot = queuebuf_attr(n->tx_array[get_index]->qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
+        struct queuebuf* qb = n->tx_array[get_index]->qb;
+        int packet_attr_slotframe = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_SLOTFRAME);
+        int packet_attr_timeslot = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
+
+        if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+            TSCH_LOG_ADD(tsch_log_message,
+                            snprintf(log->message, sizeof(log->message)
+                                    , "check packet[%d] -> (sf%d:%d)"
+                                    , ringbufindex_elements(&n->tx_ringbuf)
+                                    , packet_attr_slotframe, packet_attr_timeslot
+                                    )
+                        );
+        }
+
         if(packet_attr_slotframe != 0xffff && packet_attr_slotframe != link->slotframe_handle) {
           return NULL;
         }
@@ -441,6 +469,10 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
           return NULL;
         }
 #endif
+        if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+            trace_backoff_off();
+        }
+
         return n->tx_array[get_index];
       }
     }

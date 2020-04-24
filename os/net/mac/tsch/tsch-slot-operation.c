@@ -354,34 +354,33 @@ get_packet_and_neighbor_for_link(struct tsch_link *link, struct tsch_neighbor **
           p = tsch_queue_get_unicast_packet_for_any(&n, link);
         }
       }
+    }
 
-      if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
-      if (p == NULL)
-      //if (ringbufindex_elements(&n->tx_ringbuf) > 0) //tsch_queue_packet_count(&link->addr) > 0)
-      {
-          TSCH_LOG_ADD(tsch_log_message,
-                          snprintf(log->message, sizeof(log->message)
-                                  , "empty sf.t:%x(%x) ->:%x !%d size[%d] "
-                                  , (link->slotframe_handle<<16) | link->timeslot
-                                  , link->link_options
-                                  , (int)n->addr.u16[0]
-                                  , tsch_queue_backoff_expired(n)
-                                  , ringbufindex_elements(&n->tx_ringbuf)
-                                  )
-                      );
-          if (n != n_broadcast)
-              TSCH_LOG_ADD(tsch_log_message,
-                              snprintf(log->message, sizeof(log->message)
-                                      , "        ->:%x.%x.%x.%x"
-                                      , n->addr.u16[3], n->addr.u16[2]
-                                      , n->addr.u16[1], n->addr.u16[0]
-                                      )
-                          );
-          if (!tsch_queue_backoff_expired(n))
-              trace_backoff_on();
-      }
+    if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
+    if (p == NULL)
+    //if (ringbufindex_elements(&n->tx_ringbuf) > 0) //tsch_queue_packet_count(&link->addr) > 0)
+    {
+        TSCH_LOG_ADD(tsch_log_message,
+                        snprintf(log->message, sizeof(log->message)
+                                , "empty sf.t:%x(%x) ->:%x !%d size[%d] "
+                                , (link->slotframe_handle<<16) | link->timeslot
+                                , link->link_options
+                                , (int)n->addr.u16[0]
+                                , tsch_queue_backoff_expired(n)
+                                , ringbufindex_elements(&n->tx_ringbuf)
+                                )
+                    );
+        if (n != n_broadcast)
+            TSCH_LOG_ADD(tsch_log_message,
+                            snprintf(log->message, sizeof(log->message)
+                                    , "        ->:%x.%x.%x.%x"
+                                    , n->addr.u16[3], n->addr.u16[2]
+                                    , n->addr.u16[1], n->addr.u16[0]
+                                    )
+                        );
     }
   }
+
   /* return nbr (by reference) */
   if(target_neighbor != NULL) {
     *target_neighbor = n;
@@ -1052,7 +1051,7 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
           current_link->link_options &= ~LINK_OPTION_SIGNAL_ONCE;
       }
 #endif
-      trace_backoff_off();
+      //trace_backoff_off();
 
       /* Get a packet ready to be sent */
       current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
