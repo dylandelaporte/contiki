@@ -162,8 +162,9 @@ static rtimer_clock_t volatile current_slot_start;
 /* Are we currently inside a slot? */
 static volatile int tsch_in_slot_operation = 0;
 
-/* If we are inside a slot, this tells the current channel */
+/* If we are inside a slot, these tell the current channel and channel offset */
 uint8_t tsch_current_channel;
+uint8_t tsch_current_channel_offset;
 
 /* Info about the link, packet and neighbor of
  * the current (or next) slot */
@@ -249,6 +250,22 @@ tsch_get_lock(void)
 
 /*---------------------------------------------------------------------------*/
 /* Channel hopping utility functions */
+
+/* Return the channel offset to use for the current slot */
+static uint8_t
+tsch_get_channel_offset(struct tsch_link *link, struct tsch_packet *p)
+{
+#if TSCH_WITH_LINK_SELECTOR
+  if(p != NULL) {
+    uint16_t packet_channel_offset = queuebuf_attr(p->qb, PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET);
+    if(packet_channel_offset != 0xffff) {
+      /* The schedule specifies a channel offset for this one; use it */
+      return packet_channel_offset;
+    }
+  }
+#endif
+  return link->channel_offset;
+}
 
 /* Return channel from ASN and channel offset */
 uint8_t
@@ -1288,6 +1305,8 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 
 /* Protothread for slot operation, called from rtimer interrupt
  * and scheduled from tsch_schedule_slot_operation */
+extern struct tsch_link *signaling_link;
+
 static
 PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
 {
@@ -1317,6 +1336,16 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       /* Reset drift correction */
       drift_correction = 0;
       is_drift_correction_used = 0;
+
+      (void)signaling_link; // hide unused warning if no TSCH_CALLBACK_LINK_SIGNAL
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+      if ( (current_link->link_options & (LINK_OPTION_SIGNAL | LINK_OPTION_SIGNAL_ONCE)) != 0 ){
+          // current link need signal;
+          TSCH_CALLBACK_LINK_SIGNAL(signaling_link);
+          current_link->link_options &= ~LINK_OPTION_SIGNAL_ONCE;
+      }
+#endif
+
       /* Get a packet ready to be sent */
       current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
       /* There is no packet to send, and this link does not have Rx flag. Instead of doing
@@ -1324,11 +1353,15 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       if(current_packet == NULL && !(current_link->link_options & LINK_OPTION_RX) && backup_link != NULL) {
         current_link = backup_link;
         current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+        backup_link->link_options  &= ~LINK_OPTION_SIGNAL_ONCE;
+#endif
       }
       if ((current_link->link_options & LINK_OPTION_DISABLE) != 0)
           is_active_slot = false;
       else
       is_active_slot = current_packet != NULL || (current_link->link_options & LINK_OPTION_RX);
+
       if(is_active_slot) {
         /* If we are in a burst, we stick to current channel instead of
          * doing channel hopping, as per IEEE 802.15.4-2015 */
@@ -1337,8 +1370,8 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
           burst_link_scheduled = 0;
         } else {
           /* Hop channel */
-          tsch_current_channel = tsch_calculate_channel(&tsch_current_asn,
-              current_link->channel_offset, current_packet);
+          tsch_current_channel_offset = tsch_get_channel_offset(current_link, current_packet);
+          tsch_current_channel = tsch_calculate_channel(&tsch_current_asn, tsch_current_channel_offset);
         }
         NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, tsch_current_channel);
         /* Turn the radio on already here if configured so; necessary for radios with slow startup */

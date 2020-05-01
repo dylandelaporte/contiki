@@ -60,6 +60,13 @@ CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
 CFLAGS += -Wno-unused-const-variable
 
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
 ifeq ($(WERROR),1)
@@ -318,10 +325,22 @@ MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${not
 ### them twice.
 MODULES_INCLUDED_FIRST_PASS := $(MODULES_INCLUDES)
 include $(MODULES_INCLUDED_FIRST_PASS)
+$(info modules 1st pass $(MODULES_INCLUDED_FIRST_PASS) )
 
 # Iterate once more: include the modules added from the previous include.
 # Only works with one level of nested module inclusion.
-include $(filter-out $(MODULES_INCLUDED_FIRST_PASS),$(MODULES_INCLUDES))
+MODULES_INCLUDED_SECOND_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             , $(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_SECOND_PASS)
+$(info modules 2nd pass  $(MODULES_INCLUDED_SECOND_PASS) )
+
+# Iterate once more: include the modules added from the previous include.
+# Only works with one level of nested module inclusion.
+MODULES_INCLUDED_3_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             $(MODULES_INCLUDED_SECOND_PASS) \
+                                             ,$(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_3_PASS)
+$(info modules 3rd pass $(MODULES_INCLUDED_3_PASS) )
 
 # C-include module-specific macros using -imacros
 MODULES_IMACROS = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/module-macros.h}}
@@ -349,7 +368,7 @@ else
   TRACE_CCX= @echo "  C++      " $< "-->" $@
   TRACE_LD = @echo "  LD       " $@
   TRACE_AR = @echo "  AR       " $@
-  TRACE_AS = @echo "  AS       " $<  "-->" $@
+  TRACE_AS = @echo "  AS       " $< "-->" $@
   TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
   TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
   TRACE_MKDIR = @echo "  MKDIR    " $@
@@ -397,10 +416,14 @@ CFLAGS_CPU ?=
 CPPFLAGS := ${CPPFLAGS} ${CFLAGS}
 CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
 
-ifeq ($(V),1)
-$(info contiki objects: $(CONTIKI_SOURCEFILES))
-$(info project objects: $(PROJECT_SOURCEFILES))
+
+### drop excluded objects
+
+ifneq ("$(SOURCE_EXCLUDE)","")
+CONTIKI_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(CONTIKI_SOURCEFILES))
+PROJECT_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(PROJECT_SOURCEFILES))
 endif
+
 
 CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
 PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
@@ -534,15 +557,15 @@ ifndef LD
   LD = $(CC)
 endif
 
-$(info build in $(BUILD_DIR))
-$(info board in $(BUILD_DIR_BOARD))
-$(info objects in $(OBJECTDIR))
-
 ifndef CUSTOM_RULE_LINK
-$(BUILD_DIR_BOARD)/%.$(TARGET): %.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
+$(BUILD_DIR_BOARD)/%.$(TARGET): $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(TARGET_LIBFILES) -o $@
+
+# this objects need for debuger, and need for quick rebuild
+.PRECIOUS: $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) 
+
 endif
 
 %.$(TARGET): $(BUILD_DIR_BOARD)/%.$(TARGET)

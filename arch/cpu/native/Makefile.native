@@ -15,9 +15,10 @@ NM       ?= nm
 OBJCOPY  ?= objcopy
 STRIP    ?= strip
 ifeq ($(WERROR),1)
-CFLAGSWERROR=-Werror
+CFLAGSWERROR=-Werror -Wno-error=unused-function
 endif
-CFLAGSNO = -Wall -g $(CFLAGSWERROR)
+CFLAGSNO = -Wall -g3 $(CFLAGSWERROR)
+CFLAGSNO += -Wno-unused-function
 CFLAGS  += $(CFLAGSNO)
 
 ### Are we building with code size optimisations?
@@ -51,7 +52,7 @@ LDFLAGS += -Wl,-flat_namespace,-map,$(CONTIKI_NG_PROJECT_MAP)
 CFLAGS += -DHAVE_SNPRINTF=1 -U__ASSERT_USE_STDERR
 else
 ifeq ($(HOST_OS),Linux)
-LDFLAGS += -Wl,-Map=$(CONTIKI_NG_PROJECT_MAP),-export-dynamic
+LDFLAGS += -Wl,--cref,-Map=$(CONTIKI_NG_PROJECT_MAP),-export-dynamic
 endif
 endif
 

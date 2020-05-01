@@ -217,7 +217,7 @@ void tsch_schedule_link_addr_release(uint8_t link_options, const linkaddr_t* add
 struct tsch_link *
 tsch_schedule_add_link(struct tsch_slotframe *slotframe,
                        uint8_t link_options, enum link_type link_type, const linkaddr_t *address,
-                       uint16_t timeslot, uint16_t channel_offset)
+                       uint16_t timeslot, uint16_t channel_offset, uint8_t do_remove)
 {
   struct tsch_link *l = NULL;
   if(slotframe != NULL) {
@@ -229,9 +229,11 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
       return NULL;
     }
 
-    /* Start with removing the link currently installed at this timeslot (needed
-     * to keep neighbor state in sync with link options etc.) */
-    tsch_schedule_remove_link_by_timeslot(slotframe, timeslot, channel_offset);
+    if(do_remove) {
+      /* Start with removing the link currently installed at this timeslot (needed
+       * to keep neighbor state in sync with link options etc.) */
+      tsch_schedule_remove_link_by_timeslot(slotframe, timeslot, channel_offset);
+    }
     if(!tsch_get_lock()) {
       LOG_ERR("! add_link memb_alloc couldn't take lock\n");
     } else {
@@ -421,6 +423,9 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
 //  \arg time_offset - gives TSCH_DESYNC_THRESHOLD_SLOTS value, used to escape
 //                  timesource EB
+// used by tsch_slot_operation
+struct tsch_link *signaling_link = NULL;
+
 struct tsch_link *
 tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
     , tsch_slot_offset_t *time_offset,
@@ -428,6 +433,9 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
 {
   tsch_slot_offset_t time_to_curr_best = 0;
   struct tsch_slotframe * best_frame = NULL;
+    // signaling link has seen at time_to_curr_best
+    signaling_link                = NULL;
+
   struct tsch_link *curr_best = NULL;
   struct tsch_link *curr_backup = NULL; /* Keep a back link in case the current link
   turns out useless when the time comes. For instance, for a Tx-only link, if there is
@@ -468,6 +476,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
           time_to_curr_best = time_to_timeslot;
           best_frame        = sf;
           curr_best = l;
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+          if ( (l->link_options & (LINK_OPTION_SIGNAL|LINK_OPTION_SIGNAL_ONCE)) != 0) {
+              signaling_link = l;
+          }
+          else
+              signaling_link    = NULL;
+#endif
           curr_backup = NULL;
         } else if(time_to_timeslot == time_to_curr_best) {
           struct tsch_link *new_best = NULL;
@@ -507,6 +522,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
             curr_best = new_best;
             best_frame  = sf;
           }
+
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+          if ( (l->link_options & (LINK_OPTION_SIGNAL|LINK_OPTION_SIGNAL_ONCE)) != 0) {
+              signaling_link = l;
+          }
+#endif
+
         }
       }//for(; l != NULL
     }//for(;sf != NULL
@@ -536,6 +558,13 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
   if(backup_link != NULL) {
     *backup_link = curr_backup;
   }
+
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+  // since need to signal
+  if (signaling_link != NULL)
+      curr_best->link_options |= LINK_OPTION_SIGNAL_ONCE;
+#endif
+
   return curr_best;
 }
 /*---------------------------------------------------------------------------*/
@@ -569,9 +598,9 @@ tsch_schedule_create_minimal(void)
    * but is required according to 802.15.4e if also used for EB transmission.
    * Timeslot: 0, channel offset: 0. */
   tsch_schedule_add_link(sf_min,
-      LINK_OPTION_RX | LINK_OPTION_TX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING,
+      (LINK_OPTION_RX | LINK_OPTION_TX | LINK_OPTION_SHARED | LINK_OPTION_TIME_KEEPING),
       LINK_TYPE_ADVERTISING, &tsch_broadcast_address,
-      0, 0);
+      0, 0, 1);
 }
 /*---------------------------------------------------------------------------*/
 struct tsch_slotframe *

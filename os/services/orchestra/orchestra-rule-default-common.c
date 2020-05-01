@@ -38,6 +38,14 @@
 #include "contiki.h"
 #include "orchestra.h"
 
+#include "sys/log.h"
+#define LOG_MODULE "ORCHESTRA"
+#ifdef LOG_LEVEL_ORCHESRTA
+#define LOG_LEVEL LOG_LEVEL_ORCHESRTA
+#else
+#define LOG_LEVEL LOG_LEVEL_NONE
+#endif
+
 static uint16_t slotframe_handle = 0;
 
 #if ORCHESTRA_EBSF_PERIOD > 0
@@ -59,6 +67,7 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
   if(timeslot != NULL) {
     *timeslot = 0;
   }
+  LOG_INFO("default slot 0 ch+%d\n", ORCHESTRA_DEFAULT_COMMON_CHANNEL_OFFSET);
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -72,7 +81,7 @@ init(uint16_t sf_handle)
   tsch_schedule_add_link(sf_common,
       LINK_OPTION_RX | LINK_OPTION_TX | LINK_OPTION_SHARED,
       ORCHESTRA_COMMON_SHARED_TYPE, &tsch_broadcast_address,
-      0, ORCHESTRA_DEFAULT_COMMON_CHANNEL_OFFSET);
+      0, ORCHESTRA_DEFAULT_COMMON_CHANNEL_OFFSET, 1);
 }
 /*---------------------------------------------------------------------------*/
 struct orchestra_rule default_common = {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, TU Braunschweig
+ * Copyright (c) 2010, Swedish Institute of Computer Science.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,20 +26,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * This file is part of the Contiki operating system.
+ *
  */
 
-#include "dev/slip.h"
-#include "dev/rs232.h"
+#ifndef COOJA_RADIO_DEF_H_
+#define COOJA_RADIO_DEF_H_
 
-void
-slip_arch_init()
-{
-  rs232_set_input(slip_input_byte);
-}
+/* 1 len byte, 2 bytes CRC */
+#define RADIO_PHY_OVERHEAD         3
+#ifndef RADIO_BYTE_AIR_TIME
+/* 250kbps data rate. One byte = 32us */
+#define RADIO_BYTE_AIR_TIME       32
+#endif
+#define RADIO_DELAY_BEFORE_TX 0
+#define RADIO_DELAY_BEFORE_RX 0
+#define RADIO_DELAY_BEFORE_DETECT 0
 
-/*-----------------------------------------------------------------------------------*/
-void
-slip_arch_writeb(unsigned char c)
-{
-    rs232_send(c);
-}
+#endif /* COOJA_RADIO_H_ */

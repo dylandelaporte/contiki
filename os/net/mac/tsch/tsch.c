@@ -488,7 +488,7 @@ eb_input(struct input_packet *current_input)
       int32_t asn_diff = TSCH_ASN_DIFF(current_input->rx_asn, eb_ies.ie_asn);
       if(asn_diff != 0) {
         /* We disagree with our time source's ASN -- leave the network */
-        LOG_WARN("! ASN drifted by %ld, leaving the network\n", asn_diff);
+        LOG_WARN("! ASN drifted by %ld, leaving the network\n", (long)asn_diff);
         tsch_disassociate();
       }
 
@@ -628,7 +628,7 @@ tsch_start_coordinator(void)
   tsch_join_priority = 0;
 
   LOG_INFO("starting as coordinator, PAN ID %x, asn-%x.%lx\n",
-      frame802154_get_pan_id(), tsch_current_asn.ms1b, tsch_current_asn.ls4b);
+      frame802154_get_pan_id(), tsch_current_asn.ms1b, (long)tsch_current_asn.ls4b);
 
 #ifdef TSCH_CALLBACK_JOINING_NETWORK
       TSCH_CALLBACK_JOINING_NETWORK();
@@ -808,7 +808,8 @@ tsch_associate(const struct input_packet *input_eb, rtimer_clock_t timestamp)
         tsch_schedule_add_link(sf,
             ies.ie_tsch_slotframe_and_link.links[i].link_options,
             LINK_TYPE_ADVERTISING, &tsch_broadcast_address,
-            ies.ie_tsch_slotframe_and_link.links[i].timeslot, ies.ie_tsch_slotframe_and_link.links[i].channel_offset);
+            ies.ie_tsch_slotframe_and_link.links[i].timeslot,
+            ies.ie_tsch_slotframe_and_link.links[i].channel_offset, 0);
       }
     } else {
       LOG_ERR("! parse_eb: too many links in schedule (%u)\n", num_links);
@@ -853,7 +854,7 @@ tsch_associate(const struct input_packet *input_eb, rtimer_clock_t timestamp)
              tsch_association_count,
              tsch_is_pan_secured,
              frame.src_pid,
-             tsch_current_asn.ms1b, tsch_current_asn.ls4b, tsch_join_priority,
+             tsch_current_asn.ms1b, (long)tsch_current_asn.ls4b, tsch_join_priority,
              ies.ie_tsch_timeslot_id,
              ies.ie_channel_hopping_sequence_id,
              ies.ie_tsch_slotframe_and_link.slotframe_size,

@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2014, TU Braunschweig
+ * Copyright (c) 2017, RISE SICS
+ * Copyright (c) 2020, alexrayne <alexraynepe196@gmail.com>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,21 +26,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
 
-#include "dev/slip.h"
-#include "dev/rs232.h"
+/* use a non-default network driver */
+// override default native tun6_network
+#define NETSTACK_CONF_NETWORK sicslowpan_driver
 
-void
-slip_arch_init()
-{
-  rs232_set_input(slip_input_byte);
-}
-
-/*-----------------------------------------------------------------------------------*/
-void
-slip_arch_writeb(unsigned char c)
-{
-    rs232_send(c);
-}
+//native use it to enable default gateaway fd00::1 path to net
+//@sa platform.c
+#define UIP_CONF_IP_GATEAWAY    0

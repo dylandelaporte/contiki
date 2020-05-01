@@ -29,17 +29,17 @@
  */
 
 #include "dev/slip.h"
-#include "dev/rs232.h"
+#include "dev/serial-fd.h"
 
 void
 slip_arch_init()
 {
-  rs232_set_input(slip_input_byte);
+    fdsio_set_input(slip_input_byte);
 }
 
 /*-----------------------------------------------------------------------------------*/
 void
 slip_arch_writeb(unsigned char c)
 {
-    rs232_send(c);
+    fdsio_send(c);
 }

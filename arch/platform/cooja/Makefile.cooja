@@ -40,7 +40,7 @@ endif ## QUICKSTART
 MAIN_OBJ = $(BUILD_DIR_BOARD)/$(LIBNAME).o
 ARCHIVE = $(BUILD_DIR_BOARD)/$(LIBNAME).a
 JNILIB = $(BUILD_DIR_BOARD)/$(LIBNAME).$(TARGET)
-CONTIKI_APP_OBJ = $(CONTIKI_APP).o
+CONTIKI_APP_OBJ = $(OBJECTDIR)/$(CONTIKI_APP).o
 
 ### COOJA platform sources
 CONTIKI_TARGET_DIRS = . dev lib sys cfs net
@@ -62,6 +62,8 @@ CONTIKI_TARGET_SOURCEFILES = \
 $(COOJA_BASE) $(COOJA_INTFS) $(COOJA_CORE) $(COOJA_NET) $(COOJA_SOURCEFILES)
 
 CONTIKI_SOURCEFILES += $(CONTIKI_TARGET_SOURCEFILES)
+# cooja not support stack chacking yet
+SOURCE_EXCLUDE      += stack-check.c
 
 .SUFFIXES:
 
@@ -74,3 +76,33 @@ ifeq ($(WERROR),1)
 CFLAGSNO += -Werror
 endif
 CFLAGS   += $(CFLAGSNO)
+
+
+# coffeecatch link with project, allow crash trace in JNI
+ifneq ("${WITH_COFFEE}","") 
+
+CONTIKI_TARGET_DIRS += lib/coffeecatch
+COOJA_BASE	+= coffeecatch.c coffeejni.c
+
+CFLAGS   += -funwind-tables
+CFLAGS   += -DUSE_UNWIND -DSIG_ABORT_SIGSEGV=1
+
+ifeq ("${WITH_COFFEE}","0")
+CFLAGS   += -DNDK_DEBUG=0
+else ifeq ("${WITH_COFFEE}","1")
+CFLAGS   += -DNDK_DEBUG=0
+else
+$(info coffeecatch=${WITH_COFFEE}) 
+# use NDK_DEBUG=2 for debug coffeecatch internals with printout into mote ./%d.coffee.log
+# use NDK_DEBUG=6  for traceing coffeecatch internals
+# use NDK_DEBUG=-2 for log errors coffeecatch with printout into mote ./%d.coffee.log
+CFLAGS   += -DNDK_DEBUG=${WITH_COFFEE}
+endif
+
+ifeq ($(USE_LIBUNWIND),1)
+$(info "coffee use libunwind")
+CFLAGS   += -DUSE_LIBUNWIND=1 
+# LDFLAGS  += -Wl,-lunwind
+endif
+
+endif 
