@@ -1111,12 +1111,14 @@ tcp_input(struct tcp_socket *s,
     conn->in_packet.payload_pos += copy_bytes;
     pos += copy_bytes;
 
-    uint8_t i;
+#if DEBUG_MQTT == 1
+    uint32_t i;
     DBG("MQTT - Copied bytes: \n");
     for(i = 0; i < copy_bytes; i++) {
       DBG("%02X ", conn->in_packet.payload[i]);
     }
     DBG("\n");
+#endif
 
     /* Full buffer, shall only happen to PUBLISH messages. */
     if(MQTT_INPUT_BUFF_SIZE - conn->in_packet.payload_pos == 0) {
@@ -1493,6 +1495,10 @@ mqtt_subscribe(struct mqtt_connection *conn, uint16_t *mid, char *topic,
   conn->out_packet.qos = qos_level;
   conn->out_packet.qos_state = MQTT_QOS_STATE_NO_ACK;
 
+  if(mid) {
+    *mid = conn->out_packet.mid;
+  }
+
   process_post(&mqtt_process, mqtt_do_subscribe_event, conn);
   return MQTT_STATUS_OK;
 }
@@ -1517,6 +1523,10 @@ mqtt_unsubscribe(struct mqtt_connection *conn, uint16_t *mid, char *topic)
   conn->out_packet.topic = topic;
   conn->out_packet.topic_length = strlen(topic);
   conn->out_packet.qos_state = MQTT_QOS_STATE_NO_ACK;
+
+  if(mid) {
+    *mid = conn->out_packet.mid;
+  }
 
   process_post(&mqtt_process, mqtt_do_unsubscribe_event, conn);
   return MQTT_STATUS_OK;
@@ -1549,6 +1559,10 @@ mqtt_publish(struct mqtt_connection *conn, uint16_t *mid, char *topic,
   conn->out_packet.payload_size = payload_size;
   conn->out_packet.qos = qos_level;
   conn->out_packet.qos_state = MQTT_QOS_STATE_NO_ACK;
+
+  if(mid) {
+    *mid = conn->out_packet.mid;
+  }
 
   process_post(&mqtt_process, mqtt_do_publish_event, conn);
   return MQTT_STATUS_OK;

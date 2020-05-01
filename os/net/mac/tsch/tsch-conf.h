@@ -76,14 +76,20 @@
 #define TSCH_DESYNC_THRESHOLD (2 * TSCH_MAX_KEEPALIVE_TIMEOUT)
 #endif
 
-/* Period between two consecutive EBs */
+/* The default period between two consecutive EBs (not taking into account any randomization).
+ * When TSCH_CONF_EB_PERIOD is set to 0, sending EBs is disabled completely; the EB process is not started.
+ * Otherwise, if RPL is used, TSCH_CONF_EB_PERIOD used only before joining the RPL network;
+ * afterwards, the EB period is set dynamically based on RPL DIO period, updated whenever
+ * the DIO period changes, and is upper bounded by TSCH_MAX_EB_PERIOD.
+ */
 #ifdef TSCH_CONF_EB_PERIOD
 #define TSCH_EB_PERIOD TSCH_CONF_EB_PERIOD
 #else
 #define TSCH_EB_PERIOD (16 * CLOCK_SECOND)
 #endif
 
-/* Max Period between two consecutive EBs */
+/* Max Period between two consecutive EBs.
+ * Has no effect when TSCH_EB_PERIOD is zero. */
 #ifdef TSCH_CONF_MAX_EB_PERIOD
 #define TSCH_MAX_EB_PERIOD TSCH_CONF_MAX_EB_PERIOD
 #else
@@ -124,29 +130,9 @@
 #define TSCH_ADAPTIVE_TIMESYNC 1
 #endif
 
-/* Base drift value.
- * Used to compensate locally know inaccuracies, such as
- * the effect of having a binary 32.768 kHz timer as the TSCH time base. */
-#ifdef TSCH_CONF_BASE_DRIFT_PPM
-#define TSCH_BASE_DRIFT_PPM TSCH_CONF_BASE_DRIFT_PPM
-#else
-#define TSCH_BASE_DRIFT_PPM 0
-#endif
-
-/* Base drift value.
- * Used to compensate locally know inaccuracies, such as
- * the effect of having a binary 32.768 kHz timer as the TSCH time base. */
-#ifdef TSCH_CONF_DRIFT_SYNC_ESTIMATE
-#define TSCH_DRIFT_SYNC_ESTIMATE TSCH_CONF_DRIFT_SYNC_ESTIMATE
-#else
-#define TSCH_DRIFT_SYNC_ESTIMATE 0
-#endif
-
-
 /* By default: TSCH loads slot timing from coordinator EB
  * but for debug purposes it can be ommited by enabling this macro*/
 //#define TSCH_DEBUG_NO_TIMING_FROM_EB
-
 
 /* An ad-hoc mechanism to have TSCH select its time source without the
  * help of an upper-layer, simply by collecting statistics on received
@@ -246,6 +232,22 @@
 #define TSCH_CHECK_TIME_AT_ASSOCIATION TSCH_CONF_CHECK_TIME_AT_ASSOCIATION
 #else
 #define TSCH_CHECK_TIME_AT_ASSOCIATION 0
+#endif
+
+/* Association on turn-on strategy:
+ * 0 - associate cycling until success
+ * 1 - associate once, if not succeed, invoke disassociate */
+#ifdef TSCH_CONF_ASSOCIATION_SINGLE
+#define TSCH_ASSOCIATION_SINGLE TSCH_CONF_ASSOCIATION_SINGLE
+#else
+#define TSCH_ASSOCIATION_SINGLE 0
+#endif
+
+/* How long to scan each channel in the scanning phase */
+#ifdef TSCH_CONF_CHANNEL_SCAN_DURATION
+#define TSCH_CHANNEL_SCAN_DURATION TSCH_CONF_CHANNEL_SCAN_DURATION
+#else
+#define TSCH_CHANNEL_SCAN_DURATION CLOCK_SECOND
 #endif
 
 //  select start conditions on scan.
@@ -495,13 +497,6 @@
 by default, useful in case of duplicate seqno */
 #endif
 
-/* Estimate the drift of the time-source neighbor and compensate for it? */
-#ifdef TSCH_CONF_ADAPTIVE_TIMESYNC
-#define TSCH_ADAPTIVE_TIMESYNC TSCH_CONF_ADAPTIVE_TIMESYNC
-#else
-#define TSCH_ADAPTIVE_TIMESYNC 1
-#endif
-
 /* Estimate possible looses fo timesource EB. need to prevent timesync loose
  * when used EB slot with option LINK_OPTION_TIME_EB_ESCAPE
  * \sa LINK_OPTION_TIME_EB_ESCAPE
@@ -541,22 +536,6 @@ by default, useful in case of duplicate seqno */
 #define TSCH_POLLING_STYLE TSCH_CONF_POLLING_STYLE
 #else
 #define TSCH_POLLING_STYLE 0
-#endif
-
-/* Association on turn-on strategy:
- * 0 - associate cycling until success
- * 1 - associate once, if not succeed, invoke disassociate */
-#ifdef TSCH_CONF_ASSOCIATION_SINGLE
-#define TSCH_ASSOCIATION_SINGLE TSCH_CONF_ASSOCIATION_SINGLE
-#else
-#define TSCH_ASSOCIATION_SINGLE 0
-#endif
-
-/* How long to scan each channel in the scanning phase */
-#ifdef TSCH_CONF_CHANNEL_SCAN_DURATION
-#define TSCH_CHANNEL_SCAN_DURATION TSCH_CONF_CHANNEL_SCAN_DURATION
-#else
-#define TSCH_CHANNEL_SCAN_DURATION CLOCK_SECOND
 #endif
 
 /******** Configuration: hardware-specific settings *******/

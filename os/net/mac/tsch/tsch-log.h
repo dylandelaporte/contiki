@@ -47,6 +47,7 @@
 #include "net/mac/tsch/tsch-private.h"
 // need uip_lladdr_t
 #include "net/ip/uip.h"
+#include "net/net-debug.h"
 
 /******** Configuration *******/
 
