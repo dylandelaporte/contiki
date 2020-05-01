@@ -45,8 +45,9 @@ unsigned int
 dbg_send_bytes(const unsigned char *s, unsigned int len)
 {
   unsigned int i = 0;
-
-  while(s && *s != 0) {
+#if UART_TXBUFSIZE <= 0
+  if (s)
+  while(*s != 0) {
     if(i >= len) {
       break;
     }
@@ -59,6 +60,20 @@ dbg_send_bytes(const unsigned char *s, unsigned int len)
    * between UART on/off cycles
    */
   while(cc26xx_uart_busy() == UART_BUSY);
+#else
+  for(i = 0; i < len;) {
+      unsigned sent = cc26xx_uart_write_bytes(s+i, len - i);
+      /*
+      if (sent == 0){
+          while (!cc26xx_uart_space_avail());
+      }
+      else
+      */
+      if (sent < 0)
+          return i;
+      i+= sent;
+  }
+#endif
 
   return i;
 }
