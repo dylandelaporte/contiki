@@ -244,7 +244,6 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
         tsch_release_lock();
       } else {
         static int current_link_handle = 0;
-        struct tsch_neighbor *n;
         /* Add the link to the slotframe */
         list_add(slotframe->links_list, l);
         /* Initialize link */
@@ -260,7 +259,7 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
         }
         linkaddr_copy(&l->addr, address);
 
-        TSCH_PRINTF8("TSCH-schedule: add_link %u %u %u %u %u %x\n",
+        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %u/%u [%u+%u] %x\n",
                slotframe->handle, link_options, link_type, timeslot, channel_offset, TSCH_LOG_ID_FROM_LINKADDR(address));
 
         /* Release the lock before we update the neighbor (will take the lock) */
@@ -331,7 +330,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
 
       return 1;
     } else {
-      PRINTF("TSCH-schedule:! remove_link memb_alloc couldn't take lock\n");
+        LOG_ERR("! remove_link memb_alloc couldn't take lock\n");
     }
   }
   return 0;
@@ -370,7 +369,7 @@ void tsch_schedule_link_addr_release(uint8_t link_options, const linkaddr_t* add
 /* Removes a link from slotframe and timeslot. Return a 1 if success, 0 if failure */
 int
 tsch_schedule_remove_link_by_timeslot(struct tsch_slotframe *slotframe,
-                                      uint16_t timeslot, uint16_t channel_offset)
+                                    tsch_slot_offset_t timeslot, uint16_t channel_offset)
 {
   return tsch_schedule_remove_link(slotframe,
                                    tsch_schedule_get_link_by_timeslot(slotframe, timeslot, channel_offset));
@@ -379,7 +378,7 @@ tsch_schedule_remove_link_by_timeslot(struct tsch_slotframe *slotframe,
 /* Looks within a slotframe for a link with a given timeslot */
 struct tsch_link *
 tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe,
-                                   uint16_t timeslot, uint16_t channel_offset)
+                                    tsch_slot_offset_t timeslot, uint16_t channel_offset)
 {
   if(!tsch_is_locked()) {
     if(slotframe != NULL) {

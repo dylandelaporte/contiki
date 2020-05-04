@@ -84,15 +84,6 @@ static linkaddr_t last_eb_nbr_addr;
 /* The join priority advertised by last_eb_nbr_addr */
 static uint8_t last_eb_nbr_jp;
 
-/* Use to collect link statistics even on Keep-Alive, even though they were
- * not sent from an upper layer and don't have a valid packet_sent callback */
-#ifndef TSCH_LINK_NEIGHBOR_CALLBACK
-#if NETSTACK_CONF_WITH_IPV6
-void uip_ds6_link_neighbor_callback(int status, int numtx);
-#define TSCH_LINK_NEIGHBOR_CALLBACK(dest, status, num) uip_ds6_link_neighbor_callback(status, num)
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-#endif /* TSCH_LINK_NEIGHBOR_CALLBACK */
-
 /* Let TSCH select a time source with no help of an upper layer.
  * We do so using statistics from incoming EBs */
 #if TSCH_AUTOSELECT_TIME_SOURCE
@@ -138,6 +129,7 @@ enum TSCH_StateID{
 };
 typedef enum TSCH_StateID TSCH_StateID;
 TSCH_StateID tsch_status = tschNONE;
+static   // FIX: native linux linker confuses here - reports indefined links
 inline
 bool tsch_is_active(){return tsch_status >= tschACTIVE;}
 void tsch_activate(bool onoff);
@@ -332,9 +324,6 @@ keepalive_packet_sent(void *ptr, int status, int transmissions)
 #ifdef TSCH_CALLBACK_KA_SENT
   TSCH_CALLBACK_KA_SENT(status, transmissions);
 #endif /* TSCH_CALLBACK_KA_SENT */
-#ifdef TSCH_LINK_NEIGHBOR_CALLBACK
-  TSCH_LINK_NEIGHBOR_CALLBACK(packetbuf_addr(PACKETBUF_ADDR_RECEIVER), status, transmissions);
-#endif
   LOG_INFO("TSCH: KA sent to %u, st %d-%d\n",
          TSCH_LOG_ID_FROM_LINKADDR(packetbuf_addr(PACKETBUF_ADDR_RECEIVER)), status, transmissions);
 
@@ -507,7 +496,6 @@ eb_input(struct input_packet *current_input)
         }
 #endif /* TSCH_AUTOSELECT_TIME_SOURCE */
       }
-    }
 
       /* TSCH hopping sequence */
       if(eb_ies.ie_channel_hopping_sequence_id != 0) {
@@ -525,7 +513,6 @@ eb_input(struct input_packet *current_input)
         }
       }
     }
-  }
   }//if(tsch_packet_parse_eb
 }
 
@@ -750,7 +737,6 @@ tsch_associate(const struct input_packet *input_eb, rtimer_clock_t timestamp)
   /* TSCH timeslot timing */
   for(i = 0; i < tsch_ts_netwide_count; i++) {
     if(ies.ie_tsch_timeslot_id == 0) {
-      tsch_timing_us[i] = 
       tsch_timing_us[i] = tsch_default_timing_us[i];
     } else {
       tsch_timing_us[i] = ies.ie_tsch_timeslot[i];
@@ -938,7 +924,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
       current_channel_since = now_time;
     }
         else{
-            PRINTF("TSCH: scanning failed channel %u\n", scan_channel);
+        	LOG_INFO("TSCH: scanning failed channel %u\n", scan_channel);
             if (current_channel != 0)
                 // if there was success chanels, can skip this one
                 continue;
@@ -949,7 +935,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
     /* Turn radio on and wait for EB */
     while ( NETSTACK_RADIO.on() != 1){
-        PRINTF_FAIL("TSCH: scanning: failed turn on radio\n");
+        LOG_ERR("TSCH: scanning: failed turn on radio\n");
         const unsigned radio_fail_period = 10*CLOCK_SECOND;
         etimer_set(&scan_timer, radio_fail_period);
         PT_WAIT_UNTIL(pt, etimer_expired(&scan_timer));
@@ -976,6 +962,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
     if(is_packet_pending) {
       struct input_packet* input_eb = &tsch_temp_packet;
       rtimer_clock_t t0;
+      rtimer_clock_t t1;
       /* Read packet */
       input_eb->len = NETSTACK_RADIO.read(input_eb->payload, TSCH_PACKET_MAX_LEN);
       if (input_eb->len > 0){
@@ -983,25 +970,28 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
       /* Save packet timestamp */
       NETSTACK_RADIO.get_object(RADIO_PARAM_LAST_PACKET_TIMESTAMP, &t0, sizeof(rtimer_clock_t));
+      t1 = RTIMER_NOW();
 
       /* Parse EB and attempt to associate */
-      LOG_INFO("TSCH: association: received packet (%u bytes) on channel %u at %lu\n"
-              , input_eb->len, current_channel, t0);
+      LOG_INFO("TSCH: association: received packet (%u bytes) on channel %u at %u\n"
+              , input_eb->len, current_channel, (unsigned)t0);
 
         /* Sanity-check the timestamp */
         if(ABS(RTIMER_CLOCK_DIFF(t0, t1)) < 2ul * RTIMER_SECOND) {
-          tsch_associate(&input_eb, t0);
+          tsch_associate(input_eb, t0);
         } else {
           LOG_WARN("scan: dropping packet, timestamp too far from current time %u %u\n",
             (unsigned)t0,
             (unsigned)t1
         );
+        }
         }//if (input_eb->len > 0)
+    }//if(is_packet_pending)
 
     if(!tsch_is_coordinator) {
       /* Go back to scanning */
     }
-  }
+  } //while(!tsch_is_associated && !tsch_is_coordinator)
   ANNOTATE("TSCH: scanning complete\n");
 
   /* End of association, turn the radio off */

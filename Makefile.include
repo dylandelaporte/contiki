@@ -140,17 +140,17 @@ endif # $(BOARD) not empty
 
 PLATFORM_ACTION ?= build
 
-$(BUILDDIR):
+$(BUILD_DIR):
 	$(TRACE_MKDIR)
 	$(Q)mkdir -p $@
 
 # Provide path for *.map file
-$(BUILD_DIR_BOARD): | $(BUILDDIR)
+$(BUILD_DIR_BOARD): | $(BUILD_DIR)
 	$(TRACE_MKDIR)
 	$(Q)mkdir -p $@
 
 # Provide way to create $(OBJECTDIR) if it has been removed by make clean
-$(OBJECTDIR): | $(BUILDDIR)
+$(OBJECTDIR): | $(BUILD_DIR)
 	$(TRACE_MKDIR)
 	$(Q)mkdir -p $@
 
@@ -298,7 +298,7 @@ ifdef APPS
   $(info apps: $(APPDS))
   APPDS = ${wildcard ${foreach DIR, $(APPDIRS), ${addprefix $(DIR)/, $(APPS)}}} \
              ${wildcard ${addprefix $(CONTIKI)/apps/, $(APPS)} \
-             ${addprefix $(CONTIKI)/platform/$(TARGET)/apps/, $(APPS)} \
+             ${addprefix $(OBJECTDIR)/apps/, $(APPS)} \
              $(APPS)}
   APPINCLUDES = ${foreach APP, $(APPS), ${wildcard ${foreach DIR, $(APPDS), $(DIR)/Makefile.$(APP)}}}
   -include $(APPINCLUDES)
@@ -308,13 +308,12 @@ ifdef APPS
 endif
 
 ifdef MODULES
-  UNIQUEMODULES = $(call uniq,$(MODULES))
-  $(info modules: $(UNIQUEMODULES))
-  MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(UNIQUEMODULES)}}
-  MODULES_SOURCES = ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.c}}}
-  MODULES_SOURCES += ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
+  $(info modules: $(MODULES))
+  MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(MODULES)}}
+  UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
+  MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
+  MODULES_SOURCES += ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
   CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
-  APPDS += $(MODULEDIRS)
 
 # Include module-specific makefiles
 MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${notdir $(d)}}}
@@ -388,8 +387,14 @@ CONTIKI_TARGET_DIRS_CONCAT = ${addprefix ${dir $(target_makefile)}, \
 CONTIKI_CPU_DIRS_CONCAT    = ${addprefix $(CONTIKI_CPU)/, \
                                $(CONTIKI_CPU_DIRS)}
 
+$(info terget dirs:$(CONTIKI_TARGET_DIRS) -> $(CONTIKI_TARGET_DIRS_CONCAT) )
+$(info cpu dirs:$(CONTIKI_CPU_DIRS) -> $(CONTIKI_CPU_DIRS_CONCAT) )
+$(info external dirs:$(EXTERNALDIRS) )
+
 SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
              $(CONTIKI_CPU_DIRS_CONCAT) $(MODULEDIRS) $(EXTERNALDIRS) $(APPDS)
+
+
 
 vpath %.c $(SOURCEDIRS)
 vpath %.cpp $(SOURCEDIRS)
@@ -397,7 +402,7 @@ vpath %.S $(SOURCEDIRS)
 vpath %.s $(SOURCEDIRS)
 vpath %.o $(OBJECTDIR)
 
-CFLAGS += ${addprefix -I,$(SOURCEDIRS) $(CONTIKI)}
+CFLAGS += ${addprefix -I, $(call uniq,$(SOURCEDIRS) $(CONTIKI)) }
 
 ### Check for a git repo and pass version if found
 ### git.exe in Windows cmd shells may require no stderr redirection
@@ -538,7 +543,7 @@ ifndef CUSTOM_RULE_C_TO_E
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -E $< -o $@
 
-$(BUILDDIR)/%.co: %.cpp | $(BUILDDIR) $(BUILD_DIR_BOARD)
+$(BUILD_DIR)/%.co: %.cpp | $(BUILD_DIR) $(BUILD_DIR_BOARD)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 endif
@@ -548,7 +553,7 @@ ifndef AROPTS
 endif
 
 ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
-$(CONTIKI_NG_TARGET_LIB): $(CONTIKI_OBJECTFILES) | $(BUILDDIR)
+$(CONTIKI_NG_TARGET_LIB): $(CONTIKI_OBJECTFILES) | $(BUILD_DIR_BOARD)
 	$(TRACE_AR)
 	$(Q)$(AR) $(AROPTS) $@ $^
 endif
@@ -655,5 +660,5 @@ else
 # abstract from the actual binary name. It needs to contain some
 # command in order to be a rule, not just a prerequisite.
 %: %.$(TARGET)
-	@echo "prepared for $@ prerequesites $(BUILDDIR)/%.$(TARGET) "
+	@echo "prepared for $@ prerequesites $(BUILD_DIR)/%.$(TARGET) "
 endif

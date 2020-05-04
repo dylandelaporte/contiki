@@ -120,6 +120,8 @@ void tsch_schedule_link_change_option(struct tsch_link *l, uint8_t link_options)
 */
 struct tsch_link *tsch_schedule_get_link_by_handle(uint16_t handle);
 
+typedef uint_fast16_t tsch_slot_offset_t;
+
 /**
  * \brief Looks within a slotframe for a link with a given timeslot
  * \param slotframe The desired slotframe
@@ -128,7 +130,7 @@ struct tsch_link *tsch_schedule_get_link_by_handle(uint16_t handle);
  * \return The link if found, NULL otherwise
  */
 struct tsch_link *tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe,
-                                                     uint16_t timeslot, uint16_t channel_offset);
+                                        tsch_slot_offset_t timeslot, uint16_t channel_offset);
 
 /**
  * \brief Removes a link
@@ -137,8 +139,6 @@ struct tsch_link *tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slot
  * \return 1 if success, 0 if failure
  */
 int tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l);
-
-typedef uint_fast16_t tsch_slot_offset_t;
 
 /**
  * \brief Removes a link from a slotframe and timeslot
