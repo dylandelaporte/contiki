@@ -15,10 +15,10 @@ NM       ?= nm
 OBJCOPY  ?= objcopy
 STRIP    ?= strip
 ifeq ($(WERROR),1)
-CFLAGSWERROR=-Werror -Wno-error=unused-function
+CFLAGSWERROR=-Werror -Wno-error=unused-function -Wno-error=format-security
 endif
 CFLAGSNO = -Wall -g3 $(CFLAGSWERROR)
-CFLAGSNO += -Wno-unused-function
+CFLAGSNO += -Wno-unused-function -Wno-format-security
 CFLAGS  += $(CFLAGSNO)
 
 ### Are we building with code size optimisations?
