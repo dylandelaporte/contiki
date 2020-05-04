@@ -82,7 +82,7 @@ extern int tsch_current_burst_count;
  * \param channel_offset Given channel offset
  * \return The resulting channel
  */
-uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, uint16_t channel_offset);
+uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, tsch_ch_offset_t channel_offset);
 /**
  * Set global time before starting slot operation, with a rtimer time and an ASN
  *

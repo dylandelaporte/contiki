@@ -55,6 +55,8 @@ enum link_type { LINK_TYPE_NORMAL, LINK_TYPE_ADVERTISING, LINK_TYPE_ADVERTISING_
 
 // TSCH slot frame handle id type
 typedef uint8_t tsch_sf_h;
+// TSCH chanel offset
+typedef uint16_t tsch_ch_offset_t;
 
 /** \brief An IEEE 802.15.4-2015 TSCH link (also called cell or slot) */
 struct tsch_link {

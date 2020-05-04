@@ -54,6 +54,7 @@
 #include "net/mac/framer/framer-802154.h"
 #include "net/mac/tsch/tsch.h"
 #include "sys/critical.h"
+#include "net/mac/tsch/tsch-private.h"
 #include "net/mac/tsch/tsch-slot-operation.h"
 #include <stdlib.h>
 
@@ -164,7 +165,7 @@ static volatile int tsch_in_slot_operation = 0;
 
 /* If we are inside a slot, these tell the current channel and channel offset */
 uint8_t tsch_current_channel;
-uint8_t tsch_current_channel_offset;
+tsch_ch_offset_t tsch_current_channel_offset;
 
 /* Info about the link, packet and neighbor of
  * the current (or next) slot */
@@ -252,7 +253,7 @@ tsch_get_lock(void)
 /* Channel hopping utility functions */
 
 /* Return the channel offset to use for the current slot */
-static uint8_t
+static tsch_ch_offset_t
 tsch_get_channel_offset(struct tsch_link *link, struct tsch_packet *p)
 {
 #if TSCH_WITH_LINK_SELECTOR
@@ -269,7 +270,7 @@ tsch_get_channel_offset(struct tsch_link *link, struct tsch_packet *p)
 
 /* Return channel from ASN and channel offset */
 uint8_t
-tsch_calculate_channel(struct tsch_asn_t *asn, int_fast8_t channel_offset)
+tsch_calculate_channel(struct tsch_asn_t *asn, tsch_ch_offset_t channel_offset)
 {
     if (tsch_hopping_sequence_length.val <= 1){
         return tsch_hopping_sequence[0];
