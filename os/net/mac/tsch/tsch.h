@@ -49,7 +49,23 @@ frequency hopping for enhanced reliability.
 #include <stdbool.h>
 #include "contiki.h"
 #include "net/mac/mac.h"
+
+#include "net/mac/tsch/tsch-conf.h"
+#include "net/mac/tsch/tsch-const.h"
+#include "net/mac/tsch/tsch-types.h"
+#include "net/mac/tsch/tsch-adaptive-timesync.h"
+#include "net/mac/tsch/tsch-slot-operation.h"
+#include "net/mac/tsch/tsch-queue.h"
+#include "net/mac/tsch/tsch-log.h"
+#include "net/mac/tsch/tsch-packet.h"
 #include "net/mac/tsch/tsch-security.h"
+#include "net/mac/tsch/tsch-schedule.h"
+#include "net/mac/tsch/tsch-stats.h"
+#if UIP_CONF_IPV6_RPL
+#include "net/mac/tsch/tsch-rpl.h"
+#endif /* UIP_CONF_IPV6_RPL */
+
+
 /* Include Arch-Specific conf */
 #ifdef TSCH_CONF_ARCH_HDR_PATH
 #include TSCH_CONF_ARCH_HDR_PATH

@@ -50,7 +50,6 @@
 #include "net/mac/framer/framer-802154.h"
 #include "net/mac/tsch/tsch-log.h"
 #include "net/netstack.h"
-#include "net/llsec/anti-replay.h"
 #include "lib/ccm-star.h"
 #include "lib/aes-128.h"
 #include <stdio.h>
@@ -95,7 +94,7 @@ tsch_packet_eackbuf_attr(uint8_t type)
 /*---------------------------------------------------------------------------*/
 /* Construct enhanced ACK packet and return ACK length */
 int
-tsch_packet_create_eack(uint8_t *buf, int buf_size,
+tsch_packet_create_eack(uint8_t *buf, int buf_len,
                         const linkaddr_t *dest_addr, const frame802154_t *frame
                         , int16_t drift, int nack)
 {
@@ -112,7 +111,7 @@ tsch_packet_create_eack(uint8_t *buf, int buf_size,
 
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_FRAME_TYPE, FRAME802154_ACKFRAME);
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_METADATA, 1);
-  tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
+  tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, frame->seq);
 
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_NO_DEST_ADDR, 1);
 #if TSCH_PACKET_EACK_WITH_DEST_ADDR
@@ -408,7 +407,7 @@ tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
     return 0;
   }
 
-  if(frame->fcf.frame_version < FRAME802154_IEEE802154E_2012
+  if(frame->fcf.frame_version < FRAME802154_IEEE802154_2015
      || frame->fcf.frame_type != FRAME802154_BEACONFRAME) {
       TSCH_LOG_FRAME("TSCH:! parse_eb: frame is not a valid TSCH beacon."
               , frame, buf);

@@ -79,7 +79,7 @@ static struct tsch_log_t log_array[TSCH_LOG_QUEUE_LEN];
 static int log_dropped = 0;
 static int log_active = 0;
 
-#define LOG_PRINTF(...) printf(__VA_ARGS__)
+#define LOG_PRINTF(...) LOG_OUTPUT(__VA_ARGS__)
 
 /*---------------------------------------------------------------------------*/
 /* Process pending log messages */
@@ -95,34 +95,38 @@ int tsch_log_process_pending(void)
   if((log_index = ringbufindex_peek_get(&log_ringbuf)) != -1) {
     struct tsch_log_t *log = &log_array[log_index];
     if(log->link == NULL) {
-        LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, log->asn.ls4b);
+        LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, (unsigned long)log->asn.ls4b);
     } else {
       struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->link->slotframe_handle);
       LOG_PRINTF("TSCH: {asn-%x.%lx link-%u-%u-%u-%u %u ch-%u} ",
-             log->asn.ms1b, log->asn.ls4b,
+             log->asn.ms1b, (unsigned long)log->asn.ls4b,
              log->link->slotframe_handle, sf ? sf->size.val : 0, 
              log->burst_count, log->link->timeslot, log->link->channel_offset,
              log->channel);
     }
     switch(log->type) {
       case tsch_log_tx:
-          LOG_PRINTF("%s-%u-%u[%u] %u tx ->%x, st %d-%d",
-            linkaddr_cmp(&log->tx.dest, &linkaddr_null) ? "bc" : "uc", log->tx.is_data
-            , log->tx.sec_level, log->tx.sec_key,
-                log->tx.datalen,
-                log->tx.dest,
-                log->tx.mac_tx_status, log->tx.num_tx);
+          LOG_PRINTF("%s-%u-%u[%u] tx ->",
+                  linkaddr_cmp(&log->tx.dest, &linkaddr_null) ? "bc" : "uc"
+                          , log->tx.is_data
+                          , log->tx.sec_level, log->tx.sec_key
+                          );
+          log_lladdr_compact(&log->tx.dest);
+          LOG_PRINTF(", len %3u, seq %3u, st %d %2d",
+                  log->tx.datalen, log->tx.seqno, log->tx.mac_tx_status, log->tx.num_tx);
         if(log->tx.drift_used) {
             LOG_PRINTF(", dr %d", log->tx.drift);
         }
         LOG_PRINTF("\n");
         break;
       case tsch_log_rx:
-          LOG_PRINTF("%s-%u-%u[%u] %u rx %x",
+          LOG_PRINTF("%s-%u-%u[%u] rx <-",
             log->rx.is_unicast == 0 ? "bc" : "uc", log->rx.is_data
-            , log->rx.sec_level,log->rx.sec_key,
-                log->rx.datalen,
-                log->rx.src);
+            , log->rx.sec_level,log->rx.sec_key
+            );
+          log_lladdr_compact(&log->rx.src);
+          LOG_PRINTF(", len %3u, seq %3u",
+                  log->rx.datalen, log->rx.seqno);
         if(log->rx.drift_used) {
             LOG_PRINTF(", dr %d", log->rx.drift);
         }
@@ -182,8 +186,8 @@ int tsch_log_process_pending(void)
           break;
       case tsch_log_rx_drift:
        printf("RX : fantastic drift %ld = %lu[expect time] - %lu[rx time]\n"
-              , log->rx_drift.drift
-              , log->rx_drift.expect_us, log->rx_drift.start_us);
+              , (unsigned long)log->rx_drift.drift
+              , (unsigned long)log->rx_drift.expect_us, (unsigned long)log->rx_drift.start_us);
        break;
     }
     /* Remove input from ringbuf */
@@ -240,6 +244,7 @@ tsch_log_stop(void)
     tsch_log_process_pending();
     log_active = 0;
   }
+}
 
 void tsch_log_puts(const char* txt){
     TSCH_LOG_ADD(tsch_log_text, log->text = txt; );

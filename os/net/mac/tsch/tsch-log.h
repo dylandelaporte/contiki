@@ -102,6 +102,7 @@
 #define TSCH_LOGS(... )
 #define TSCH_LOGF(... )
 #define TSCH_LOGF8(... )
+#define TSCH_DBG(... )
 
 #define TSCH_PUTS(txt)      PRINTF(txt)
 #define TSCH_PRINTF(... )  PRINTF(__VA_ARGS__)
@@ -210,6 +211,7 @@ void tsch_log_init(void);
 /* Process pending log messages */
 // \return - 0 if no messages printed
 int tsch_log_process_pending(void);
+/**
  * \brief Stop logging module
  */
 void tsch_log_stop(void);
@@ -252,13 +254,15 @@ void tsch_log_printf8(const char* fmt
 #define TSCH_PRINTF( ... ) _TSCH_LOGF4(__VA_ARGS__, 0,0,0,0)
 #define TSCH_PRINTF8( ... ) _TSCH_LOGF8(__VA_ARGS__, 0,0,0,0, 0,0,0,0)
 
+#define TSCH_DBG(... ) do { if(LOG_LEVEL_DBG <= (LOG_LEVEL)) TSCH_LOGF( __VA_ARGS__ ); } while(false)
+
 #define TSCH_ANNOTATE( ... ) do { \
     if ((DEBUG) & DEBUG_ANNOTATE)\
         TSCH_LOGF(__VA_ARGS__, 0,0,0,0); \
     } while(false)
 
 
-#include "net/mac/frame802154.h"
+#include "net/mac/framer/frame802154.h"
 void tsch_log_print_frame(const char* msg, frame802154_t *frame, const void* raw);
 #define TSCH_LOG_FRAME(msg, frame, raw)  tsch_log_print_frame(msg, frame, raw)
 

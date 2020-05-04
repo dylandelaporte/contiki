@@ -76,13 +76,16 @@ static aes_key keys[] = {
 };
 #define N_KEYS (sizeof(keys) / sizeof(aes_key))
 
+uint8_t* tsch_sec_key(uint8_t key_index){
     if(key_index == 0 || key_index > N_KEYS) {
       return NULL;
     }
     return keys[key_index - 1];
 }
+
 #define TSCH_SEC_KEY(key_idx, addr) tsch_sec_key(key_idx)
 #define TSCH_SEC_USER_KEYS 0
+
 #else
 #define TSCH_SEC_USER_KEYS (TSCH_SECURITY_RELAX_KEYID & TSCH_SECURITY_STRICT)
 #endif
@@ -167,7 +170,7 @@ unsigned int tsch_seclevel_mic_len(unsigned level){
 }
 
 /*---------------------------------------------------------------------------*/
-unsigned int
+int
 tsch_security_secure_frame(uint8_t *hdr, uint8_t *outbuf,
                            int hdrlen, int datalen,
                            const linkaddr_t *receiver, struct tsch_asn_t *asn)
@@ -175,13 +178,7 @@ tsch_security_secure_frame(uint8_t *hdr, uint8_t *outbuf,
   frame802154_t frame;
   uint8_t key_index = 0;
   uint8_t security_level = 0;
-  uint8_t with_encryption;
-  uint8_t mic_len;
-  uint8_t nonce[16];
   struct ieee802154_ies ies;
-
-  uint8_t a_len;
-  uint8_t m_len;
 
   if(hdr == NULL || outbuf == NULL || hdrlen < 0 || datalen < 0) {
     return tschERR_BADARG;

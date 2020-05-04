@@ -387,7 +387,7 @@ tsch_get_network_uptime_ticks(void)
 
   status = critical_enter();
 
-  uptime_asn = last_sync_asn.ls4b + ((uint64_t)last_sync_asn.ms1b << 32);
+  uptime_asn = tsch_last_sync_asn.ls4b + ((uint64_t)tsch_last_sync_asn.ms1b << 32);
   /* first calculate the at the uptime at the last sync in rtimer ticks */
   uptime_ticks = uptime_asn * tsch_timing[tsch_ts_timeslot_length];
   /* then convert to clock ticks (assume that CLOCK_SECOND divides RTIMER_ARCH_SECOND) */
@@ -627,7 +627,6 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
       static uint8_t seqno;
       /* wait for ack? */
       static uint8_t do_wait_for_ack;
-      static rtimer_clock_t tx_start_time;
       /* Did we set the frame pending bit to request an extra burst link? */
       static int burst_link_requested;
 
@@ -1078,10 +1077,6 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
         /* At the end of the reception, get an more accurate estimate of SFD arrival time */
         NETSTACK_RADIO.get_object(RADIO_PARAM_LAST_PACKET_TIMESTAMP, &rx_start_time, sizeof(rtimer_clock_t));
 #endif
-
-        packet_duration = TSCH_PACKET_DURATION(current_input->len);
-        /* limit packet_duration to its max value */
-        packet_duration = MIN(packet_duration, tsch_timing[tsch_ts_max_tx]);
 
         if(!frame_valid) {
           TSCH_LOG_ADD(tsch_log_message,
