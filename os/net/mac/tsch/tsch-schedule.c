@@ -239,7 +239,7 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
     } else {
       l = memb_alloc(&link_memb);
       if(l == NULL) {
-        TSCH_PUTS("TSCH-schedule:! add_link memb_alloc failed\n");
+        //TSCH_PUTS("TSCH-schedule:! add_link memb_alloc failed\n");
         LOG_ERR("! add_link memb_alloc failed\n");
         tsch_release_lock();
       } else {
@@ -259,12 +259,22 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
         }
         linkaddr_copy(&l->addr, address);
 
-        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %u/%u [%u+%u] %x\n",
-               slotframe->handle, link_options, link_type, timeslot, channel_offset, TSCH_LOG_ID_FROM_LINKADDR(address));
-
         /* Release the lock before we update the neighbor (will take the lock) */
         tsch_release_lock();
         tsch_schedule_link_addr_aqure(l);
+
+        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %u/%u [%u+%u] %x\n",
+               slotframe->handle, link_options, link_type
+               , timeslot, channel_offset
+               , TSCH_LOG_ID_FROM_LINKADDR(address));
+
+        LOG_INFO("add_link sf=%u opt=%s type=%s ts=%u ch=%u addr=",
+                 slotframe->handle,
+                 print_link_options(link_options),
+                 print_link_type(link_type), timeslot, channel_offset);
+        LOG_INFO_LLADDR(address);
+        LOG_INFO_("\n");
+
       }
     }
   }
