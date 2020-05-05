@@ -67,6 +67,12 @@
 #define PACKETBUF_SIZE 128
 #endif
 
+#ifdef PACKETBUF_CONF_WITH_PACKET_TYPE
+#define PACKETBUF_WITH_PACKET_TYPE PACKETBUF_CONF_WITH_PACKET_TYPE
+#else
+#define PACKETBUF_WITH_PACKET_TYPE NETSTACK_CONF_WITH_RIME
+#endif
+
 /**
  * \brief      Clear and reset the packetbuf
  *
@@ -221,6 +227,7 @@ enum {
   PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS,
   PACKETBUF_ATTR_MAC_SEQNO,
   PACKETBUF_ATTR_MAC_ACK,
+  PACKETBUF_ATTR_IS_CREATED_AND_SECURED, //ContikiMAC use it
   PACKETBUF_ATTR_MAC_METADATA,
   PACKETBUF_ATTR_MAC_NO_SRC_ADDR,
   PACKETBUF_ATTR_MAC_NO_DEST_ADDR,
@@ -231,38 +238,100 @@ enum {
 #endif /* TSCH_WITH_LINK_SELECTOR */
 
   /* Scope 1 attributes: used between two neighbors only. */
+#if PACKETBUF_WITH_PACKET_TYPE
+  PACKETBUF_ATTR_PACKET_TYPE,
+#endif
+#if NETSTACK_CONF_WITH_RIME
+  PACKETBUF_ATTR_PACKET_ID,
+  PACKETBUF_ATTR_RELIABLE,
+  PACKETBUF_ATTR_REXMIT,
+  PACKETBUF_ATTR_MAX_REXMIT,
+  PACKETBUF_ATTR_NUM_REXMIT,
+#endif /* NETSTACK_CONF_WITH_RIME */
+  PACKETBUF_ATTR_PENDING,
   PACKETBUF_ATTR_FRAME_TYPE,
 #if LLSEC802154_USES_AUX_HEADER
   PACKETBUF_ATTR_SECURITY_LEVEL,
+        //< this is PACKETBUF_ATTR_SECURITY_LEVEL value force drop Sequrity to None,
+        //    ommits default security value
+        PACKETBUF_ATTR_SECURITY_LEVEL_DROP = 0x80,
 #endif /* LLSEC802154_USES_AUX_HEADER */
-#if LLSEC802154_USES_EXPLICIT_KEYS
-  PACKETBUF_ATTR_KEY_ID_MODE,
-  PACKETBUF_ATTR_KEY_INDEX,
-#endif /* LLSEC802154_USES_EXPLICIT_KEYS */
 
 #if LLSEC802154_USES_FRAME_COUNTER
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_0_1,
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_2_3,
 #endif /* LLSEC802154_USES_FRAME_COUNTER */
+#if LLSEC802154_USES_EXPLICIT_KEYS
+  PACKETBUF_ATTR_KEY_ID_MODE,
+  PACKETBUF_ATTR_KEY_INDEX,
+  PACKETBUF_ATTR_KEY_SOURCE_BYTES_0_1,
+#endif /* LLSEC802154_USES_EXPLICIT_KEYS */
 
   /* Scope 2 attributes: used between end-to-end nodes. */
+#if NETSTACK_CONF_WITH_RIME
+  PACKETBUF_ATTR_HOPS,
+  PACKETBUF_ATTR_TTL,
+  PACKETBUF_ATTR_EPACKET_ID,
+  PACKETBUF_ATTR_EPACKET_TYPE,
+  PACKETBUF_ATTR_ERELIABLE,
+#endif /* NETSTACK_CONF_WITH_RIME */
+
   /* These must be last */
   PACKETBUF_ADDR_SENDER,
   PACKETBUF_ADDR_RECEIVER,
+#if NETSTACK_CONF_WITH_RIME
+  PACKETBUF_ADDR_ESENDER,
+  PACKETBUF_ADDR_ERECEIVER,
+#endif /* NETSTACK_CONF_WITH_RIME */
+#if TSCH_WITH_PHANTOM_NBR
+  PACKETBUF_ADDR_TSCH_RECEIVER,
+#endif /* TSCH_WITH_LINK_SELECTOR */
 
   PACKETBUF_ATTR_MAX
+  ,   PACKETBUF_ADDR_MAX = PACKETBUF_ATTR_MAX
 };
 
-#define PACKETBUF_NUM_ADDRS 2
 #define PACKETBUF_NUM_ATTRS (PACKETBUF_ATTR_MAX - PACKETBUF_NUM_ADDRS)
 #define PACKETBUF_ADDR_FIRST PACKETBUF_ADDR_SENDER
+#define PACKETBUF_NUM_ADDRS (PACKETBUF_ADDR_MAX - PACKETBUF_ADDR_FIRST)
 
 #define PACKETBUF_IS_ADDR(type) ((type) >= PACKETBUF_ADDR_FIRST)
 
+#if PACKETBUF_CONF_ATTRS_INLINE
+
+extern struct packetbuf_attr packetbuf_attrs[];
+extern struct packetbuf_addr packetbuf_addrs[];
+
+static inline int
+packetbuf_set_attr(uint8_t type, const packetbuf_attr_t val)
+{
+  packetbuf_attrs[type].val = val;
+  return 1;
+}
+static inline packetbuf_attr_t
+packetbuf_attr(uint8_t type)
+{
+  return packetbuf_attrs[type].val;
+}
+
+static inline int
+packetbuf_set_addr(uint8_t type, const linkaddr_t *addr)
+{
+  linkaddr_copy(&packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr, addr);
+  return 1;
+}
+
+static inline const linkaddr_t *
+packetbuf_addr(uint8_t type)
+{
+  return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
+}
+#else /* PACKETBUF_CONF_ATTRS_INLINE */
 int               packetbuf_set_attr(uint8_t type, const packetbuf_attr_t val);
 packetbuf_attr_t packetbuf_attr(uint8_t type);
 int               packetbuf_set_addr(uint8_t type, const linkaddr_t *addr);
 const linkaddr_t *packetbuf_addr(uint8_t type);
+#endif /* PACKETBUF_CONF_ATTRS_INLINE */
 
 /**
  * \brief      Checks whether the current packet is a broadcast.

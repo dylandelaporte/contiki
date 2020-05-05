@@ -115,8 +115,24 @@ typedef unsigned short uip_stats_t;
 #define CLOCK_CONF_SECOND 1000L
 typedef unsigned long clock_time_t;
 
+// COOGA have not problems with RTimer latency, therefore it no need guard rTimer ISR
+#ifndef RTIMER_CONF_GUARD_TIME
+#define RTIMER_CONF_GUARD_TIME 0
+#endif
+
 /* Use 64-bit rtimer (default in Contiki-NG is 32) */
 #define RTIMER_CONF_CLOCK_SIZE 8
+
+/*  RTIMER_CONF_ARCH_SECOND definition requests cooja to simulate polling
+ *      with demanded rtimer step.
+ *  This helps achieve RTIMER_BUSYWAIT_UNTIL_ABS accuracy and behaviour close
+ *      to real platforms. This demanded for precise TSCH simulation
+ * WARN: change default behaviour of COOJA sim was not apropriated, so you should
+ *      provide RTIMER_CONF_ARCH_SECOND explicitly, if need simulate this BUSYWAIT precise
+ */
+//#define RTIMER_CONF_ARCH_SECOND                     10000
+
+
 
 #ifndef RADIO_CONF_HDR_PATH
 #include "dev/cooja-radio-def.h"

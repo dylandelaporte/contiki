@@ -43,6 +43,10 @@
 /********** Includes **********/
 
 #include "contiki.h"
+#include "lib/list.h"
+#include "net/mac/tsch/tsch-private.h"
+#include "net/mac/tsch/tsch-queue.h"
+#include "net/mac/tsch/tsch-slot-operation.h"
 #include "net/linkaddr.h"
 
 /********** Functions *********/
@@ -68,14 +72,14 @@ void tsch_schedule_print(void);
  * \param size the slotframe size
  * \return the new slotframe, NULL if failure
  */
-struct tsch_slotframe *tsch_schedule_add_slotframe(uint16_t handle, uint16_t size);
+struct tsch_slotframe *tsch_schedule_add_slotframe(tsch_sf_h handle, uint16_t size);
 
 /**
  * \brief Looks up a slotframe by handle
  * \param handle the slotframe handle
  * \return the slotframe with required handle, if any. NULL otherwise.
  */
-struct tsch_slotframe *tsch_schedule_get_slotframe_by_handle(uint16_t handle);
+struct tsch_slotframe *tsch_schedule_get_slotframe_by_handle(tsch_sf_h handle);
 
 /**
  * \brief Removes a slotframe
@@ -104,12 +108,19 @@ int tsch_schedule_remove_all_slotframes(void);
 struct tsch_link *tsch_schedule_add_link(struct tsch_slotframe *slotframe,
                                          uint8_t link_options, enum link_type link_type, const linkaddr_t *address,
                                          uint16_t timeslot, uint16_t channel_offset, uint8_t do_remove);
+/* Changes adress on a link*/
+void tsch_schedule_link_change_addr(struct tsch_link *l, const linkaddr_t *address);
+/* Changes adress on a link*/
+void tsch_schedule_link_change_option(struct tsch_link *l, uint8_t link_options);
+/* Looks for a link from a handle */
 /**
 * \brief Looks for a link from a handle
 * \param handle The target handle
 * \return The link with required handle, if any. Otherwise, NULL
 */
 struct tsch_link *tsch_schedule_get_link_by_handle(uint16_t handle);
+
+typedef uint_fast16_t tsch_slot_offset_t;
 
 /**
  * \brief Looks within a slotframe for a link with a given timeslot
@@ -119,7 +130,7 @@ struct tsch_link *tsch_schedule_get_link_by_handle(uint16_t handle);
  * \return The link if found, NULL otherwise
  */
 struct tsch_link *tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe,
-                                                     uint16_t timeslot, uint16_t channel_offset);
+                                        tsch_slot_offset_t timeslot, uint16_t channel_offset);
 
 /**
  * \brief Removes a link
@@ -137,16 +148,17 @@ int tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link
  * \return 1 if success, 0 if failure
  */
 int tsch_schedule_remove_link_by_timeslot(struct tsch_slotframe *slotframe,
-                                          uint16_t timeslot, uint16_t channel_offset);
+                                          tsch_slot_offset_t timeslot, uint16_t channel_offset);
 
 /**
  * \brief Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag)
  * \param asn The base ASN, from which we look for the next active link
  * \param time_offset A pointer to uint16_t where to store the time offset between base ASN and link found
+//  \arg time_offset - gives TSCH_DESYNC_THRESHOLD_SLOTS value, used to escape timesource EB
  * \param backup_link A pointer where to write the address of a backup link, to be executed should the original be no longer active at wakeup
  * \return The next active link if any, NULL otherwise
  */
-struct tsch_link * tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, uint16_t *time_offset,
+struct tsch_link * tsch_schedule_get_next_active_link(struct tsch_asn_t *asn, tsch_slot_offset_t *time_offset,
     struct tsch_link **backup_link);
 
 /**

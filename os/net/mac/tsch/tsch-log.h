@@ -44,6 +44,10 @@
 
 #include "contiki.h"
 #include "sys/rtimer.h"
+#include "net/mac/tsch/tsch-private.h"
+// need uip_lladdr_t
+#include "net/ip/uip.h"
+#include "net/net-debug.h"
 
 /******** Configuration *******/
 
@@ -55,6 +59,25 @@
 #define TSCH_LOG_PER_SLOT (LOG_CONF_LEVEL_MAC >= LOG_LEVEL_DBG)
 #endif /* TSCH_LOG_CONF_PER_SLOT */
 
+/* TSCH log levels:
+ * -1: no any print, even failure reports
+ * 0: no log
+ * 1: basic PRINTF enabled
+ * 2: basic PRINTF enabled and tsch-log module enabled */
+#ifdef TSCH_LOG_CONF_LEVEL
+#define TSCH_LOG_LEVEL TSCH_LOG_CONF_LEVEL
+#else /* TSCH_LOG_CONF_LEVEL */
+
+#if TSCH_LOG_PER_SLOT
+#define TSCH_LOG_LEVEL 2
+#else
+#define TSCH_LOG_LEVEL 0
+#endif
+
+#endif /* TSCH_LOG_CONF_LEVEL */
+
+
+
 /* The length of the log queue, i.e. maximum number postponed log messages */
 #ifdef TSCH_LOG_CONF_QUEUE_LEN
 #define TSCH_LOG_QUEUE_LEN TSCH_LOG_CONF_QUEUE_LEN
@@ -62,13 +85,31 @@
 #define TSCH_LOG_QUEUE_LEN 8
 #endif /* TSCH_LOG_CONF_QUEUE_LEN */
 
-#if (TSCH_LOG_PER_SLOT == 0)
+/* Returns an integer ID from a link-layer address */
+#ifdef TSCH_LOG_CONF_ID_FROM_LINKADDR
+#define TSCH_LOG_ID_FROM_LINKADDR(addr) TSCH_LOG_CONF_ID_FROM_LINKADDR(addr)
+#else /* TSCH_LOG_ID_FROM_LINKADDR */
+#define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
+#endif /* TSCH_LOG_ID_FROM_LINKADDR */
+
+#if TSCH_LOG_LEVEL < 2 /* For log level 0 or 1, the logging functions do nothing */
 
 #define tsch_log_init()
-#define tsch_log_process_pending()
+#define tsch_log_process_pending()  0
 #define TSCH_LOG_ADD(log_type, init_code)
+#define TSCH_LOG_FRAME(msg, frame, raw)
 
-#else /* (TSCH_LOG_PER_SLOT == 0) */
+#define TSCH_LOGS(... )
+#define TSCH_LOGF(... )
+#define TSCH_LOGF8(... )
+#define TSCH_DBG(... )
+
+#define TSCH_PUTS(txt)      PRINTF(txt)
+#define TSCH_PRINTF(... )  PRINTF(__VA_ARGS__)
+#define TSCH_PRINTF8(... )  PRINTF(__VA_ARGS__)
+#define TSCH_ANNOTATE(... )  ANNOTATE(__VA_ARGS__)
+
+#else /* TSCH_LOG_LEVEL */
 
 /************ Types ***********/
 
@@ -76,6 +117,14 @@
 struct tsch_log_t {
   enum { tsch_log_tx,
          tsch_log_rx,
+         tsch_log_rx_drift,
+         tsch_log_change_timesrc,
+         tsch_log_frame,
+         tsch_log_packet,       //< post packet[index] info
+         tsch_log_packet_verbose,  //< post locked packet[index]->quebuf neibohour info
+         tsch_log_text,         //< post static const string
+         tsch_log_fmt,          //< post static const string
+         tsch_log_fmt8,          //< post static const string
          tsch_log_message
   } type;
   struct tsch_asn_t asn;
@@ -85,6 +134,11 @@ struct tsch_log_t {
   uint8_t channel_offset;
   union {
     char message[48];
+    const char* text;
+    struct {
+        const char* text;
+        int         arg[8];
+    } fmt;
     struct {
       int mac_tx_status;
       linkaddr_t dest;
@@ -95,6 +149,7 @@ struct tsch_log_t {
       uint8_t sec_level;
       uint8_t drift_used;
       uint8_t seqno;
+      uint8_t sec_key;
     } tx;
     struct {
       linkaddr_t  src;
@@ -106,7 +161,36 @@ struct tsch_log_t {
       uint8_t sec_level;
       uint8_t drift_used;
       uint8_t seqno;
+      uint8_t sec_key;
     } rx;
+    struct {
+        int32_t     drift;
+        uint32_t    start_us;
+        uint32_t    expect_us;
+    } rx_drift;
+    struct {
+        linkaddr_t  was;
+        linkaddr_t  now;
+    } timesrc_change;
+    struct {
+        const char* fmt;
+        struct tsch_packet *p;
+        int                 index;
+        struct tsch_neighbor *n;
+        struct queuebuf      *qb;
+        int                 locked;
+    } packet;
+    struct {
+        const char*         msg;
+        uint8_t             raw[2];
+        uint8_t             frame_version;
+        uint8_t             frame_type;
+        uint16_t            src_pid;
+        uint16_t            dst_pid;
+        uip_lladdr_t        src_addr;
+        uip_lladdr_t        dst_addr;
+        char                tmp[16];
+    } frame;
   };
 };
 
@@ -125,10 +209,9 @@ void tsch_log_commit(void);
  * \brief Initialize log module
  */
 void tsch_log_init(void);
-/**
- * \brief Process pending log messages
- */
-void tsch_log_process_pending(void);
+/* Process pending log messages */
+// \return - 0 if no messages printed
+int tsch_log_process_pending(void);
 /**
  * \brief Stop logging module
  */
@@ -147,7 +230,45 @@ void tsch_log_stop(void);
     } \
 } while(0);
 
-#endif /* (TSCH_LOG_PER_SLOT == 0) */
+
+
+void tsch_log_puts(const char* txt);
+void tsch_log_printf3(const char* fmt, int arg1, int arg2, int arg3);
+void tsch_log_printf4(const char* fmt, int arg1, int arg2, int arg3, int arg4);
+void tsch_log_printf8(const char* fmt
+                      , int arg1, int arg2, int arg3, int arg4
+                      , int arg5, int arg6, int arg7, int arg8);
+
+#define _TSCH_LOGF3( fmt, arg1,  arg2, arg3, ...) \
+        tsch_log_printf3(fmt, (int)(arg1), (int)(arg2), (int)(arg3))
+#define _TSCH_LOGF4( fmt, arg1, arg2, arg3, arg4, ...) \
+        tsch_log_printf4(fmt, (int)(arg1), (int)(arg2), (int)(arg3), (int)(arg4))
+#define _TSCH_LOGF8( fmt, arg1,  arg2, arg3, arg4, arg5, arg6, arg7, arg8,...) \
+        tsch_log_printf8(fmt, (int)(arg1), (int)(arg2), (int)(arg3), (int)(arg4)\
+                        , (int)(arg5), (int)(arg6), (int)(arg7), (int)(arg8) )
+
+#define TSCH_LOGS(msg)    tsch_log_puts(msg)
+#define TSCH_LOGF(...)    _TSCH_LOGF4(__VA_ARGS__, 0,0,0,0)
+#define TSCH_LOGF8( ... ) _TSCH_LOGF8(__VA_ARGS__, 0,0,0,0, 0,0,0,0)
+
+#define TSCH_PUTS(txt)  tsch_log_puts(txt)
+#define TSCH_PRINTF( ... ) _TSCH_LOGF4(__VA_ARGS__, 0,0,0,0)
+#define TSCH_PRINTF8( ... ) _TSCH_LOGF8(__VA_ARGS__, 0,0,0,0, 0,0,0,0)
+
+#define TSCH_DBG(... ) do { if(LOG_LEVEL_DBG <= (LOG_LEVEL)) TSCH_LOGF( __VA_ARGS__ ); } while(false)
+
+#define TSCH_ANNOTATE( ... ) do { \
+    if ((DEBUG) & DEBUG_ANNOTATE)\
+        TSCH_LOGF(__VA_ARGS__, 0,0,0,0); \
+    } while(false)
+
+
+#include "net/mac/framer/frame802154.h"
+void tsch_log_print_frame(const char* msg, frame802154_t *frame, const void* raw);
+#define TSCH_LOG_FRAME(msg, frame, raw)  tsch_log_print_frame(msg, frame, raw)
+
+
+#endif /* TSCH_LOG_LEVEL */
 
 #endif /* __TSCH_LOG_H__ */
 /** @} */

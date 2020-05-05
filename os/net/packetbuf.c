@@ -46,6 +46,7 @@
 
 #include "contiki-net.h"
 #include "net/packetbuf.h"
+#include "net/rime/rime.h"
 #include "sys/cc.h"
 
 struct packetbuf_attr packetbuf_attrs[PACKETBUF_NUM_ATTRS];
@@ -62,6 +63,7 @@ static uint8_t hdrlen;
 static uint32_t packetbuf_aligned[(PACKETBUF_SIZE + 3) / 4];
 static uint8_t *packetbuf = (uint8_t *)packetbuf_aligned;
 
+#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -183,6 +185,10 @@ packetbuf_attr_clear(void)
   for(i = 0; i < PACKETBUF_NUM_ADDRS; ++i) {
     linkaddr_copy(&packetbuf_addrs[i].addr, &linkaddr_null);
   }
+#if TSCH_WITH_LINK_SELECTOR
+  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME, (packetbuf_attr_t)~0);
+  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT, (packetbuf_attr_t)~0);
+#endif
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -201,6 +207,7 @@ packetbuf_attr_copyfrom(struct packetbuf_attr *attrs,
   memcpy(packetbuf_addrs, addrs, sizeof(packetbuf_addrs));
 }
 /*---------------------------------------------------------------------------*/
+#if !PACKETBUF_CONF_ATTRS_INLINE
 int
 packetbuf_set_attr(uint8_t type, const packetbuf_attr_t val)
 {
@@ -227,6 +234,7 @@ packetbuf_addr(uint8_t type)
   return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
 }
 /*---------------------------------------------------------------------------*/
+#endif /* PACKETBUF_CONF_ATTRS_INLINE */
 int
 packetbuf_holds_broadcast(void)
 {

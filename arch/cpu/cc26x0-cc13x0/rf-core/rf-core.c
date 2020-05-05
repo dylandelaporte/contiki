@@ -36,13 +36,14 @@
  * Implementation of the CC13xx/CC26xx RF core driver
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "dev/watchdog.h"
 #include "sys/process.h"
 #include "sys/energest.h"
 #include "sys/cc.h"
 #include "net/netstack.h"
 #include "net/packetbuf.h"
+#include "net/rime/rimestats.h"
 #include "rf-core/rf-core.h"
 #include "rf-core/rf-switch.h"
 #include "ti-lib.h"
@@ -61,6 +62,7 @@
 #include <stdio.h>
 #include <string.h>
 /*---------------------------------------------------------------------------*/
+#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -108,8 +110,8 @@ static const rf_core_primary_mode_t *primary_mode = NULL;
 #define RAT_OVERFLOW_TIMER_INTERVAL (CLOCK_SECOND * RAT_OVERFLOW_PERIOD_SECONDS / 3)
 
 /* Radio timer (RAT) offset as compared to the rtimer counter (RTC) */
-static int32_t rat_offset;
-static bool rat_offset_known;
+int32_t rat_offset = 0;
+static bool rat_offset_known = false;
 
 /* Value during the last read of the RAT register */
 static uint32_t rat_last_value;
@@ -178,10 +180,10 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
   interrupts_disabled = ti_lib_int_master_disable();
 
   if(!rf_core_is_accessible()) {
-    PRINTF("rf_core_send_cmd: RF was off\n");
     if(!interrupts_disabled) {
       ti_lib_int_master_enable();
     }
+    PRINTF("rf_core_send_cmd: RF was off\n");
     return RF_CORE_CMD_ERROR;
   }
 
@@ -716,11 +718,15 @@ PROCESS_THREAD(rf_core_process, ev, data)
 static void
 rx_nok_isr(void)
 {
+  RIMESTATS_ADD(badcrc);
+  PRINTF("RF: Bad CRC\n");
 }
 /*---------------------------------------------------------------------------*/
 void
 cc26xx_rf_cpe1_isr(void)
 {
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
   PRINTF("RF Error\n");
 
   if(!rf_core_is_accessible()) {
@@ -741,11 +747,15 @@ cc26xx_rf_cpe1_isr(void)
 
   /* Clear INTERNAL_ERROR interrupt flag */
   HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) = 0x7FFFFFFF;
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 void
 cc26xx_rf_cpe0_isr(void)
 {
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
   if(!rf_core_is_accessible()) {
     printf("RF ISR called but RF not ready... PANIC!!\n");
     if(rf_core_power_up() != RF_CORE_CMD_OK) {
@@ -777,6 +787,8 @@ cc26xx_rf_cpe0_isr(void)
   }
 
   ti_lib_int_master_enable();
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

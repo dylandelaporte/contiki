@@ -42,10 +42,25 @@
 
 /********** Includes **********/
 
+#include <stdbool.h>
 #include "contiki.h"
 #include "lib/ringbufindex.h"
 #include "net/linkaddr.h"
+#include "net/mac/tsch/tsch-schedule.h"
 #include "net/mac/mac.h"
+
+/*********** Callbacks *********/
+
+/* Called by TSCH when switching time source */
+#ifdef TSCH_CALLBACK_NEW_TIME_SOURCE
+struct tsch_neighbor;
+void TSCH_CALLBACK_NEW_TIME_SOURCE(const struct tsch_neighbor *old, const struct tsch_neighbor *new);
+#endif
+
+/* Called by TSCH every time a packet is ready to be added to the send queue */
+#ifdef TSCH_CALLBACK_PACKET_READY
+void TSCH_CALLBACK_PACKET_READY(void);
+#endif
 
 /***** External Variables *****/
 
@@ -53,6 +68,8 @@
 extern struct tsch_neighbor *n_broadcast;
 extern struct tsch_neighbor *n_eb;
 
+//* private variable for xxx_time_source methods. do ton use it directly
+extern struct tsch_neighbor *n_time_source;
 /********** Functions *********/
 
 /**
@@ -70,7 +87,10 @@ struct tsch_neighbor *tsch_queue_get_nbr(const linkaddr_t *addr);
  * \brief Get the TSCH time source (we currently assume there is only one)
  * \return The neighbor queue associated to the time source
  */
-struct tsch_neighbor *tsch_queue_get_time_source(void);
+static inline
+struct tsch_neighbor *tsch_queue_get_time_source(void){
+    return n_time_source;
+}
 /**
  * \brief Update TSCH time source
  * \param new_addr The address of the new TSCH time source
@@ -122,16 +142,26 @@ int tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p, struc
  * \brief Reset neighbor queues module
  */
 void tsch_queue_reset(void);
+/* Flush a neighbor queue */
+void tsch_queue_flush_nbr_queue(struct tsch_neighbor *n);
+/* Remove TSCH neighbor queue */
+void tsch_queue_remove_nbr(struct tsch_neighbor *n);
 /**
  * \brief Deallocate all neighbors with empty queue
  */
 void tsch_queue_free_unused_neighbors(void);
+enum { tsch_free_UNUSED = 0
+    /* Flush and Deallocate neighbors wich are not in links*/
+     , tsch_free_UNLINKED = 1
+};
+void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style);
+/* Is the neighbor queue empty? */
 /**
  * \brief Is the neighbor queue empty?
  * \param n The neighbor queue
  * \return 1 if empty, 0 otherwise
  */
-int tsch_queue_is_empty(const struct tsch_neighbor *n);
+bool tsch_queue_is_empty(const struct tsch_neighbor *n);
 /**
  * \brief Returns the first packet that can be sent from a queue on a given link
  * \param n The neighbor queue

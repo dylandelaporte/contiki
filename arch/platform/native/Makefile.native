@@ -33,6 +33,8 @@ endif
 # looks gcc ld can`t handle weak symbols in archives. 
 # !!!So sure that board.o links out of archive
 
+CFLAGS += -Wno-stringop-truncation
+
 CONTIKI_SOURCEFILES += $(CONTIKI_TARGET_SOURCEFILES)
 
 .SUFFIXES:

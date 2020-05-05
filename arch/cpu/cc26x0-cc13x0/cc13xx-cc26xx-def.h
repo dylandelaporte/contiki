@@ -35,7 +35,7 @@
 #include "cm3/cm3-def.h"
 #include "rf-core/radio-def.h"
 /*---------------------------------------------------------------------------*/
-#define RTIMER_ARCH_SECOND 65536
+#define RTIMER_CONF_ARCH_SECOND 65536u
 /*---------------------------------------------------------------------------*/
 /* Path to CMSIS header */
 #define CMSIS_CONF_HEADER_PATH               "cc13x0-cc26x0-cm3.h"

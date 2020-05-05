@@ -28,6 +28,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*---------------------------------------------------------------------------*/
+#include "lib/dbg-io/dbg.h"
 #include "cc26xx-uart.h"
 #include "ti-lib.h"
 

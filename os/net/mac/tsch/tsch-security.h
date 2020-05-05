@@ -50,9 +50,9 @@
 /********** Configurarion *********/
 
 /* To enable TSCH security:
-* - set LLSEC802154_CONF_ENABLED
-* - set LLSEC802154_CONF_USES_EXPLICIT_KEYS
-* */
+ * - set LLSEC802154_CONF_ENABLED
+ * - set LLSEC802154_CONF_USES_EXPLICIT_KEYS
+ * */
 
 /* K1, defined in 6TiSCH minimal, is well-known (offers no security) and used for EBs only */
 #ifdef TSCH_SECURITY_CONF_K1
@@ -110,7 +110,29 @@
 #define TSCH_SECURITY_KEY_SEC_LEVEL_OTHER 5 /* Encryption + MIC-32, as per 6TiSCH minimal */
 #endif
 
-/********** Data types *********/
+//   Strictness of net security:
+//<  need that secured PAN use only secured packets
+#define TSCH_SECURITY_STRICT_PAN_SECURED    0
+//<  allow unsecured packets in secured PAN/secured packets in unsecured PAN
+#define TSCH_SECURITY_RELAX_PAN_SECURED     1
+//<  by default keyid used according to frame type:
+//          EB - TSCH_SECURITY_KEY_INDEX_EB
+//          ACK - TSCH_SECURITY_KEY_INDEX_ACK
+//          .. and so on
+#define TSCH_SECURITY_STRICT_KEYID_BYTYPE   0
+//<  allow use any key_id for secured frames, regards frame-type
+#define TSCH_SECURITY_RELAX_KEYID           2
+/* Security level for Other (Data, Cmd) */
+#ifdef TSCH_SECURITY_CONF_STRICT
+#define TSCH_SECURITY_STRICT TSCH_SECURITY_CONF_STRICT
+#else
+#define TSCH_SECURITY_STRICT TSCH_SECURITY_STRICT_PAN_SECURED
+#endif
+
+// uint8_t* TSCH_SEC_KEY(uint8_t key_index, const linkaddr_t *addr)
+//#define TSCH_SEC_KEY(key_index, addr)
+
+/************ Types ***********/
 
 /* AES-128 key */
 typedef uint8_t aes_key[16];
@@ -121,14 +143,29 @@ typedef uint8_t aes_key[16];
  * \return The length of MIC (>= 0)
  */
 unsigned int tsch_security_mic_len(const frame802154_t *frame);
+unsigned int tsch_seclevel_mic_len(unsigned level);
 
 /**
  * \brief Protect a frame with encryption and/or MIC
  * \return The length of a generated MIC (>= 0)
  */
-unsigned int tsch_security_secure_frame(uint8_t *hdr, uint8_t *outbuf,
+enum {
+      tschERR           = -1
+    //< no sequred
+    , tschERR_UNSECURED = -1
+    //< no required key found
+    , tschERR_NOKEY     = -2
+    //< no required key found
+    , tschERR_BADARG    = -3
+};
+int tsch_security_secure_frame(uint8_t *hdr, uint8_t *outbuf,
                                         int hdrlen, int datalen,
-                                        struct tsch_asn_t *asn);
+            const linkaddr_t *receiver, struct tsch_asn_t *asn);
+
+int tsch_security_secure_packet(uint8_t *hdr, uint8_t *outbuf,
+                                        int hdrlen, int datalen
+                                        , uint8_t keyid, int8_t sec_level
+            , const linkaddr_t *receiver, struct tsch_asn_t *asn);
 
 /**
  * \brief Parse and check a frame protected with encryption and/or MIC

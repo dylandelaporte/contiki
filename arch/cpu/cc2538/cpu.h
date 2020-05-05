@@ -59,3 +59,14 @@
  * @}
  * @}
  */
+/** \brief Disables all CPU interrupts. */
+#define INTERRUPTS_DISABLE() __disable_irq()
+
+#endif /* CPU_H_ */
+
+/**
+ * @}
+ * @}
+ * @}
+ * @}
+ */

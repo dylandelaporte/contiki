@@ -5,7 +5,7 @@
  *      Author: alexrayne
  */
 
-#include "platform-native.h"
+#include "platform.h"
 #include "dev/serial-fd.h"
 #include "services/rpl-border-router/native/slip-config.h"
 
