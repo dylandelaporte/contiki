@@ -352,7 +352,7 @@ tsch_schedule_slot_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
     if(tsch_schedule_slot_operation(tm, ref_time, offset, str)) { \
       PT_YIELD(pt); \
     } \
-    BUSYWAIT_UNTIL_ABS(0, ref_time, offset); \
+    RTIMER_BUSYWAIT_UNTIL_ABS(0, ref_time, offset); \
   } while(0);
 /*---------------------------------------------------------------------------*/
 /* Get EB, broadcast or unicast packet to be sent, and target neighbor. */
@@ -713,7 +713,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
         TSCH_DEBUG_TX_EVENT();
         tsch_radio_on(TSCH_RADIO_CMD_ON_WITHIN_TIMESLOT);
         /* CCA */
-        BUSYWAIT_UNTIL_ABS(!(cca_status &= NETSTACK_RADIO.channel_clear()),
+        RTIMER_BUSYWAIT_UNTIL_ABS(!(cca_status &= NETSTACK_RADIO.channel_clear()),
                            current_slot_start, tsch_timing[tsch_ts_cca_offset] + tsch_timing[tsch_ts_cca]);
         TSCH_DEBUG_TX_EVENT();
         /* there is not enough time to turn radio off */
@@ -769,7 +769,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               ack_start_time = tx_start_time + tx_duration;
 #endif
               /* Unicast: wait for ack after tx: sleep until ack time */
-              BUSYWAIT_UNTIL_ABS(0, ack_start_time
+              RTIMER_BUSYWAIT_UNTIL_ABS(0, ack_start_time
                   , tsch_timing[tsch_ts_rx_ack_delay] - RADIO_DELAY_BEFORE_RX
                   ); //"TxBeforeAck"
               TSCH_DEBUG_TX_EVENT();
@@ -797,7 +797,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 
 #endif
               /* Wait for ACK to finish */
-              BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet()
+              RTIMER_BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet()
 #if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
                                   || NETSTACK_RADIO.pending_packet()
 #endif
@@ -1026,7 +1026,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
     //need to take accurate packet rx time
     while(!packet_seen) {
       /* Check if receiving within guard time */
-      BUSYWAIT_UNTIL_ABS((packet_seen = NETSTACK_RADIO.receiving_packet()),
+      RTIMER_BUSYWAIT_UNTIL_ABS((packet_seen = NETSTACK_RADIO.receiving_packet()),
           current_slot_start, pend_limit + RADIO_DELAY_BEFORE_DETECT);
       if (!packet_seen)
           break;
@@ -1034,7 +1034,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       TSCH_DEBUG_RX_EVENT();
       // sure that packet receives till rx wait time. this should help filter out
       // false receiving detection before packet actualy starts receive
-      BUSYWAIT_UNTIL_ABS(!(packet_seen = NETSTACK_RADIO.receiving_packet()),
+      RTIMER_BUSYWAIT_UNTIL_ABS(!(packet_seen = NETSTACK_RADIO.receiving_packet()),
           current_slot_start, pend_limit);
     }
 #endif
@@ -1045,7 +1045,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       TSCH_DEBUG_RX_EVENT();
 
       /* Wait until packet is received, turn radio off */
-        BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet()
+      RTIMER_BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet()
 #if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
                               || (NETSTACK_RADIO.pending_packet() > 0)
 #endif
@@ -1215,7 +1215,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
                 rx_end_time = rx_start_time + packet_duration;
 #endif
                 /* Wait for time to ACK and transmit ACK */
-                BUSYWAIT_UNTIL_ABS(0, rx_end_time
+                RTIMER_BUSYWAIT_UNTIL_ABS(0, rx_end_time
                          , tsch_timing[tsch_ts_tx_ack_delay] - RADIO_DELAY_BEFORE_TX
                          ); //"RxBeforeAck"
                 TSCH_DEBUG_RX_EVENT();
