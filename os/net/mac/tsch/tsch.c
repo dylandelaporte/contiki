@@ -631,6 +631,8 @@ void tsch_poll(void){
 
 void tsch_activate(bool onoff){
     if (onoff){
+        if (tsch_status < tschACTIVE)
+            tsch_poll();
         tsch_status = tschACTIVE;
         process_post_synch(&tsch_process, PROCESS_EVENT_INIT, NULL);
         //process_post_synch(&tsch_pending_events_process, PROCESS_EVENT_INIT, NULL);
@@ -638,10 +640,11 @@ void tsch_activate(bool onoff){
     }
     else {
         tsch_disassociate();
-        if (tsch_status >tschDISABLED)
+        if (tsch_status >tschDISABLED) {
+            tsch_status = tschDISABLED;
             tsch_poll();
-        tsch_status = tschDISABLED;
-}
+        }
+    }
 }
 
 /* Leave the TSCH network */
