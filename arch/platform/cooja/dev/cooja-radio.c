@@ -185,6 +185,7 @@ radio_read(void *buf, unsigned short bufsize)
     return 0;
   }
 
+  if (buf != NULL)
   memcpy(buf, simInDataBuffer, simInSize);
   simInSize = 0;
   if(!poll_mode) {
