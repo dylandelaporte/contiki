@@ -87,8 +87,8 @@
 #define TSCH_HOPPING_SEQUENCE_1_1 (uint8_t[]){ 20 }
 
 /* Max TSCH packet length equal to the length of the packet buffer */
-//#define TSCH_PACKET_MAX_LEN PACKETBUF_SIZE
-#define TSCH_PACKET_MAX_LEN MIN(127,PACKETBUF_SIZE)
+#define TSCH_PACKET_MAX_LEN PACKETBUF_SIZE
+//#define TSCH_PACKET_MAX_LEN MIN(127,PACKETBUF_SIZE)
 
 /* The jitter to remove in ticks.
  * This should be the sum of measurement errors on Tx and Rx nodes.

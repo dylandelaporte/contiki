@@ -283,7 +283,7 @@
 /* SICSLOWPAN_CONF_COMPRESSION specifies what 6lowpan compression
    mechanism to be used. 6lowpan hc06 is the default in Contiki. */
 #ifndef SICSLOWPAN_CONF_COMPRESSION
-#define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_IPV6
+#define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_IPHC
 #endif /* SICSLOWPAN_CONF_COMPRESSION */
 
 /*---------------------------------------------------------------------------*/
