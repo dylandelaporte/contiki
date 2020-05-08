@@ -796,7 +796,9 @@ PROCESS_THREAD(tsch_process, ev, data)
     if (!tsch_is_active())
         continue;
 
-    if(tsch_is_associated || !TSCH_ASSOCIATION_SINGLE) {
+    if(tsch_is_associated) {
+
+    PRINTF("tsch_process: start associated%d\n", tsch_is_associated);
 
     /* We are part of a TSCH network, start slot operation */
     tsch_slot_operation_start();
@@ -806,7 +808,7 @@ PROCESS_THREAD(tsch_process, ev, data)
     PROCESS_WAIT_UNTIL(!tsch_is_associated);
 
     }//if(tsch_is_associated)
-    else {
+    else if (TSCH_ASSOCIATION_SINGLE) {
         PRINTF("TSCH:failed to associate, shut down net\n");
         turn_off(true);
     }
