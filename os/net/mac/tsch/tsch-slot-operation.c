@@ -1327,6 +1327,14 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
   PT_END(pt);
 }
 /*---------------------------------------------------------------------------*/
+//#include "project-trace.h"
+#ifndef trace_droplink_off
+#define trace_droplink_on()
+#define trace_droplink_off()
+#endif
+
+
+
 #ifndef TSCH_DESYNC_THRESHOLD_SLOTS
 #define TSCH_DESYNC_THRESHOLD_SLOTS() (100 * TSCH_CLOCK_TO_SLOTS(TSCH_DESYNC_THRESHOLD / 100, tsch_timing[tsch_ts_timeslot_length]))
 #endif

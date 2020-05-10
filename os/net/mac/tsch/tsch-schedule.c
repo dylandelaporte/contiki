@@ -430,7 +430,11 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
 
 
 
-#include "project-trace.h"
+//#include "project-trace.h"
+#ifndef trace_droplink_off
+#define trace_droplink_on()
+#define trace_droplink_off()
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
