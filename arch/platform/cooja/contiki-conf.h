@@ -115,6 +115,11 @@ typedef unsigned short uip_stats_t;
 #define CLOCK_CONF_SECOND 1000L
 typedef unsigned long clock_time_t;
 
+// COOGA have not problems with RTimer latency, therefore it no need guard rTimer ISR
+#ifndef RTIMER_CONF_GUARD_TIME
+#define RTIMER_CONF_GUARD_TIME 0
+#endif
+
 /* Use 64-bit rtimer (default in Contiki-NG is 32) */
 #define RTIMER_CONF_CLOCK_SIZE 8
 
