@@ -123,23 +123,16 @@ typedef unsigned long clock_time_t;
 /* Use 64-bit rtimer (default in Contiki-NG is 32) */
 #define RTIMER_CONF_CLOCK_SIZE 8
 
-//  RTIMER_CONF_ARCH_SECOND definition requests cooja to simulate polling
-//      with demanded rtimer step.
-//   This helps achieve RTIMER_BUSYWAIT_UNTIL_ABS accuracy and behaviour close
-//      to real platforms. This demanded for well TSCH simulation
-#ifndef RTIMER_CONF_ARCH_SECOND
+/*  RTIMER_CONF_ARCH_SECOND definition requests cooja to simulate polling
+ *      with demanded rtimer step.
+ *  This helps achieve RTIMER_BUSYWAIT_UNTIL_ABS accuracy and behaviour close
+ *      to real platforms. This demanded for precise TSCH simulation
+ * WARN: change default behaviour of COOJA sim was not apropriated, so you should
+ *      provide RTIMER_CONF_ARCH_SECOND explicitly, if need simulate this BUSYWAIT precise
+ */
+//#define RTIMER_CONF_ARCH_SECOND                     10000
 
-#if defined(MAC_CONF_WITH_TSCH)
-#define RTIMER_CONF_ARCH_SECOND                     10000
-#elif defined(NETSTACK_MAC)
 
-#   if (NETSTACK_MAC == tschmac_driver)
-#define RTIMER_CONF_ARCH_SECOND                     10000
-#   endif
-
-#endif
-
-#endif //RTIMER_CONF_ARCH_SECOND
 
 #ifndef RADIO_CONF_HDR_PATH
 #include "dev/cooja-radio-def.h"
