@@ -912,6 +912,9 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
       }
     }
 
+#if BUILD_WITH_MSF
+    current_packet->last_tx_timeslot = current_link->timeslot;
+#endif /* BUILD_WITH_MSF */
     current_packet->transmissions++;
     current_packet->ret = mac_tx_status;
 
