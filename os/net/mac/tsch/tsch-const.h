@@ -54,11 +54,13 @@
 #define LINK_OPTION_RX              2
 #define LINK_OPTION_SHARED          4
 #define LINK_OPTION_TIME_KEEPING    8
+#define LINK_OPTION_LINK_TO_DELETE 64
+#define LINK_OPTION_RESERVED_LINK 128
 //< scheduler skip this slot
-#define LINK_OPTION_DISABLE         0x10
+#define LINK_OPTION_DISABLE         0x100
 //< scheduler, when TXslot have no any data to send, turn on option flag LINK_OPTION_DISABLE
 //  this intends to help reduce slot activity when no data sends
-#define LINK_OPTION_IDLED_AUTOOFF   0x20
+#define LINK_OPTION_IDLED_AUTOOFF   0x200
 //< this feature escapes to activate timesource EB slot to latest possible time, enough
 //      to keep net in timesync
 //  scheduler plan slot with this flag in future to:
@@ -67,20 +69,20 @@
 //      TSCH_DESYNC_THRESHOLD_SLOTS - timeout for timesource EB
 //      Tryes - expected amount of packets loose \sa TSCH_CONF_TIMESYNC_EB_LOOSES
 //  this flag works when active TSCH_SCHEDULE_OMMIT_NOXFER
-#define LINK_OPTION_TIME_EB_ESCAPE  0x40
+#define LINK_OPTION_TIME_EB_ESCAPE  0x400
 //< scheduler forced to stops on this slot. this is like phantom LINK_OPTION_TX
 //      but actualy not affects transmit.
 //      it helpful for TSCH_SCHEDULE_OMMIT_NOXFER policy style, to stop and replan
 //      at desired slot, even if nothing transfers
-#define LINK_OPTION_PLANPOINT       0x80
+#define LINK_OPTION_PLANPOINT       0x800
 
 //> signals TSCH_CALLBACK_LINK_SIGNAL on slot time
 //   this signal is not overlaps by more prioritysed links
-#define LINK_OPTION_SIGNAL           0x100
+#define LINK_OPTION_SIGNAL           0x1000
 //> same as _SIGNAL, but automatic clears after signaling
 //  but this option clears only on active link
 //  this use by scheduler as temporary flag, for selected active link
-#define LINK_OPTION_SIGNAL_ONCE      0x200
+#define LINK_OPTION_SIGNAL_ONCE      0x2000
 
 //> log when link is droped by more best
 #define LINK_OPTION_TRACE_DROP       0x1000

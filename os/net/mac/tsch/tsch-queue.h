@@ -51,17 +51,6 @@
 
 /*********** Callbacks *********/
 
-/* Called by TSCH when switching time source */
-#ifdef TSCH_CALLBACK_NEW_TIME_SOURCE
-struct tsch_neighbor;
-void TSCH_CALLBACK_NEW_TIME_SOURCE(const struct tsch_neighbor *old, const struct tsch_neighbor *new);
-#endif
-
-/* Called by TSCH every time a packet is ready to be added to the send queue */
-#ifdef TSCH_CALLBACK_PACKET_READY
-void TSCH_CALLBACK_PACKET_READY(void);
-#endif
-
 /***** External Variables *****/
 
 /* Broadcast and EB virtual neighbors */

@@ -187,6 +187,9 @@ print_link_options(uint16_t link_options)
   if(link_options & LINK_OPTION_SHARED) {
     strcat(buffer, "Sh|");
   }
+  if(link_options & LINK_OPTION_RESERVED_LINK) {
+    strcat(buffer, "(Rsvd)");
+  }
   length = strlen(buffer);
   if(length > 0) {
     buffer[length - 1] = '\0';
@@ -263,7 +266,7 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
         tsch_release_lock();
         tsch_schedule_link_addr_aqure(l);
 
-        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %u/%u [%u+%u] %x\n",
+        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %u:%u [%u+%u] %x\n",
                slotframe->handle, link_options, link_type
                , timeslot, channel_offset
                , TSCH_LOG_ID_FROM_LINKADDR(address));
@@ -326,7 +329,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
       if(l == current_link) {
         current_link = NULL;
       }
-      TSCH_PRINTF8("TSCH-schedule: remove_link %u %u %u %u %x\n",
+      TSCH_PRINTF8("TSCH-schedule: remove_link sf%u $%x %u+%u %x\n",
              slotframe->handle, l->link_options, l->timeslot, l->channel_offset,
              TSCH_LOG_ID_FROM_LINKADDR(&l->addr));
 
@@ -349,6 +352,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
 /*---------------------------------------------------------------------------*/
 void tsch_schedule_link_addr_aqure(struct tsch_link *l){
     struct tsch_neighbor *n;
+    if((l->link_options & LINK_OPTION_RESERVED_LINK) == 0)
     if(l->link_options & LINK_OPTION_TX) {
       n = tsch_queue_add_nbr(&l->addr);
       /* We have a tx link to this neighbor, update counters */
@@ -363,6 +367,7 @@ void tsch_schedule_link_addr_aqure(struct tsch_link *l){
 
 void tsch_schedule_link_addr_release(uint8_t link_options, const linkaddr_t* addr){
     /* This was a tx link to this neighbor, update counters */
+    if((link_options & LINK_OPTION_LINK_TO_DELETE) == 0)
     if(link_options & LINK_OPTION_TX) {
       struct tsch_neighbor *n = tsch_queue_add_nbr(addr);
       if(n != NULL) {
@@ -474,6 +479,10 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
           // plan point is not avoidable
           if ((l->link_options & (LINK_OPTION_DISABLE)) != 0)
               continue;
+          if(l->link_options & LINK_OPTION_RESERVED_LINK) {
+            /* this link is not effective; skip it */
+            continue;
+          }
           if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER){
           if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX|LINK_OPTION_PLANPOINT)) == 0)
               // when link ton transfers, skip it
