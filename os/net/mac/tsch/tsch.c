@@ -284,10 +284,11 @@ static int
 resynchronize(const linkaddr_t *original_time_source_addr)
 {
   const struct tsch_neighbor *current_time_source = tsch_queue_get_time_source();
-  if(current_time_source && !linkaddr_cmp(&current_time_source->addr, original_time_source_addr)) {
+  const linkaddr_t *ts_addr = tsch_queue_get_nbr_address(current_time_source);
+  if(ts_addr != NULL && !linkaddr_cmp(ts_addr, original_time_source_addr)) {
     /* Time source has already been changed (e.g. by RPL). Let's see if it works. */
     LOG_INFO("time source has been changed to ");
-    LOG_INFO_LLADDR(&current_time_source->addr);
+    LOG_INFO_LLADDR(ts_addr);
     LOG_INFO_("\n");
     return 0;
   }
@@ -347,12 +348,13 @@ keepalive_send(void *ptr)
   if(tsch_is_associated) {
     struct tsch_neighbor *n = tsch_queue_get_time_source();
     if(n != NULL) {
+        linkaddr_t *destination = tsch_queue_get_nbr_address(n);
         /* Simply send an empty packet */
         packetbuf_clear();
-        packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &n->addr);
+        packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, destination);
         NETSTACK_MAC.send(keepalive_packet_sent, NULL);
         TSCH_LOGF("TSCH: sending KA to %u\n",
-           TSCH_LOG_ID_FROM_LINKADDR(&n->addr));
+           TSCH_LOG_ID_FROM_LINKADDR(destination));
     } else {
         LOG_ERR("no timesource - KA not sent\n");
     }
@@ -433,7 +435,8 @@ eb_input(struct input_packet *current_input)
     /* Got an EB from a different neighbor than our time source, keep enough data
      * to switch to it in case we lose the link to our time source */
     struct tsch_neighbor *ts = tsch_queue_get_time_source();
-    if(ts == NULL || !linkaddr_cmp(&last_eb_nbr_addr, &ts->addr)) {
+    linkaddr_t *ts_addr = tsch_queue_get_nbr_address(ts);
+    if(ts_addr == NULL || !linkaddr_cmp(&last_eb_nbr_addr, ts_addr)) {
       linkaddr_copy(&last_eb_nbr_addr, (linkaddr_t *)&frame.src_addr);
       last_eb_nbr_jp = eb_ies.ie_join_priority;
     }
@@ -472,7 +475,7 @@ eb_input(struct input_packet *current_input)
 #endif /* TSCH_AUTOSELECT_TIME_SOURCE */
 
     /* Did the EB come from our time source? */
-    if(ts != NULL && linkaddr_cmp((linkaddr_t *)&frame.src_addr, &ts->addr)) {
+    if(ts_addr != NULL && linkaddr_cmp((linkaddr_t *)&frame.src_addr, ts_addr)) {
       /* Check for ASN drift */
       int32_t asn_diff = TSCH_ASN_DIFF(current_input->rx_asn, eb_ies.ie_asn);
       if(asn_diff != 0) {
@@ -798,7 +801,7 @@ tsch_associate(const struct input_packet *input_eb, rtimer_clock_t timestamp)
             ies.ie_tsch_slotframe_and_link.links[i].link_options,
             LINK_TYPE_ADVERTISING, &tsch_broadcast_address,
             ies.ie_tsch_slotframe_and_link.links[i].timeslot,
-            ies.ie_tsch_slotframe_and_link.links[i].channel_offset, 0);
+            ies.ie_tsch_slotframe_and_link.links[i].channel_offset, 1);
       }
     } else {
       LOG_ERR("! parse_eb: too many links in schedule (%u)\n", num_links);
@@ -1096,7 +1099,7 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
       && !NETSTACK_ROUTING.is_in_leaf_mode()
         ) {
       /* Enqueue EB only if there isn't already one in queue */
-      if(tsch_queue_packet_count(&tsch_eb_address) == 0) {
+      if(tsch_queue_nbr_packet_count(n_eb) == 0) {
         int eb_len;
         uint8_t hdr_len = 0;
         uint8_t tsch_sync_ie_offset;
@@ -1285,7 +1288,6 @@ static void
 send_packet(mac_callback_t sent, void *ptr)
 {
   int ret = MAC_TX_DEFERRED;
-  int packet_count_before;
   int hdr_len = 0;
   const linkaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
   uint8_t max_transmissions = 0;
@@ -1327,8 +1329,6 @@ send_packet(mac_callback_t sent, void *ptr)
   tsch_security_set_packetbuf_attr(FRAME802154_DATAFRAME);
 #endif /* LLSEC802154_ENABLED */
 
-  packet_count_before = tsch_queue_packet_count(addr);
-
 #if !NETSTACK_CONF_BRIDGE_MODE
   /*
    * In the Contiki stack, the source address of a frame is set at the RDC
@@ -1360,20 +1360,16 @@ send_packet(mac_callback_t sent, void *ptr)
     /* Enqueue packet */
     p = tsch_queue_add_packet(nbr_addr, max_transmissions, sent, ptr);
     if(p == NULL) {
-        TSCH_PRINTF("TSCH:! can't send packet to %x with seqno %u, queue %u %u\n",
+        TSCH_PRINTF("TSCH:! can't send packet to %x with seqno %u, queue[%u]\n",
           TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
-          packet_count_before,
-          tsch_queue_packet_count(nbr_addr));
+          tsch_queue_packet_count(nbr_addr) );
       ret = MAC_TX_ERR;
     } else {
       p->header_len = hdr_len;
-      TSCH_PRINTF8("TSCH: send packet to %x with seqno %u, queue %u %u, len %u %u\n",
+      TSCH_PRINTF8("TSCH: send packet to %x with seqno %u, queue[%u/%u], len %u %u\n",
              TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
-             packet_count_before,
-             tsch_queue_packet_count(nbr_addr),
-             p->header_len,
-             queuebuf_datalen(p->qb));
-      (void)packet_count_before; /* Discard "variable set but unused" warning in case of TSCH_LOG_LEVEL of 0 */
+             tsch_queue_packet_count(nbr_addr), tsch_queue_global_packet_count(),
+             p->header_len, queuebuf_datalen(p->qb));
     }
   }
   if(ret != MAC_TX_DEFERRED) {

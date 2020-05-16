@@ -49,6 +49,7 @@ frequency hopping for enhanced reliability.
 #include <stdbool.h>
 #include "contiki.h"
 #include "net/mac/mac.h"
+#include "net/linkaddr.h"
 
 #include "net/mac/tsch/tsch-conf.h"
 #include "net/mac/tsch/tsch-const.h"

@@ -58,7 +58,11 @@
 #include "net/mac/tsch/tsch-slot-operation.h"
 #include <stdlib.h>
 
+/* Log configuration */
 #include "sys/log.h"
+#define LOG_MODULE "TSCH Slop"
+#define LOG_LEVEL LOG_LEVEL_MAC
+
 /* TSCH debug macros, i.e. to set LEDs or GPIOs on various TSCH
  * timeslot events */
 #ifndef TSCH_DEBUG_INIT
@@ -276,19 +280,20 @@ tsch_get_channel_offset(struct tsch_link *link, struct tsch_packet *p)
   return link->channel_offset;
 }
 
-/* Return channel from ASN and channel offset */
+/**
+ * Returns a 802.15.4 channel from an ASN and channel offset. Basically adds
+ * The offset to the ASN and performs a hopping sequence lookup.
+ *
+ * \param asn A given ASN
+ * \param channel_offset Given channel offset
+ * \return The resulting channel
+ */
 uint8_t
-tsch_calculate_channel(struct tsch_asn_t *asn, tsch_ch_offset_t channel_offset)
+tsch_calculate_channel(struct tsch_asn_t *asn, uint16_t channel_offset)
 {
-    if (tsch_hopping_sequence_length.val <= 1){
-        return tsch_hopping_sequence[0];
-    }
-  uint_fast8_t index_of_0 = TSCH_ASN_MOD(*asn, tsch_hopping_sequence_length);
-  int_fast8_t index_of_offset = (index_of_0 + channel_offset);
-  if (index_of_offset > tsch_hopping_sequence_length.val)
-      index_of_offset -= tsch_hopping_sequence_length.val;
-  else if (index_of_offset < 0)
-      index_of_offset += tsch_hopping_sequence_length.val;
+  uint16_t index_of_0, index_of_offset;
+  index_of_0 = TSCH_ASN_MOD(*asn, tsch_hopping_sequence_length);
+  index_of_offset = (index_of_0 + channel_offset) % tsch_hopping_sequence_length.val;
   return tsch_hopping_sequence[index_of_offset];
 }
 
@@ -669,7 +674,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
       burst_link_requested = 0;
       if(do_wait_for_ack
              && tsch_current_burst_count + 1 < TSCH_BURST_MAX_LEN
-             && tsch_queue_packet_count(&current_neighbor->addr) > 1) {
+             && tsch_queue_nbr_packet_count(current_neighbor) > 1) {
         burst_link_requested = 1;
         tsch_packet_set_frame_pending(packet, packet_len);
       }

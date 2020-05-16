@@ -36,6 +36,7 @@
  * \author
  *         Simon Duquennoy <simonduq@sics.se>
  *         Beshr Al Nahas <beshr@sics.se>
+ *         Atis Elsts <atis.elsts@edi.lv>
  */
 
 /**
@@ -381,8 +382,23 @@ int
 tsch_schedule_remove_link_by_timeslot(struct tsch_slotframe *slotframe,
                                     tsch_slot_offset_t timeslot, uint16_t channel_offset)
 {
-  return tsch_schedule_remove_link(slotframe,
-                                   tsch_schedule_get_link_by_timeslot(slotframe, timeslot, channel_offset));
+  int ret = 0;
+  if(!tsch_is_locked()) {
+    if(slotframe != NULL) {
+      struct tsch_link *l = list_head(slotframe->links_list);
+      /* Loop over all items and remove all matching links */
+      while(l != NULL) {
+        struct tsch_link *next = list_item_next(l);
+        if(l->timeslot == timeslot && l->channel_offset == channel_offset) {
+          if(tsch_schedule_remove_link(slotframe, l)) {
+            ret = 1;
+          }
+        }
+        l = next;
+      }
+    }
+  }
+  return ret;
 }
 /*---------------------------------------------------------------------------*/
 /* Looks within a slotframe for a link with a given timeslot */
@@ -393,7 +409,7 @@ tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe,
   if(!tsch_is_locked()) {
     if(slotframe != NULL) {
       struct tsch_link *l = list_head(slotframe->links_list);
-      /* Loop over all items. Assume there is max one link per timeslot */
+      /* Loop over all items. Assume there is max one link per timeslot and channel_offset */
       while(l != NULL) {
         if(l->timeslot == timeslot && l->channel_offset == channel_offset) {
           return l;

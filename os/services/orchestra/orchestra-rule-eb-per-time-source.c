@@ -86,8 +86,8 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
 static void
 new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new)
 {
-  uint16_t old_ts = old != NULL ? get_node_timeslot(&old->addr) : 0xffff;
-  uint16_t new_ts = new != NULL ? get_node_timeslot(&new->addr) : 0xffff;
+  uint16_t old_ts = old != NULL ? get_node_timeslot(tsch_queue_get_nbr_address(old)) : 0xffff;
+  uint16_t new_ts = new != NULL ? get_node_timeslot(tsch_queue_get_nbr_address(new)) : 0xffff;
 
   LOG_INFO("change TS to ");
   LOG_INFO_LLADDR(&new->addr);

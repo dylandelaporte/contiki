@@ -101,7 +101,7 @@ int tsch_log_process_pending(void)
       LOG_PRINTF("TSCH: {asn-%x.%lx link-%u:%u*%u[%u+%u] ch%u} ",
              log->asn.ms1b, (unsigned long)log->asn.ls4b,
              log->link->slotframe_handle, sf ? sf->size.val : 0, 
-             log->burst_count, log->link->timeslot, log->link->channel_offset,
+             log->burst_count, log->link->timeslot, log->channel_offset,
              log->channel);
     }
     switch(log->type) {

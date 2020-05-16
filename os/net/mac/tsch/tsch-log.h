@@ -94,6 +94,13 @@
 
 #if TSCH_LOG_LEVEL < 2 /* For log level 0 or 1, the logging functions do nothing */
 
+#define TSCH_IS_LOG  0
+#if ((DEBUG) & DEBUG_PRINT)
+#define TSCH_IS_PRINT 1
+#else
+#define TSCH_IS_PRINT 0
+#endif
+
 #define tsch_log_init()
 #define tsch_log_process_pending()  0
 #define TSCH_LOG_ADD(log_type, init_code)
@@ -110,6 +117,9 @@
 #define TSCH_ANNOTATE(... )  ANNOTATE(__VA_ARGS__)
 
 #else /* TSCH_LOG_LEVEL */
+
+#define TSCH_IS_LOG         1
+#define TSCH_IS_PRINT       1
 
 /************ Types ***********/
 
