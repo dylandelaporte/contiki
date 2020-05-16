@@ -116,6 +116,7 @@ tsch_queue_get_nbr(const linkaddr_t *addr)
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
+/* Get a TSCH time source (we currently assume there is only one) */
 struct tsch_neighbor *n_time_source = NULL;
 /*---------------------------------------------------------------------------*/
 linkaddr_t *
