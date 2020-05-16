@@ -39,8 +39,11 @@
  */
 
 #include "contiki-net.h"
-#include "net/ip/uip-split.h"
 #include "net/ip/uip-packetqueue.h"
+
+#if UIP_CONF_TCP_SPLIT
+#include "net/ip/uip-split.h"
+#endif
 
 #if NETSTACK_CONF_WITH_IPV6
 #include "net/ipv6/uip-nd6.h"
