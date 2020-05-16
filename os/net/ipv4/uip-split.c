@@ -41,8 +41,6 @@
 
 #include "net/ip/tcpip.h"
 
-#define BUF ((struct uip_tcpip_hdr *)&uip_buf[UIP_LLH_LEN])
-
 #ifdef UIP_SPLIT_CONF_SIZE
 #define UIP_SPLIT_SIZE UIP_SPLIT_CONF_SIZE
 #else /* UIP_SPLIT_CONF_SIZE */
@@ -59,10 +57,10 @@ uip_split_output(void)
   /* We only split TCP segments that are larger than or equal to
      UIP_SPLIT_SIZE, which is configurable through
      UIP_SPLIT_CONF_SIZE. */
-  if(BUF->proto == UIP_PROTO_TCP &&
-     uip_len >= UIP_SPLIT_SIZE + UIP_TCPIP_HLEN) {
+  if(UIP_IP_BUF->proto == UIP_PROTO_TCP &&
+     uip_len >= UIP_SPLIT_SIZE + UIP_IPTCPH_LEN) {
 
-    tcplen = uip_len - UIP_TCPIP_HLEN;
+    tcplen = uip_len - UIP_IPTCPH_LEN;
     /* Split the segment in two. If the original packet length was
        odd, we make the second packet one byte larger. */
     len1 = len2 = tcplen / 2;
@@ -72,25 +70,25 @@ uip_split_output(void)
 
     /* Create the first packet. This is done by altering the length
        field of the IP header and updating the checksums. */
-    uip_len = len1 + UIP_TCPIP_HLEN;
+    uip_len = len1 + UIP_IPTCPH_LEN;
 #if NETSTACK_CONF_WITH_IPV6
     /* For IPv6, the IP length field does not include the IPv6 IP header
        length. */
-    BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
-    BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
+    UIP_IP_BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
+    UIP_IP_BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
 #else /* NETSTACK_CONF_WITH_IPV6 */
-    BUF->len[0] = uip_len >> 8;
-    BUF->len[1] = uip_len & 0xff;
+    UIP_IP_BUF->len[0] = uip_len >> 8;
+    UIP_IP_BUF->len[1] = uip_len & 0xff;
 #endif /* NETSTACK_CONF_WITH_IPV6 */
     
     /* Recalculate the TCP checksum. */
-    BUF->tcpchksum = 0;
-    BUF->tcpchksum = ~(uip_tcpchksum());
+    UIP_TCP_BUF->tcpchksum = 0;
+    UIP_TCP_BUF->tcpchksum = ~(uip_tcpchksum());
 
 #if !NETSTACK_CONF_WITH_IPV6
     /* Recalculate the IP checksum. */
-    BUF->ipchksum = 0;
-    BUF->ipchksum = ~(uip_ipchksum());
+    UIP_IP_BUF->ipchksum = 0;
+    UIP_IP_BUF->ipchksum = ~(uip_ipchksum());
 #endif /* NETSTACK_CONF_WITH_IPV6 */
     
     /* Transmit the first packet. */
@@ -106,34 +104,34 @@ uip_split_output(void)
        sequence number and point the uip_appdata to a new place in
        memory. This place is detemined by the length of the first
        packet (len1). */
-    uip_len = len2 + UIP_TCPIP_HLEN;
+    uip_len = len2 + UIP_IPTCPH_LEN;
 #if NETSTACK_CONF_WITH_IPV6
     /* For IPv6, the IP length field does not include the IPv6 IP header
        length. */
-    BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
-    BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
+    UIP_IP_BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
+    UIP_IP_BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
 #else /* NETSTACK_CONF_WITH_IPV6 */
-    BUF->len[0] = uip_len >> 8;
-    BUF->len[1] = uip_len & 0xff;
+    UIP_IP_BUF->len[0] = uip_len >> 8;
+    UIP_IP_BUF->len[1] = uip_len & 0xff;
 #endif /* NETSTACK_CONF_WITH_IPV6 */
     
     /*    uip_appdata += len1;*/
     memcpy(uip_appdata, (uint8_t *)uip_appdata + len1, len2);
 
-    uip_add32(BUF->seqno, len1);
-    BUF->seqno[0] = uip_acc32[0];
-    BUF->seqno[1] = uip_acc32[1];
-    BUF->seqno[2] = uip_acc32[2];
-    BUF->seqno[3] = uip_acc32[3];
+    uip_add32(UIP_TCP_BUF->seqno, len1);
+    UIP_TCP_BUF->seqno[0] = uip_acc32[0];
+    UIP_TCP_BUF->seqno[1] = uip_acc32[1];
+    UIP_TCP_BUF->seqno[2] = uip_acc32[2];
+    UIP_TCP_BUF->seqno[3] = uip_acc32[3];
     
     /* Recalculate the TCP checksum. */
-    BUF->tcpchksum = 0;
-    BUF->tcpchksum = ~(uip_tcpchksum());
+    UIP_TCP_BUF->tcpchksum = 0;
+    UIP_TCP_BUF->tcpchksum = ~(uip_tcpchksum());
 
 #if !NETSTACK_CONF_WITH_IPV6
     /* Recalculate the IP checksum. */
-    BUF->ipchksum = 0;
-    BUF->ipchksum = ~(uip_ipchksum());
+    UIP_IP_BUF->ipchksum = 0;
+    UIP_IP_BUF->ipchksum = ~(uip_ipchksum());
 #endif /* NETSTACK_CONF_WITH_IPV6 */
 
     /* Transmit the second packet. */
