@@ -231,6 +231,10 @@ static void
 tsch_reset(void)
 {
   ANNOTATE("TSCH:reset");
+  tsch_is_associated = 0;
+#ifdef TSCH_CALLBACK_LEAVING_NETWORK
+  TSCH_CALLBACK_LEAVING_NETWORK();
+#endif
   int i;
   tsch_slot_operation_stop();
   frame802154_set_pan_id(0xffff);
@@ -251,9 +255,6 @@ tsch_reset(void)
     tsch_timing_us[i] = tsch_default_timing_us[i];
     tsch_timing[i] = us_to_rtimerticks(tsch_default_timing_us[i]);
   }
-#ifdef TSCH_CALLBACK_LEAVING_NETWORK
-  TSCH_CALLBACK_LEAVING_NETWORK();
-#endif
   linkaddr_copy(&last_eb_nbr_addr, &linkaddr_null);
 #if TSCH_AUTOSELECT_TIME_SOURCE
   struct nbr_sync_stat *stat;
@@ -618,6 +619,10 @@ tsch_start_coordinator(void)
 
   LOG_INFO("starting as coordinator, PAN ID %x, asn-%x.%lx\n",
       frame802154_get_pan_id(), tsch_current_asn.ms1b, (long)tsch_current_asn.ls4b);
+
+#ifdef TSCH_CALLBACK_JOINING_NETWORK
+      TSCH_CALLBACK_JOINING_NETWORK();
+#endif
 
 #ifdef TSCH_CALLBACK_JOINING_NETWORK
       TSCH_CALLBACK_JOINING_NETWORK();
