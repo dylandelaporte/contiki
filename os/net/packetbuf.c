@@ -186,8 +186,7 @@ packetbuf_attr_clear(void)
     linkaddr_copy(&packetbuf_addrs[i].addr, &linkaddr_null);
   }
 #if TSCH_WITH_LINK_SELECTOR
-  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME, (packetbuf_attr_t)~0);
-  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT, (packetbuf_attr_t)~0);
+  packetbuf_linksel_clear();
 #endif
 }
 /*---------------------------------------------------------------------------*/
@@ -241,5 +240,29 @@ packetbuf_holds_broadcast(void)
   return linkaddr_cmp(&packetbuf_addrs[PACKETBUF_ADDR_RECEIVER - PACKETBUF_ADDR_FIRST].addr, &linkaddr_null);
 }
 /*---------------------------------------------------------------------------*/
+#if TSCH_WITH_LINK_SELECTOR
+void packetbuf_set_linksel(uint16_t  fsh, uint16_t  slot, uint16_t  choffs){
+    packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME        , sfh );
+    packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT         , slot );
+    packetbuf_set_attr(PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET   , choffs);
+}
+
+void packetbuf_linksel_set(const packetbuf_linkselector val){
+    packetbuf_set_linksel(val.sfh, val.slot, val.choffs);
+}
+
+void packetbuf_linksel_clear(const LinkSelectorSlot val){
+    packetbuf_set_linksel(0xffff, 0xffff, 0xffff);
+}
+
+packetbuf_linkselector packetbuf_linksel(){
+    LinkSelectorSlot save;
+    save.sfh        = packetbuf_get_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME);
+    save.slot       = packetbuf_get_attr(PACKETBUF_ATTR_TSCH_TIMESLOT);
+    save.choffs     = packetbuf_get_attr(PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET);
+    return save;
+}
+
+#endif
 
 /** @} */

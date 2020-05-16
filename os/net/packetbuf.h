@@ -360,6 +360,25 @@ struct packetbuf_attrlist {
   uint8_t len;
 };
 
+
+
+//----------------------------------------------------------------------------
+struct packetbuf_linkselector{
+    uint16_t  fsh;
+    uint16_t  slot;
+    uint16_t  choffs;
+};
+typedef struct packetbuf_linkselector packetbuf_linkselector;
+
+#if TSCH_WITH_LINK_SELECTOR
+void packetbuf_set_linksel(uint16_t  fsh, uint16_t  slot, uint16_t  choffs);
+void packetbuf_linksel_set(const packetbuf_linkselector val);
+void packetbuf_linksel_clear();
+packetbuf_linkselector packetbuf_linksel();
+#endif
+
+
+
 #endif /* PACKETBUF_H_ */
 /** @} */
 /** @} */

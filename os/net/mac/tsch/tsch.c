@@ -542,8 +542,7 @@ int tsch_rx_process_pending()
       packetbuf_set_attr(PACKETBUF_ATTR_RSSI, current_input->rssi);
       packetbuf_set_attr(PACKETBUF_ATTR_CHANNEL, current_input->channel);
 #if TSCH_WITH_LINK_SELECTOR > 1
-      packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME, current_input->slotframe);
-      packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT, current_input->timeslot);
+      packetbuf_set_linksel(current_input->slotframe, current_input->timeslot, 0xffff);
 #endif
 #if LLSEC802154_USES_AUX_HEADER
       // this for app can check wich security of received frame was used
