@@ -57,7 +57,9 @@
 
 /* variables */
 static linkaddr_t parent_addr_storage;
-static linkaddr_t *parent_addr;
+const linkaddr_t* msf_housekeeping_parent_addr;
+#define parent_addr msf_housekeeping_parent_addr
+
 static tsch_link_t *cell_to_relocate;
 
 PROCESS(msf_housekeeping_process, "MSF housekeeping");
@@ -213,7 +215,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
     msf_num_cells_reset(true);
   } else {
     parent_addr = &parent_addr_storage;
-    linkaddr_copy(parent_addr, new_parent);
+    linkaddr_copy(&parent_addr_storage, new_parent);
     /*
      * keep the numbers of cells required and use them for the new
      * parent

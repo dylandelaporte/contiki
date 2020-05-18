@@ -64,7 +64,8 @@ typedef struct {
 } msf_negotiated_cell_data_t;
 
 /* variables */
-static tsch_slotframe_t *slotframe;
+tsch_slotframe_t * msf_negotiate_slotframe;
+#define slotframe msf_negotiate_slotframe
 static const bool is_used = true;
 static const bool is_unused = true;
 static const bool is_kept = true;
@@ -161,12 +162,6 @@ msf_negotiated_cell_deactivate(void)
   msf_negotiated_cell_delete_all(NULL);
   msf_reserved_cell_delete_all(NULL);
   slotframe = NULL;
-}
-/*---------------------------------------------------------------------------*/
-tsch_slotframe_t *
-msf_negotiated_cell_get_slotframe(void)
-{
-  return slotframe;
 }
 /*---------------------------------------------------------------------------*/
 int

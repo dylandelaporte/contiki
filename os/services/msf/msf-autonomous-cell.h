@@ -48,7 +48,12 @@
  * \brief Return a pointer to the slotframe for the autnomous cells
  * \return non-NULL if it exists, otherwise NULL
  */
-tsch_slotframe_t *msf_autonomous_cell_get_slotframe(void);
+static inline
+tsch_slotframe_t *msf_autonomous_cell_get_slotframe(void)
+{
+  extern tsch_slotframe_t* msf_autonomous_slotframe;
+  return msf_autonomous_slotframe;
+}
 
 /**
  * \brief Activate the autonomous cell scheduling
@@ -66,7 +71,11 @@ void msf_autonomous_cell_deactivate();
  * \brief Return a poniter to the autonomous RX cell
  * \return non-NULL if it's scheduled, otherwise NULL
  */
-const tsch_link_t *msf_autonomous_cell_get_rx(void);
+static inline
+const tsch_link_t *msf_autonomous_cell_get_rx(void){
+    extern tsch_link_t* msf_our_autonomous_rx_cell;
+    return msf_our_autonomous_rx_cell;
+}
 
 /**
  * \brief Add an autonomous TX cell for a peer

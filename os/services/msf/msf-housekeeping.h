@@ -65,7 +65,11 @@ void msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent);
  * \brief Return the parent address
  * \return The MAC address of the parent if available, otherwise NULL
  */
-const linkaddr_t * msf_housekeeping_get_parent_addr(void);
+static inline
+const linkaddr_t * msf_housekeeping_get_parent_addr(void){
+    extern const linkaddr_t* msf_housekeeping_parent_addr;
+    return msf_housekeeping_parent_addr;
+}
 
 /**
  * \brief Delete a cell to be relocated

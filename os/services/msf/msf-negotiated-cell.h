@@ -69,7 +69,12 @@ void msf_negotiated_cell_deactivate(void);
 /**
  * \brief Return a pointer to the slotframe for negotiated cells
  */
-tsch_slotframe_t *msf_negotiated_cell_get_slotframe(void);
+static inline
+tsch_slotframe_t * msf_negotiated_cell_get_slotframe(void)
+{
+  extern tsch_slotframe_t * msf_negotiate_slotframe;
+  return msf_negotiate_slotframe;
+}
 
 /**
  * \brief Add a negotiated cell

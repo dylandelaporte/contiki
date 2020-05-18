@@ -61,8 +61,10 @@ typedef enum {
 
 /* variables */
 extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
-static tsch_slotframe_t *slotframe = NULL;
-static tsch_link_t *our_autonomous_rx_cell = NULL;
+tsch_slotframe_t *msf_autonomous_slotframe = NULL;
+#define slotframe msf_autonomous_slotframe
+tsch_link_t* msf_our_autonomous_rx_cell = NULL;
+#define our_autonomous_rx_cell msf_our_autonomous_rx_cell
 
 /* static functions */
 static tsch_link_t *add_cell(msf_autonomous_cell_type_t type,
@@ -144,12 +146,6 @@ delete_cell(tsch_link_t *cell)
            cell->timeslot, cell->channel_offset);
 }
 /*---------------------------------------------------------------------------*/
-tsch_slotframe_t *
-msf_autonomous_cell_get_slotframe(void)
-{
-  return slotframe;
-}
-/*---------------------------------------------------------------------------*/
 int
 msf_autonomous_cell_activate(void)
 {
@@ -171,12 +167,6 @@ msf_autonomous_cell_deactivate(void)
   delete_cell(our_autonomous_rx_cell);
   our_autonomous_rx_cell = NULL;
   slotframe = NULL;
-}
-/*---------------------------------------------------------------------------*/
-const tsch_link_t *
-msf_autonomous_cell_get_rx(void)
-{
-  return our_autonomous_rx_cell;
 }
 /*---------------------------------------------------------------------------*/
 void
