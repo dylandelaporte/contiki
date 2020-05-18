@@ -186,8 +186,9 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
     cell_type_str = "RX";
   }
 
-  if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL &&
-     (nbr = tsch_queue_add_nbr(peer_addr)) == NULL) {
+  // WHAT IT? try add nbr twice?
+  if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL)
+  if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL) {
     LOG_ERR("failed to add a negotiated %s cell because nbr is not available\n",
             cell_type_str);
     return -1;
@@ -441,11 +442,9 @@ msf_negotiated_cell_update_num_tx(uint16_t slot_offset,
   const linkaddr_t *parent_addr;
   tsch_neighbor_t *nbr;
 
-  if((parent_addr = msf_housekeeping_get_parent_addr()) == NULL ||
-     (nbr = tsch_queue_get_nbr(parent_addr)) == NULL ||
-     nbr->negotiated_tx_cell == NULL) {
-    /* nothing to do */
-  } else {
+  if( (parent_addr = msf_housekeeping_get_parent_addr()) != NULL )
+  if( (nbr = tsch_queue_get_nbr(parent_addr)) != NULL)
+  if( nbr->negotiated_tx_cell != NULL ) {
     tsch_link_t *cell;
     tsch_link_t *last_used = NULL;
     /* identify the cell that is used for the last transmission */

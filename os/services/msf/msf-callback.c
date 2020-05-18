@@ -134,9 +134,10 @@ msf_callback_packet_sent(uint16_t slot_offset,
       msf_autonomous_cell_delete_tx(dest_addr);
     }
 
-    if((parent_addr = msf_housekeeping_get_parent_addr()) !=  NULL &&
-       linkaddr_cmp(dest_addr, parent_addr) &&
-       msf_negotiated_cell_is_scheduled_tx(nbr)) {
+    if((parent_addr = msf_housekeeping_get_parent_addr()) !=  NULL)
+    if (linkaddr_cmp(dest_addr, parent_addr) &&
+       msf_negotiated_cell_is_scheduled_tx(nbr))
+    {
       /* update the counters for the negotiated TX cells */
       msf_num_cells_update_tx_used(num_tx);
       msf_negotiated_cell_update_num_tx(slot_offset, num_tx, mac_tx_status);
@@ -177,21 +178,14 @@ void
 msf_callback_parent_switch(rpl_parent_t *old, rpl_parent_t *new)
 {
   if(msf_is_activated() && tsch_is_coordinator == 0) {
-    uip_ipaddr_t *ipaddr;
     const linkaddr_t *linkaddr;
 
     tsch_rpl_callback_parent_switch(old, new);
 
     if(new == NULL) {
-      ipaddr = NULL;
-    } else {
-      ipaddr = rpl_parent_get_ipaddr(new);
-    }
-
-    if(ipaddr == NULL) {
       linkaddr = NULL;
     } else {
-      linkaddr = (const linkaddr_t *)uip_ds6_nbr_lladdr_from_ipaddr(ipaddr);
+      linkaddr = rpl_get_parent_lladdr(new);
     }
 
     msf_housekeeping_set_parent_addr(linkaddr);

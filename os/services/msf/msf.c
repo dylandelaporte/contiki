@@ -299,16 +299,19 @@ msf_activate(void)
 {
   assert(activated == false);
 
-  if(tsch_schedule_get_slotframe_by_handle(
-       MSF_SLOTFRAME_HANDLE_AUTONOMOUS_CELLS) == NULL &&
-     tsch_schedule_add_slotframe(MSF_SLOTFRAME_HANDLE_AUTONOMOUS_CELLS,
-                                 MSF_SLOTFRAME_LENGTH) == NULL) {
+  if (tsch_schedule_get_slotframe_by_handle(
+       MSF_SLOTFRAME_HANDLE_AUTONOMOUS_CELLS) == NULL)
+  if (tsch_schedule_add_slotframe(MSF_SLOTFRAME_HANDLE_AUTONOMOUS_CELLS,
+                                 MSF_SLOTFRAME_LENGTH) == NULL)
+  {
     LOG_ERR("failed to add a slotframe for the autonomous cells\n");
   }
+
   if(tsch_schedule_get_slotframe_by_handle(
-       MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS) == NULL &&
-     tsch_schedule_add_slotframe(MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS,
-                                 MSF_SLOTFRAME_LENGTH) == NULL) {
+       MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS) == NULL )
+  if(tsch_schedule_add_slotframe(MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS,
+                                 MSF_SLOTFRAME_LENGTH) == NULL)
+  {
     LOG_ERR("failed to add a slotframe for the negotiated cells\n");
   }
 
