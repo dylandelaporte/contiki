@@ -59,7 +59,7 @@ typedef uint8_t tsch_sf_h;
 typedef uint16_t tsch_ch_offset_t;
 
 /** \brief An IEEE 802.15.4-2015 TSCH link (also called cell or slot) */
-struct tsch_link {
+typedef struct tsch_link {
   /* Links are stored as a list: "next" must be the first field */
   struct tsch_link *next;
   /* Unique identifier */
@@ -83,10 +83,10 @@ struct tsch_link {
   enum link_type link_type;
   /* Any other data for upper layers */
   void *data;
-};
+} tsch_link_t;
 
 /** \brief 802.15.4e slotframe (contains links) */
-struct tsch_slotframe {
+typedef struct tsch_slotframe {
   /* Slotframes are stored as a list: "next" must be the first field */
   struct tsch_slotframe *next;
   /* Unique identifier */
@@ -96,13 +96,16 @@ struct tsch_slotframe {
   struct tsch_asn_divisor_t size;
   /* List of links belonging to this slotframe */
   LIST_STRUCT(links_list);
-};
+} tsch_slotframe_t;
 
 /** \brief TSCH packet information */
 struct tsch_packet {
   struct queuebuf *qb;  /* pointer to the queuebuf to be sent */
   mac_callback_t sent; /* callback for this packet */
   void *ptr; /* MAC callback parameter */
+#if BUILD_WITH_MSF
+  uint16_t last_tx_timeslot; /* timeslot of the last transmission performed */
+#endif /* BUILD_WITH_MSF */
   uint8_t transmissions; /* #transmissions performed for this packet */
   uint8_t max_transmissions; /* maximal number of Tx before dropping the packet */
   uint8_t ret; /* status -- MAC return code */
@@ -111,7 +114,7 @@ struct tsch_packet {
 };
 
 /** \brief TSCH neighbor information */
-struct tsch_neighbor {
+typedef struct tsch_neighbor {
   uint8_t is_broadcast; /* is this neighbor a virtual neighbor used for broadcast (of data packets or EBs) */
   uint8_t is_time_source; /* is this neighbor a time source? */
   uint8_t backoff_exponent; /* CSMA backoff exponent */
@@ -119,12 +122,16 @@ struct tsch_neighbor {
   uint8_t last_backoff_window; /* Last CSMA backoff window */
   uint8_t tx_links_count; /* How many links do we have to this neighbor? */
   uint8_t dedicated_tx_links_count; /* How many dedicated links do we have to this neighbor? */
+#if BUILD_WITH_MSF
+  struct tsch_link *negotiated_tx_cell;
+#endif /* BUILD_WITH_MSF */
+  struct tsch_packet *tx_priority; /* priority TX frame */
   /* Array for the ringbuf. Contains pointers to packets.
    * Its size must be a power of two to allow for atomic put */
   struct tsch_packet *tx_array[TSCH_QUEUE_NUM_PER_NEIGHBOR];
   /* Circular buffer of pointers to packet. */
   struct ringbufindex tx_ringbuf;
-};
+} tsch_neighbor_t;
 
 /** \brief TSCH timeslot timing elements. Used to index timeslot timing
  * of different units, such as rtimer tick or micro-second */
