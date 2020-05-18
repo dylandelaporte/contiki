@@ -162,6 +162,7 @@ struct input_packet {
 #if TSCH_WITH_LINK_SELECTOR > 1
   uint16_t      slotframe;
   uint16_t      timeslot;
+  uint16_t      choffs;
 #endif
 };
 

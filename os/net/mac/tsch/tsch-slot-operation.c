@@ -1102,6 +1102,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 #if TSCH_WITH_LINK_SELECTOR > 1
         current_input->slotframe = current_link->slotframe_handle;
         current_input->timeslot  = current_link->timeslot;
+        current_input->choffs    = tsch_current_channel_offset;
 #endif
         header_len = frame802154_parse((uint8_t *)current_input->payload, current_input->len, &frame);
         frame_valid = header_len > 0;
