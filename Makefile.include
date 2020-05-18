@@ -162,7 +162,13 @@ endif
 
 # Include IPv6, IPv4, and/or Rime
 
-HAS_STACK = 0
+
+ifneq ($(MAKE_NET),)
+  HAS_STACK = 1
+else
+  HAS_STACK = 0
+endif
+
 ifeq ($(CONTIKI_WITH_IPV4),1)
   HAS_STACK = 1
   MAKE_NET ?= MAKE_NET_IPV4
@@ -176,6 +182,7 @@ endif
 # Make IPv6 the default stack
 ifeq ($(HAS_STACK),0)
 ifneq ($(CONTIKI_WITH_IPV6),0)
+$(info enable IPV6 by default)
 CONTIKI_WITH_IPV6 ?= 1
 endif
 endif
