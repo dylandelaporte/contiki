@@ -33,6 +33,10 @@
 #ifndef CONTIKI_CONF_H_
 #define CONTIKI_CONF_H_
 
+#ifndef CONTIKI_TARGET_COOJA
+#define CONTIKI_TARGET_COOJA 1
+#endif
+
 /* include the project config */
 #ifdef PROJECT_CONF_PATH
 #include PROJECT_CONF_PATH
@@ -138,6 +142,17 @@ typedef unsigned long clock_time_t;
 #include "dev/cooja-radio-def.h"
 #else
 #include RADIO_CONF_HDR_PATH
+#endif
+
+#ifndef TSCH_CONF_ACK_TIMING_STYLE
+#   if defined(RTIMER_CONF_ARCH_SECOND) && (RTIMER_CONF_ARCH_SECOND > 2000)
+// RTimer resolution pretty enough to track packet end, so avoid packet duration evaluate,
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
+#   else
+// cooja default RTimer resolution poor, so provide ACK timing rely on
+//      evaluated packet duration
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_OLD
+#   endif
 #endif
 
 #define UIP_ARCH_IPCHKSUM        1

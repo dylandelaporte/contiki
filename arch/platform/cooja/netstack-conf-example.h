@@ -39,4 +39,8 @@
 #define NETSTACK_CONF_RADIO cooja_radio_driver
 /*#define NETSTACK_CONF_FRAMER framer_nullmac*/
 
+// cooja RADIO provide SFT timestams
+//#define TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS 1
+
+
 #endif /* __NETSTACK_CONF_H */

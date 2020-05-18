@@ -582,6 +582,13 @@ by default, useful in case of duplicate seqno */
 #define TSCH_ACK_TIMING_IMMEDIATE   1
 #ifdef TSCH_CONF_ACK_TIMING_STYLE
 #define TSCH_ACK_TIMING_STYLE TSCH_CONF_ACK_TIMING_STYLE
+#elif CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64
+// cooja default RTimer resolution poor
+#   if defined(RTIMER_CONF_ARCH_SECOND) && (RTIMER_CONF_ARCH_SECOND > 2000)
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
+#   else
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_OLD
+#   endif
 #else
 #define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
 #endif

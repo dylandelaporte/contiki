@@ -43,4 +43,9 @@
 #define RADIO_DELAY_BEFORE_RX 0
 #define RADIO_DELAY_BEFORE_DETECT 0
 
+// cooja RADIO provide SFT timestams
+#ifndef TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS
+#define TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS 1
+#endif
+
 #endif /* COOJA_RADIO_H_ */
