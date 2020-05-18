@@ -48,6 +48,7 @@
 #define _MSF_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "net/linkaddr.h"
 #include "net/mac/tsch/tsch.h"

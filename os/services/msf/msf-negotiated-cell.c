@@ -176,6 +176,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
 
   assert(slotframe != NULL);
   assert(peer_addr != NULL);
+  (void)cell_type_str;
 
   if(type == MSF_NEGOTIATED_CELL_TYPE_TX) {
     cell_options = LINK_OPTION_TX;
