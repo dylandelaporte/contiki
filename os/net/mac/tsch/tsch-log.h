@@ -89,7 +89,11 @@
 #ifdef TSCH_LOG_CONF_ID_FROM_LINKADDR
 #define TSCH_LOG_ID_FROM_LINKADDR(addr) TSCH_LOG_CONF_ID_FROM_LINKADDR(addr)
 #else /* TSCH_LOG_ID_FROM_LINKADDR */
+#if (LINKADDR_SIZE == 8)
+#define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u32[1] : 0)
+#else
 #define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
+#endif
 #endif /* TSCH_LOG_ID_FROM_LINKADDR */
 
 #if TSCH_LOG_LEVEL < 2 /* For log level 0 or 1, the logging functions do nothing */

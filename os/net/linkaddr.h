@@ -70,6 +70,7 @@ typedef union {
   uint32_t u32;
 #else
   uint16_t u16[LINKADDR_SIZE/2];
+  uint16_t u32[LINKADDR_SIZE/4];
 #endif /* LINKADDR_SIZE == 2 */
 } linkaddr_t;
 
