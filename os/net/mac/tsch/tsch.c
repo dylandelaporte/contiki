@@ -627,9 +627,6 @@ tsch_start_coordinator(void)
 #if TSCH_SCHEDULE_WITH_6TISCH_MINIMAL
   tsch_schedule_create_minimal();
 #endif
-#if BUILD_WITH_MSF
-  msf_activate();
-#endif /* BUILD_WITH_MSF */
 
   tsch_is_associated = 1;
   tsch_join_priority = 0;
