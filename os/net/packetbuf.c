@@ -220,6 +220,13 @@ packetbuf_attr(uint8_t type)
   return packetbuf_attrs[type].val;
 }
 /*---------------------------------------------------------------------------*/
+const linkaddr_t *
+packetbuf_addr(uint8_t type)
+{
+  return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
+}
+#endif /* PACKETBUF_CONF_ATTRS_INLINE */
+/*---------------------------------------------------------------------------*/
 int
 packetbuf_set_addr(uint8_t type, const linkaddr_t *addr)
 {
@@ -227,13 +234,6 @@ packetbuf_set_addr(uint8_t type, const linkaddr_t *addr)
   return 1;
 }
 /*---------------------------------------------------------------------------*/
-const linkaddr_t *
-packetbuf_addr(uint8_t type)
-{
-  return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
-}
-/*---------------------------------------------------------------------------*/
-#endif /* PACKETBUF_CONF_ATTRS_INLINE */
 int
 packetbuf_holds_broadcast(void)
 {
