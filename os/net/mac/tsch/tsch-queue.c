@@ -493,14 +493,11 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
 
       if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
       {
-          TSCH_LOG_ADD(tsch_log_message,
-                          snprintf(log->message, sizeof(log->message)
-                                  , "check packets[%d/%d] ->:%x (!%d)"
+          TSCH_DBG("check packets[%d] ->:%x (!%d)\n"
                                   , (int)get_index
                                   , ringbufindex_elements(&n->tx_ringbuf)
                                   , (int)n->addr.u16[0]
                                   , tsch_queue_backoff_expired(n)
-                                  )
                       );
           if ((get_index > 0) && !tsch_queue_backoff_expired(n)){
               trace_backoff_on();
@@ -516,12 +513,9 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
         int packet_attr_timeslot = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
 
         if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
-            TSCH_LOG_ADD(tsch_log_message,
-                            snprintf(log->message, sizeof(log->message)
-                                    , "check packet[%d] -> (sf%d:%d)"
+            TSCH_DBG("check packet[%d] -> (sf%d:%d)\n"
                                     , ringbufindex_elements(&n->tx_ringbuf)
                                     , packet_attr_slotframe, packet_attr_timeslot
-                                    )
                         );
         }
 
