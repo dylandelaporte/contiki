@@ -198,7 +198,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
   new_cell = tsch_schedule_add_link(slotframe, cell_options,
                                     LINK_TYPE_NORMAL, peer_addr,
                                     slot_offset, channel_offset
-                                    , 0 // WHAT to do here?
+                                    , 1 // WHAT to do here?
                                     );
 
   if(new_cell != NULL && type == MSF_NEGOTIATED_CELL_TYPE_TX) {

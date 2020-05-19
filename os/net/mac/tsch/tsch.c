@@ -194,10 +194,7 @@ tsch_set_coordinator(bool enable)
 {
 #ifndef TSCH_IS_COORDINATOR
   if(tsch_is_coordinator != enable) {
-    tsch_is_associated = 0;
-#if BUILD_WITH_MSF
-    msf_deactivate();
-#endif /* BUILD_WITH_MSF */
+      tsch_disassociate();
   }
   tsch_is_coordinator = enable;
 #else
@@ -636,10 +633,6 @@ tsch_start_coordinator(void)
 
   LOG_INFO("starting as coordinator, PAN ID %x, asn-%x.%lx\n",
       frame802154_get_pan_id(), tsch_current_asn.ms1b, (long)tsch_current_asn.ls4b);
-
-#ifdef TSCH_CALLBACK_JOINING_NETWORK
-      TSCH_CALLBACK_JOINING_NETWORK();
-#endif
 
 #ifdef TSCH_CALLBACK_JOINING_NETWORK
       TSCH_CALLBACK_JOINING_NETWORK();
