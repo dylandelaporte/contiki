@@ -319,11 +319,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
   tsch_link_t *cell;
   assert(slotframe);
 
-  if(peer_addr == NULL) {
-    while((cell = list_head(slotframe->links_list)) != NULL) {
-      msf_negotiated_cell_delete(cell);
-    }
-  } else {
+  {
     tsch_neighbor_t *nbr;
     tsch_link_t *next_cell;
     if((nbr = tsch_queue_get_nbr(peer_addr)) != NULL) {
@@ -331,6 +327,11 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
           cell != NULL;
           cell = next_cell) {
         next_cell = list_item_next(cell);
+        if(peer_addr == NULL){
+            msf_negotiated_cell_delete(cell);
+            continue;
+        }
+        else
         if(linkaddr_cmp(&cell->addr, peer_addr) &&
            (cell->link_options & LINK_OPTION_LINK_TO_DELETE) == 0) {
           msf_negotiated_cell_delete(cell);
