@@ -1356,6 +1356,8 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
 #ifdef TSCH_CALLBACK_LINK_SIGNAL
       if ( (current_link->link_options & (LINK_OPTION_SIGNAL | LINK_OPTION_SIGNAL_ONCE)) != 0 ){
           // current link need signal;
+          if (signaling_link == NULL)
+              signaling_link = current_link;
           TSCH_CALLBACK_LINK_SIGNAL(signaling_link);
           current_link->link_options &= ~LINK_OPTION_SIGNAL_ONCE;
       }
