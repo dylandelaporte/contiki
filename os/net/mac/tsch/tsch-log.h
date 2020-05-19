@@ -47,7 +47,6 @@
 #include "net/mac/tsch/tsch-private.h"
 // need uip_lladdr_t
 #include "net/ip/uip.h"
-#include "net/net-debug.h"
 
 /******** Configuration *******/
 
@@ -76,6 +75,15 @@
 
 #endif /* TSCH_LOG_CONF_LEVEL */
 
+#ifndef DEBUG
+// turn on TSCH_PRINT if have some LOG_LEVEL_MAC
+#if LOG_CONF_LEVEL_MAC > LOG_LEVEL_NONE
+#define DEBUG   (DEBUG_PRINT)
+#endif
+#endif
+
+#include "net/net-debug.h"
+
 
 
 /* The length of the log queue, i.e. maximum number postponed log messages */
@@ -90,7 +98,7 @@
 #define TSCH_LOG_ID_FROM_LINKADDR(addr) TSCH_LOG_CONF_ID_FROM_LINKADDR(addr)
 #else /* TSCH_LOG_ID_FROM_LINKADDR */
 #if (LINKADDR_SIZE == 8)
-#define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u32[1] : 0)
+#define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u32[0] : 0)
 #else
 #define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
 #endif
