@@ -201,7 +201,7 @@ msf_callback_tsch_nbr_removed(tsch_neighbor_t *nbr)
     /* do nothing */
   } else {
     /* delete an autnomous cell for the peer if it exists */
-    msf_autonomous_cell_delete_tx(&nbr->addr);
+    msf_autonomous_cell_delete_tx(tsch_queue_get_nbr_address(nbr));
   }
 }
 /*---------------------------------------------------------------------------*/
