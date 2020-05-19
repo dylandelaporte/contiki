@@ -359,7 +359,7 @@ struct packetbuf_attrlist {
 
 //----------------------------------------------------------------------------
 struct packetbuf_linkselector{
-    uint16_t  fsh;
+    uint16_t  sfh;
     uint16_t  slot;
     uint16_t  choffs;
 };
