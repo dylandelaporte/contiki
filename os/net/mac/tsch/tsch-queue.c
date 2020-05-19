@@ -401,12 +401,10 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
         tsch_queue_remove_packet_from_queue(n);
       }
       in_queue = 0;
-      TSCH_LOG_ADD(tsch_log_message,
-                      snprintf(log->message, sizeof(log->message)
-                              , "retransmition fail seq%d -># %x.%x.%x.%x"
-                              , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
-                              , n->addr.u16[0], n->addr.u16[1], n->addr.u16[2], n->addr.u16[3]
-                              )
+      TSCH_DBG("retransmition fail seq%d ->(%p)# %x.%x.%x.%x"
+                  , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
+                  , n
+                  , link->addr.u16[0], link->addr.u16[1], link->addr.u16[2], link->addr.u16[3]
                   );
     }
     /* Update CSMA state in the unicast case */
@@ -505,7 +503,7 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
           TSCH_DBG("check packets[%d] ->:%x (!%d)\n"
                                   , (int)get_index
                                   , ringbufindex_elements(&n->tx_ringbuf)
-                                  , (int)n->addr.u16[0]
+                                  , (int)link->addr.u16[0]
                                   , tsch_queue_backoff_expired(n)
                       );
           if ((get_index > 0) && !tsch_queue_backoff_expired(n)){

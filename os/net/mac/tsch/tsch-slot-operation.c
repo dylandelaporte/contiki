@@ -405,7 +405,7 @@ get_packet_and_neighbor_for_link(struct tsch_link *link, struct tsch_neighbor **
                                 , "empty sf.t:%x(%x) ->:%x !%d size[%d] "
                                 , (link->slotframe_handle<<16) | link->timeslot
                                 , link->link_options
-                                , (int)n->addr.u16[0]
+                                , (int)link->addr.u16[0]
                                 , tsch_queue_backoff_expired(n)
                                 , ringbufindex_elements(&n->tx_ringbuf)
                                 )
@@ -414,8 +414,8 @@ get_packet_and_neighbor_for_link(struct tsch_link *link, struct tsch_neighbor **
             TSCH_LOG_ADD(tsch_log_message,
                             snprintf(log->message, sizeof(log->message)
                                     , "        ->:%x.%x.%x.%x"
-                                    , n->addr.u16[3], n->addr.u16[2]
-                                    , n->addr.u16[1], n->addr.u16[0]
+                                    , link->addr.u16[3], link->addr.u16[2]
+                                    , link->addr.u16[1], link->addr.u16[0]
                                     )
                         );
     }
@@ -1570,6 +1570,7 @@ tsch_slot_operation_start(void)
   rtimer_clock_t time_to_next_active_slot;
   rtimer_clock_t prev_slot_start;
   TSCH_DEBUG_INIT();
+  TSCH_PUTS("tsch_slot_operation_start\n");
   do {
     tsch_slot_offset_t timeslot_diff;
     /* Get next active link */
