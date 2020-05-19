@@ -193,8 +193,8 @@ static void
 new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new)
 {
   if(new != old) {
-    const linkaddr_t *old_addr = old != NULL ? &old->addr : NULL;
-    const linkaddr_t *new_addr = new != NULL ? &new->addr : NULL;
+    const linkaddr_t *old_addr = tsch_queue_get_nbr_address(old);
+    const linkaddr_t *new_addr = tsch_queue_get_nbr_address(new);
 
     LOG_INFO("change TS to ");
     LOG_INFO_LLADDR(new_addr);
