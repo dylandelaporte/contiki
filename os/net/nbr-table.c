@@ -40,6 +40,17 @@
 #include "lib/list.h"
 #include "net/nbr-table.h"
 
+
+
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "NetNbr"
+#ifdef  LOG_CONF_LEVEL_NET
+#define LOG_LEVEL LOG_CONF_LEVEL_NET
+#else
+#define LOG_LEVEL LOG_LEVEL_IPV6
+#endif
+
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -48,7 +59,7 @@ static void handle_periodic_timer(void *ptr);
 static struct ctimer periodic_timer;
 static uint8_t initialized = 0;
 static void print_table();
-#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTF(...) LOG_DBG(__VA_ARGS__)
 #else
 #define PRINTF(...)
 #endif
@@ -83,26 +94,49 @@ static unsigned num_tables;
 MEMB(neighbor_addr_mem, nbr_table_key_t, NBR_TABLE_MAX_NEIGHBORS);
 LIST(nbr_table_keys);
 
+#if 1 //MEMB_CHECK_BOUNDS
+#include <assert.h>
+#define ASSERT_NBR( x ) assert( (x) )
+#define IN_MEMB(m, index) (index < m.num)
+#define IN_MAPS(m, index) (index < NBR_TABLE_MAX_NEIGHBORS)
+#define IN_BITMAP(m, index) (index < (8*sizeof(used_map[0])))
+#else
+#define ASSERT_NBR( x )
+#define IN_MEMB(m, index) 1
+#define IN_BITMAP(m, index) 1
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Get a key from a neighbor index */
 static nbr_table_key_t *
 key_from_index(int index)
 {
-  return index != -1 ? &((nbr_table_key_t *)neighbor_addr_mem.mem)[index] : NULL;
+  ASSERT_NBR(IN_MEMB(neighbor_addr_mem, index));
+  if ((index >= 0) && IN_MEMB(neighbor_addr_mem, index))
+      return &((nbr_table_key_t *)neighbor_addr_mem.mem)[index];
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 /* Get an item from its neighbor index */
 static nbr_table_item_t *
 item_from_index(nbr_table_t *table, int index)
 {
-  return table != NULL && index != -1 ? (char *)table->data + index * table->item_size : NULL;
+  if ((table != NULL) && (index >= 0))
+      return (char *)table->data + index * table->item_size;
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 /* Get the neighbor index of an item */
 static int
 index_from_key(nbr_table_key_t *key)
 {
-  return key != NULL ? key - (nbr_table_key_t *)neighbor_addr_mem.mem : -1;
+  if (key != NULL){
+      int idx = key - (nbr_table_key_t *)neighbor_addr_mem.mem;
+      ASSERT_NBR( IN_MEMB(neighbor_addr_mem, idx ));
+      if (IN_MEMB(neighbor_addr_mem, idx))
+          return idx;
+  }
+  return  -1;
 }
 /*---------------------------------------------------------------------------*/
 /* Get the neighbor index of an item */
@@ -151,7 +185,9 @@ static int
 nbr_get_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item)
 {
   int item_index = index_from_item(table, item);
-  if(table != NULL && item_index != -1) {
+  if(table != NULL && item_index >= 0) {
+    ASSERT_NBR( IN_MAPS(bitmap, item_index) );
+    ASSERT_NBR( IN_BITMAP(bitmap, table->index) );
     return (bitmap[item_index] & (1 << table->index)) != 0;
   } else {
     return 0;
@@ -165,7 +201,9 @@ nbr_set_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item, int val
 {
   int item_index = index_from_item(table, item);
 
-  if(table != NULL && item_index != -1) {
+  if(table != NULL && item_index >= 0) {
+    ASSERT_NBR( IN_MAPS(bitmap, item_index) );
+    ASSERT_NBR( IN_BITMAP(bitmap, table->index) );
     if(value) {
       bitmap[item_index] |= 1 << table->index;
     } else {
@@ -219,13 +257,15 @@ nbr_table_allocate(nbr_table_reason_t reason, void *data)
       /* used least_used_key to indicate what is the least useful entry */
       int index;
       int locked = 0;
-      if((index = index_from_lladdr(lladdr)) != -1) {
+      if((index = index_from_lladdr(lladdr)) >= 0) {
         least_used_key = key_from_index(index);
+        ASSERT_NBR( (index >= 0) && IN_MAPS(locked_map, index) );
         locked = locked_map[index];
       }
       /* Allow delete of locked item? */
       if(least_used_key != NULL && locked) {
         PRINTF("Deleting locked item!\n");
+        ASSERT_NBR( (index >= 0) && IN_MAPS(locked_map, index) );
         locked_map[index] = 0;
       }
     }
@@ -242,6 +282,7 @@ nbr_table_allocate(nbr_table_reason_t reason, void *data)
       key = list_head(nbr_table_keys);
       while(key != NULL) {
         int item_index = index_from_key(key);
+        ASSERT_NBR( (item_index >= 0) && IN_MAPS(locked_map, item_index) );
         int locked = locked_map[item_index];
         /* Never delete a locked item */
         if(!locked) {
@@ -301,6 +342,7 @@ nbr_table_register(nbr_table_t *table, nbr_table_callback *callback)
     table->index = num_tables++;
     table->callback = callback;
     all_tables[table->index] = table;
+    LOG_DBG("registen new table %p ->[%u]\n", table, num_tables);
     return 1;
   } else {
     /* Maximum number of tables exceeded */
@@ -312,8 +354,8 @@ nbr_table_register(nbr_table_t *table, nbr_table_callback *callback)
 int
 nbr_table_is_registered(nbr_table_t *table)
 {
-  if(table != NULL && table->index >= 0 && table->index < MAX_NUM_TABLES
-                   && all_tables[table->index] == table) {
+  if(table != NULL && table->index >= 0 && table->index < MAX_NUM_TABLES)
+  if(all_tables[table->index] == table) {
     return 1;
   }
   return 0;
@@ -325,6 +367,8 @@ nbr_table_head(nbr_table_t *table)
 {
   /* Get item from first key */
   nbr_table_item_t *item = item_from_key(table, list_head(nbr_table_keys));
+  if (item == NULL)
+      return NULL;
   /* Item is the first neighbor, now check is it is in the current table */
   if(nbr_get_bit(used_map, table, item)) {
     return item;
@@ -370,6 +414,9 @@ nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_rea
 
     /* No space available for new entry */
     if(key == NULL) {
+      LOG_ERR("Not enough mem to alloc ");
+      LOG_ERR_LLADDR(lladdr);
+      LOG_ERR_("\n");
       return NULL;
     }
 
@@ -382,6 +429,10 @@ nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_rea
     /* Set link-layer address */
     linkaddr_copy(&key->lladdr, lladdr);
   }
+
+  LOG_DBG("set nbr ");
+  LOG_DBG_LLADDR(lladdr);
+  LOG_DBG_(" ->[%d]\n", index);
 
   /* Get item in the current table */
   item = item_from_index(table, index);
