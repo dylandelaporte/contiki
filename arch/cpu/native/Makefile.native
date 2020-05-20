@@ -15,10 +15,12 @@ NM       ?= nm
 OBJCOPY  ?= objcopy
 STRIP    ?= strip
 ifeq ($(WERROR),1)
-CFLAGSWERROR=-Werror -Wno-error=unused-function -Wno-error=format-security
+CFLAGSWERROR +=-Werror 
+CFLAGSWERROR +=-Wno-error=unused-function -Wno-unused-function
+# printf( (char*)pfmt ) - here fmt is variable, may warns on modern compiler 
+#CFLAGSWERROR += -Wno-error=format-security -Wno-format-security
 endif
-CFLAGSNO = -Wall -g3 $(CFLAGSWERROR)
-CFLAGSNO += -Wno-unused-function -Wno-format-security
+CFLAGSNO = -Wall -g $(CFLAGSWERROR)
 CFLAGS  += $(CFLAGSNO)
 
 ### Are we building with code size optimisations?
