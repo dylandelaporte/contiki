@@ -46,6 +46,7 @@
 #include "msf-autonomous-cell.h"
 #include "msf-avoid-cell.h"
 #include "msf-reserved-cell.h"
+#include "msf-negotiated-cell.h"
 #include "msf-housekeeping.h"
 #include "sax.h"
 
@@ -122,6 +123,7 @@ add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
     LOG_DBG_(" at slot_offset:%u, channel_offset:%u\n",
              slot_offset, channel_offset);
     msf_avoid_link_cell(cell);
+    MSF_AFTER_CELL_USE(NULL, cell);
   }
 
   return cell;
@@ -148,6 +150,7 @@ delete_cell(tsch_link_t *cell)
   LOG_DBG_LLADDR(&cell->addr);
   LOG_DBG_(" at slot_offset:%u, channel_offset:%u\n",
            cell->timeslot, cell->channel_offset);
+  MSF_AFTER_CELL_RELEASE(NULL, cell);
 }
 /*---------------------------------------------------------------------------*/
 int

@@ -264,6 +264,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
         }
       }
     }
+    MSF_AFTER_CELL_USE(nbr, new_cell);
   }
 
   return new_cell == NULL ? -1 : 0;
@@ -345,6 +346,7 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);
+  MSF_AFTER_CELL_RELEASE(nbr, cell);
 }
 /*---------------------------------------------------------------------------*/
 void

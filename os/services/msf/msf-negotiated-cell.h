@@ -172,5 +172,28 @@ void msf_negotiated_cell_rx_is_used(const linkaddr_t *src_addr,
  */
 void msf_negotiated_cell_delete_unused_cells(void);
 
+
+
+/* callbacks */
+#ifdef MSF_AFTER_CELL_USE
+void MSF_AFTER_CELL_USE(tsch_neighbor_t *nbr, tsch_link_t *cell);
+#else
+#define MSF_AFTER_CELL_USE(...)
+#endif
+
+#ifdef MSF_AFTER_CELL_RELEASE
+void MSF_AFTER_CELL_RELEASE(tsch_neighbor_t *nbr, tsch_link_t *cell);
+#else
+#define MSF_AFTER_CELL_RELEASE(...)
+#endif
+
+#ifdef MSF_AFTER_CELL_CLEAN
+void MSF_AFTER_CELL_CLEAN( void);
+#else
+#define MSF_AFTER_CELL_CLEAN(...)
+#endif
+
+
+
 #endif /* !_MSF_NEGOTIATED_CELL_H */
 /** @} */

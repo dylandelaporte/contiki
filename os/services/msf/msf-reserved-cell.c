@@ -284,4 +284,5 @@ msf_reserved_cell_delete_all(const linkaddr_t *peer_addr)
       /* this is not a reserved cell; skip it */
     }
   }
+  MSF_AFTER_CELL_CLEAN();
 }
