@@ -38,6 +38,7 @@
  *         Konrad Krentz <konrad.krentz@gmail.com>
  */
 
+#include "ccm-star-packetbuf.h"
 #include "net/linkaddr.h"
 #include "net/packetbuf.h"
 #include "net/mac/llsec802154.h"

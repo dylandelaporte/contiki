@@ -39,7 +39,7 @@
  *
  */
 
-/** \addtogroup data
+/** \addtogroup lib
     @{ */
 /**
  * \defgroup list Linked list library
@@ -68,6 +68,8 @@
 #define LIST_H_
 
 #include <stdbool.h>
+#include "contiki-conf.h"
+
 
 #define LIST_CONCAT2(s1, s2) s1##s2
 #define LIST_CONCAT(s1, s2) LIST_CONCAT2(s1, s2)
@@ -82,7 +84,7 @@
  *
  * The list variable is declared as static to make it easy to use in a
  * single C module without unnecessarily exporting the name to other
- * modules.
+ * modules. 
  *
  * \param name The name of the list.
  */
@@ -129,6 +131,14 @@
        list_init((struct_ptr)->name);                                   \
     } while(0)
 
+
+
+#if (PACKETBUF_CONF_ATTRS_INLINE) //|| defined(__GNUC__)
+#define LIB_INLINES     1
+#else
+#define LIB_INLINES     0
+#endif
+
 /**
  * The linked list type.
  *
@@ -136,7 +146,10 @@
 typedef void ** list_t;
 
 void   list_init(list_t list);
+#if !LIB_INLINES
 void * list_head(list_t list);
+void   list_copy(list_t dest, list_t src);
+#endif
 void * list_tail(list_t list);
 void * list_pop (list_t list);
 void   list_push(list_t list, void *item);
@@ -148,13 +161,52 @@ void   list_remove(list_t list, void *item);
 
 int    list_length(list_t list);
 
-void   list_copy(list_t dest, list_t src);
-
 void   list_insert(list_t list, void *previtem, void *newitem);
 
 void * list_item_next(void *item);
 
 bool list_contains(list_t list, void *item);
+
+#if LIB_INLINES
+#ifndef NULL
+#define NULL 0
+#endif
+/*---------------------------------------------------------------------------*/
+/**
+ * Get a pointer to the first element of a list.
+ *
+ * This function returns a pointer to the first element of the
+ * list. The element will \b not be removed from the list.
+ *
+ * \param list The list.
+ * \return A pointer to the first element on the list.
+ *
+ * \sa list_tail()
+ */
+static inline
+void * list_head(list_t list)
+{
+  return *list;
+}
+/*---------------------------------------------------------------------------*/
+/**
+ * Duplicate a list.
+ *
+ * This function duplicates a list by copying the list reference, but
+ * not the elements.
+ *
+ * \note This function does \b not copy the elements of the list, but
+ * merely duplicates the pointer to the first element of the list.
+ *
+ * \param dest The destination list.
+ * \param src The source list.
+ */
+static inline
+void list_copy(list_t dest, list_t src)
+{
+  *dest = *src;
+}
+#endif //LIB_INLINES
 
 #endif /* LIST_H_ */
 

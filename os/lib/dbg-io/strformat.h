@@ -40,6 +40,7 @@
 #define STRFORMAT_FAILED 1
 /*---------------------------------------------------------------------------*/
 typedef unsigned int strformat_result;
+typedef strformat_result StrFormatResult; // compatibility for pre NextGen
 /*---------------------------------------------------------------------------*/
 /* The data argument may only be considered valid during the function call */
 typedef strformat_result (*strformat_write)(void *user_data,
@@ -50,6 +51,7 @@ typedef struct strformat_context_s {
   strformat_write write_str;
   void *user_data;
 } strformat_context_t;
+typedef strformat_context_t StrFormatContext; // compatibility for pre NextGen
 /*---------------------------------------------------------------------------*/
 int format_str(const strformat_context_t *ctxt, const char *format, ...)
      __attribute__ ((__format__ (__printf__, 2,3)));

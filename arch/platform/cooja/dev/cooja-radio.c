@@ -65,7 +65,7 @@ int simInSize = 0;
 rtimer_clock_t simLastPacketTimestamp = 0;
 char simOutDataBuffer[COOJA_RADIO_BUFSIZE];
 int simOutSize = 0;
-char simRadioHWOn = 1;
+char simRadioHWOn = 0;
 int simSignalStrength = -100;
 int simLastSignalStrength = -100;
 char simPower = 100;
@@ -188,6 +188,7 @@ radio_read(void *buf, unsigned short bufsize)
     return 0;
   }
 
+  if (buf != NULL)
   memcpy(buf, simInDataBuffer, simInSize);
   simInSize = 0;
   if(!poll_mode) {
@@ -324,6 +325,7 @@ PROCESS_THREAD(cooja_radio_process, ev, data)
 static int
 init(void)
 {
+  radio_off();
   process_start(&cooja_radio_process, NULL);
   return 1;
 }

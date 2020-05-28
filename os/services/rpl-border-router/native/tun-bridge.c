@@ -67,9 +67,7 @@
 #include "cmd.h"
 #include "border-router.h"
 
-extern const char *slip_config_ipaddr;
-extern char slip_config_tundev[32];
-extern uint16_t slip_config_basedelay;
+extern struct SlipConfig slip_config;
 
 #ifndef __CYGWIN__
 static int tunfd;
@@ -103,14 +101,14 @@ ssystem(const char *fmt, ...)
 void
 cleanup(void)
 {
-  ssystem("ifconfig %s down", slip_config_tundev);
+  ssystem("ifconfig %s down", slip_config.tundev);
 #ifndef linux
   ssystem("sysctl -w net.ipv6.conf.all.forwarding=1");
 #endif
   ssystem("netstat -nr"
 	  " | awk '{ if ($2 == \"%s\") print \"route delete -net \"$1; }'"
 	  " | sh",
-	  slip_config_tundev);
+	  slip_config.tundev);
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -201,13 +199,18 @@ static uint32_t delaystartsec, delaystartmsec;
 void
 tun_init()
 {
+  if (slip_config.ipaddr == NULL) {
+      fprintf(stderr, "have no ipadress for tun-bridge!\n");
+      err(1, "usage: ... [-B baudrate] [-H] [-L] [-s siodev] [-t tundev] [-T] [-v verbosity] [-d delay] [-a serveraddress] [-p serverport] [ipaddress]");
+  }
+
   setvbuf(stdout, NULL, _IOLBF, 0); /* Line buffered output. */
 
   slip_init();
 
-  LOG_INFO("Opening tun interface:%s\n", slip_config_tundev);
+  LOG_INFO("Opening tun interface:%s\n", slip_config.tundev);
 
-  tunfd = tun_alloc(slip_config_tundev);
+  tunfd = tun_alloc(slip_config.tundev);
 
   if(tunfd == -1) {
     err(1, "tun_init: open");
@@ -216,13 +219,13 @@ tun_init()
   select_set_callback(tunfd, &tun_select_callback);
 
   fprintf(stderr, "opened %s device ``/dev/%s''\n",
-          "tun", slip_config_tundev);
+          "tun", slip_config.tundev);
 
   atexit(cleanup);
   signal(SIGHUP, sigcleanup);
   signal(SIGTERM, sigcleanup);
   signal(SIGINT, sigcleanup);
-  ifconf(slip_config_tundev, slip_config_ipaddr);
+  ifconf(slip_config.tundev, slip_config.ipaddr);
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -303,10 +306,10 @@ handle_fd(fd_set *rset, fd_set *wset)
       uip_len = size;
       tcpip_input();
 
-      if(slip_config_basedelay) {
+      if(slip_config.basedelay) {
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        delaymsec = slip_config_basedelay;
+        delaymsec = slip_config.basedelay;
         delaystartsec = tv.tv_sec;
         delaystartmsec = tv.tv_usec / 1000;
       }

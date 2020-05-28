@@ -43,7 +43,7 @@
 #ifndef CFS_COFFEE_ARCH_H_
 #define CFS_COFFEE_ARCH_H_
 
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "cfs/cfs-coffee.h"
 #include "dev/cc2538-dev.h"
 #include "dev/flash.h"

@@ -1803,6 +1803,7 @@ input(void)
 {
   /* size of the IP packet (read from fragment) */
   uint16_t frag_size = 0;
+  (void)frag_size;
   /* offset of the fragment in the IP packet */
   uint8_t frag_offset = 0;
   uint8_t *buffer;
@@ -1919,11 +1920,14 @@ input(void)
   }
 
   /* Process next dispatch and headers */
-  if(SICSLOWPAN_COMPRESSION > SICSLOWPAN_COMPRESSION_IPV6 &&
-     (PACKETBUF_6LO_PTR[PACKETBUF_6LO_DISPATCH] & SICSLOWPAN_DISPATCH_IPHC_MASK) == SICSLOWPAN_DISPATCH_IPHC) {
+#if SICSLOWPAN_COMPRESSION > SICSLOWPAN_COMPRESSION_IPV6
+  if((PACKETBUF_6LO_PTR[PACKETBUF_6LO_DISPATCH] & SICSLOWPAN_DISPATCH_IPHC_MASK) == SICSLOWPAN_DISPATCH_IPHC)
+  {
     LOG_DBG("uncompression: IPHC dispatch\n");
     uncompress_hdr_iphc(buffer, frag_size);
-  } else if(PACKETBUF_6LO_PTR[PACKETBUF_6LO_DISPATCH] == SICSLOWPAN_DISPATCH_IPV6) {
+  } else
+#endif
+  if(PACKETBUF_6LO_PTR[PACKETBUF_6LO_DISPATCH] == SICSLOWPAN_DISPATCH_IPV6) {
     LOG_DBG("uncompression: IPV6 dispatch\n");
     packetbuf_hdr_len += SICSLOWPAN_IPV6_HDR_LEN;
 

@@ -46,6 +46,11 @@
 
 #include "contiki.h"
 
+/* Include Project Specific conf for TSCH*/
+#ifdef TSCH_CONF_H
+#include TSCH_CONF_H
+#endif /* PROJECT_CONF_H */
+
 /******** Configuration: synchronization *******/
 
 /* Max time before sending a unicast keep-alive message to the time source */
@@ -125,6 +130,10 @@
 #define TSCH_ADAPTIVE_TIMESYNC 1
 #endif
 
+/* By default: TSCH loads slot timing from coordinator EB
+ * but for debug purposes it can be ommited by enabling this macro*/
+//#define TSCH_DEBUG_NO_TIMING_FROM_EB
+
 /* An ad-hoc mechanism to have TSCH select its time source without the
  * help of an upper-layer, simply by collecting statistics on received
  * EBs and their join priority. Disabled by default as we recomment
@@ -150,6 +159,10 @@
 #define TSCH_JOIN_HOPPING_SEQUENCE TSCH_CONF_JOIN_HOPPING_SEQUENCE
 #else
 #define TSCH_JOIN_HOPPING_SEQUENCE TSCH_DEFAULT_HOPPING_SEQUENCE
+#endif
+
+#ifndef TSCH_JOIN_HOPPING_SEQUENCE_SIZE
+#define TSCH_JOIN_HOPPING_SEQUENCE_SIZE() sizeof(TSCH_JOIN_HOPPING_SEQUENCE)
 #endif
 
 /* Maximum length of the TSCH channel hopping sequence. Must be greater or
@@ -186,6 +199,17 @@
 /* By default, set if LLSEC802154_ENABLED is also non-zero */
 #define TSCH_JOIN_SECURED_ONLY LLSEC802154_ENABLED
 #endif
+// Style of nodes scan chanels during association
+//< select random chanel in TSCH_JOIN_HOPPING_SEQUENCE
+#define TSCH_JOIN_HOPPING_RANDOM  0
+//< select consequntly chanel in TSCH_JOIN_HOPPING_SEQUENCE, one by one
+#define TSCH_JOIN_HOPPING_STEPPED 1
+
+#ifdef TSCH_CONF_JOIN_STYLE
+#define TSCH_JOIN_STYLE TSCH_CONF_JOIN_STYLE
+#else
+#define TSCH_JOIN_STYLE TSCH_JOIN_HOPPING_RANDOM
+#endif
 
 /* By default, join any PAN ID. Otherwise, wait for an EB from IEEE802154_PANID */
 #ifdef TSCH_CONF_JOIN_MY_PANID_ONLY
@@ -208,6 +232,38 @@
 #define TSCH_CHECK_TIME_AT_ASSOCIATION TSCH_CONF_CHECK_TIME_AT_ASSOCIATION
 #else
 #define TSCH_CHECK_TIME_AT_ASSOCIATION 0
+#endif
+
+/* Association on turn-on strategy:
+ * 0 - associate cycling until success
+ * 1 - associate once, if not succeed, invoke disassociate */
+#ifdef TSCH_CONF_ASSOCIATION_SINGLE
+#define TSCH_ASSOCIATION_SINGLE TSCH_CONF_ASSOCIATION_SINGLE
+#else
+#define TSCH_ASSOCIATION_SINGLE 0
+#endif
+
+/* How long to scan each channel in the scanning phase */
+#ifdef TSCH_CONF_CHANNEL_SCAN_DURATION
+#define TSCH_CHANNEL_SCAN_DURATION TSCH_CONF_CHANNEL_SCAN_DURATION
+#else
+#define TSCH_CHANNEL_SCAN_DURATION CLOCK_SECOND
+#endif
+
+//  select start conditions on scan.
+//  should define macro on TSCH_JOIN_HOPPING_START(ch, time)
+//      where ch - local scaner ch variable
+//            time - local scaner last scan variable
+//  * usage:
+//      - assign start scaning with  my_faivorite_chanel
+//  #define TSCH_CONF_JOIN_HOPPING_START(ch, time) {ch = my_faivorite_chanel;}
+//      - force to choose new chanel for scan
+//  #define TSCH_CONF_JOIN_HOPPING_START(ch, time) {time -= TSCH_CHANNEL_SCAN_DURATION;}
+//
+#ifdef TSCH_CONF_JOIN_HOPPING_START
+#define TSCH_JOIN_HOPPING_START(ch, time)  TSCH_CONF_JOIN_HOPPING_START(ch, time)
+#else
+#define TSCH_JOIN_HOPPING_START(ch, time)
 #endif
 
 /* By default: initialize schedule from EB when associating, using the
@@ -362,6 +418,14 @@
 
 /* A custom feature allowing upper layers to assign packets to
  * a specific slotframe and link */
+// 1 - enables PACKETBUF_ATTR_TSCH_SLOTFRAME/TIMESLOT attributes
+#define  TSCH_LINK_SELECTOR_ENABLED 1
+// 2 - enbles this attributes for received packets.
+//      it costs more memory for receiving packets atributes.
+#define  TSCH_LINK_SELECTOR_ENABLEDRX 2
+
+/* A custom feature allowing upper layers to assign packets to
+ * a specific slotframe and link */
 #ifdef TSCH_CONF_WITH_LINK_SELECTOR
 #define TSCH_WITH_LINK_SELECTOR TSCH_CONF_WITH_LINK_SELECTOR
 #else /* TSCH_CONF_WITH_LINK_SELECTOR */
@@ -373,6 +437,17 @@
 #define TSCH_LINK_COMPARATOR TSCH_CONF_LINK_COMPARATOR
 #else
 #define TSCH_LINK_COMPARATOR(a, b) default_tsch_link_comparator(a, b)
+#endif
+
+/* sheduling policy*/
+// Enable skip slots that have ho xfer activity - options RX or TX are disabled
+#define TSCH_SCHEDULE_OMMIT_NOXFER    1
+
+/* shedule policies set */
+#ifdef TSCH_SCHEDULE_CONF_POLICY
+#define TSCH_SCHEDULE_POLICY TSCH_SCHEDULE_CONF_POLICY
+#else
+#define TSCH_SCHEDULE_POLICY 0
 #endif
 
 /******** Configuration: CSMA *******/
@@ -422,6 +497,47 @@
 by default, useful in case of duplicate seqno */
 #endif
 
+/* Estimate possible looses fo timesource EB. need to prevent timesync loose
+ * when used EB slot with option LINK_OPTION_TIME_EB_ESCAPE
+ * \sa LINK_OPTION_TIME_EB_ESCAPE
+ * */
+#ifdef TSCH_CONF_TIMESYNC_EB_LOOSES
+#define TSCH_TIMESYNC_EB_LOOSES TSCH_CONF_TIMESYNC_EB_LOOSES
+#else
+//#define TSCH_TIMESYNC_EB_LOOSES 5
+#define TSCH_TIMESYNC_EB_LOOSES TSCH_MAC_MAX_FRAME_RETRIES
+#endif
+
+/* phantom TSCH adress, if != eb_adress, binds width adress declared in links
+ * this allows use different queues on same receiver adress,
+ * denoted to different links
+ * */
+#ifdef TSCH_CONF_WITH_PHANTOM_NBR
+#define TSCH_WITH_PHANTOM_NBR TSCH_CONF_WITH_PHANTOM_NBR
+#else
+#define TSCH_WITH_PHANTOM_NBR  0
+#endif /* TSCH_CONF_EB_AUTOSELECT */
+
+//* Initiates sequence no of packets from RTclock at strtup.
+//* this should help to pass though duplicates filter when fast
+//* chip restarts.
+#ifndef TSCH_CONF_SEQ_FROMRT
+#define TSCH_CONF_SEQ_FROMRT 0
+#endif
+
+/* TSCH send/receive events polling style.
+ * */
+//< tsch events are executed all in one cycle. Simpler code.
+#define TSCH_POLLING_STRONG    0
+//< tsch events are executed yielding by pause. Gives better cooperative
+//      it still enSUREs TX events before RX
+#define TSCH_POLLING_RELAXED   1
+#ifdef TSCH_CONF_POLLING_STYLE
+#define TSCH_POLLING_STYLE TSCH_CONF_POLLING_STYLE
+#else
+#define TSCH_POLLING_STYLE 0
+#endif
+
 /******** Configuration: hardware-specific settings *******/
 
 /* HW frame filtering enabled */
@@ -431,11 +547,50 @@ by default, useful in case of duplicate seqno */
 #define TSCH_HW_FRAME_FILTERING 1
 #endif /* TSCH_CONF_HW_FRAME_FILTERING */
 
+/* HW issues, that TSCH should handle  */
+// denotes that radio can generate spurous RX events, or frames, while wait received
+//  packet. and this packets should be droped while last readen packet read.
+#define TSCH_HW_FEATURE_SPUROUS_RX  1
+// denotes that radio receive can be reset by TransmitPower reset. Else use
+//   ordinar radio.off
+#define TSCH_HW_FEATURE_BREAK_BY_POWER  2
+// denotes use radio.pending() as test for received packet.
+//      helpful when radio.receiving is not relyable
+#define TSCH_HW_FEATURE_RECV_BY_PENDING 4
+#ifdef TSCH_CONF_HW_FEATURE
+#define TSCH_HW_FEATURE TSCH_CONF_HW_FEATURE
+#else /* TSCH_CONF_HW_FEATURE */
+#define TSCH_HW_FEATURE 0
+#endif /* TSCH_CONF_HW_FEATURE */
+
 /* Keep radio always on within TSCH timeslot (1) or turn it off between packet and ACK? (0) */
 #ifdef TSCH_CONF_RADIO_ON_DURING_TIMESLOT
 #define TSCH_RADIO_ON_DURING_TIMESLOT TSCH_CONF_RADIO_ON_DURING_TIMESLOT
 #else
 #define TSCH_RADIO_ON_DURING_TIMESLOT 0
+#endif
+
+/* ACK timing style:
+ * \value 0 - default: old behaviour - where ACK at time position from estimated
+ *              packet trasmition time.
+ *              tx_duration(t) + TSCH_DEFAULT_TS_TX_ACK_DELAY
+ * \value 1 - immediate ACK after receive + TSCH_DEFAULT_TS_TX_ACK_DELAY.
+ *          rely on radio_driver behaviour - that blocks receive/transmit operation
+ *          right for operation time.
+ *  */
+#define TSCH_ACK_TIMING_OLD         0
+#define TSCH_ACK_TIMING_IMMEDIATE   1
+#ifdef TSCH_CONF_ACK_TIMING_STYLE
+#define TSCH_ACK_TIMING_STYLE TSCH_CONF_ACK_TIMING_STYLE
+#elif CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64
+// cooja default RTimer resolution poor
+#   if defined(RTIMER_CONF_ARCH_SECOND) && (RTIMER_CONF_ARCH_SECOND > 2000)
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
+#   else
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_OLD
+#   endif
+#else
+#define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
 #endif
 
 /* TSCH timeslot timing template */
@@ -448,6 +603,11 @@ by default, useful in case of duplicate seqno */
 /* Configurable Rx guard time is micro-seconds */
 #ifndef TSCH_CONF_RX_WAIT
 #define TSCH_CONF_RX_WAIT 2200
+#endif /* TSCH_CONF_RX_WAIT */
+
+/* Configurable guard time [us] for turn on radio, before slot activity */
+#ifndef TSCH_CONF_RFON_GUARD_TIME
+#define TSCH_CONF_RFON_GUARD_TIME 0
 #endif /* TSCH_CONF_RX_WAIT */
 
 #endif /* __TSCH_CONF_H__ */

@@ -6,6 +6,8 @@ include $(CONTIKI)/Makefile.dir-variables
 
 MODULES += $(CONTIKI_NG_STORAGE_DIR)/cfs $(CONTIKI_NG_SERVICES_DIR)/unit-test
 
+CONTIKI_WITH_RIME = 1
+
 CONTIKI_PROJECT = test-cfs test-coffee example-coffee
 all: $(CONTIKI_PROJECT)
 

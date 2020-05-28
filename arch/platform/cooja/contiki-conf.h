@@ -33,6 +33,10 @@
 #ifndef CONTIKI_CONF_H_
 #define CONTIKI_CONF_H_
 
+#ifndef CONTIKI_TARGET_COOJA
+#define CONTIKI_TARGET_COOJA 1
+#endif
+
 /* include the project config */
 #ifdef PROJECT_CONF_PATH
 #include PROJECT_CONF_PATH
@@ -103,6 +107,10 @@
 #define CC_CONF_VA_ARGS                1
 #define CC_CONF_INLINE inline
 
+#ifndef PACKETBUF_CONF_ATTRS_INLINE
+#define PACKETBUF_CONF_ATTRS_INLINE       1
+#endif
+
 /* These names are deprecated, use C99 names. */
 #include <inttypes.h>
 typedef uint8_t u8_t;
@@ -115,16 +123,41 @@ typedef unsigned short uip_stats_t;
 #define CLOCK_CONF_SECOND 1000L
 typedef unsigned long clock_time_t;
 
+// COOGA have not problems with RTimer latency, therefore it no need guard rTimer ISR
+#ifndef RTIMER_CONF_GUARD_TIME
+#define RTIMER_CONF_GUARD_TIME 0
+#endif
+
 /* Use 64-bit rtimer (default in Contiki-NG is 32) */
 #define RTIMER_CONF_CLOCK_SIZE 8
 
-/* 1 len byte, 2 bytes CRC */
-#define RADIO_PHY_OVERHEAD         3
-/* 250kbps data rate. One byte = 32us */
-#define RADIO_BYTE_AIR_TIME       32
-#define RADIO_DELAY_BEFORE_TX 0
-#define RADIO_DELAY_BEFORE_RX 0
-#define RADIO_DELAY_BEFORE_DETECT 0
+/*  RTIMER_CONF_ARCH_SECOND definition requests cooja to simulate polling
+ *      with demanded rtimer step.
+ *  This helps achieve RTIMER_BUSYWAIT_UNTIL_ABS accuracy and behaviour close
+ *      to real platforms. This demanded for precise TSCH simulation
+ * WARN: change default behaviour of COOJA sim was not apropriated, so you should
+ *      provide RTIMER_CONF_ARCH_SECOND explicitly, if need simulate this BUSYWAIT precise
+ */
+//#define RTIMER_CONF_ARCH_SECOND                     10000
+
+
+
+#ifndef RADIO_CONF_HDR_PATH
+#include "dev/cooja-radio-def.h"
+#else
+#include RADIO_CONF_HDR_PATH
+#endif
+
+#ifndef TSCH_CONF_ACK_TIMING_STYLE
+#   if defined(RTIMER_CONF_ARCH_SECOND) && (RTIMER_CONF_ARCH_SECOND > 2000)
+// RTimer resolution pretty enough to track packet end, so avoid packet duration evaluate,
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_IMMEDIATE
+#   else
+// cooja default RTimer resolution poor, so provide ACK timing rely on
+//      evaluated packet duration
+#       define TSCH_ACK_TIMING_STYLE TSCH_ACK_TIMING_OLD
+#   endif
+#endif
 
 #define UIP_ARCH_IPCHKSUM        1
 
