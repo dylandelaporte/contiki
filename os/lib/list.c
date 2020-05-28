@@ -233,13 +233,12 @@ list_pop(list_t list)
  *
  */
 /*---------------------------------------------------------------------------*/
-void
-list_remove(list_t list, void *item)
+bool list_remove(list_t list, void *item)
 {
   struct list *l, *r;
 
   if(*list == NULL) {
-    return;
+    return false;
   }
 
   r = NULL;
@@ -253,10 +252,11 @@ list_remove(list_t list, void *item)
         r->next = l->next;
       }
       l->next = NULL;
-      return;
+      return true;
     }
     r = l;
   }
+  return false;
 }
 /*---------------------------------------------------------------------------*/
 /**
