@@ -370,7 +370,7 @@ sixp_pkt_get_num_cells(sixp_pkt_type_t type, sixp_pkt_code_t code,
   }
 
   /* NumCells is an 8-bit unsigned integer */
-  memcpy(num_cells, body + offset, sizeof(uint8_t));
+  memcpy(num_cells, body + offset, sizeof(*num_cells));
 
   return 0;
 }

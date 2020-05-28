@@ -66,7 +66,7 @@ typedef enum {
 typedef enum {
   SIXP_TRANS_MODE_UNAVAILABLE = 0,
   SIXP_TRANS_MODE_2_STEP,
-  SIXP_TRANS_MODE_3_STEP
+  SIXP_TRANS_MODE_3_STEP,
 } sixp_trans_mode_t;
 
 typedef struct sixp_trans sixp_trans_t;

@@ -253,7 +253,9 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
        trans->mode == SIXP_TRANS_MODE_3_STEP) ||
       (new_state == SIXP_TRANS_STATE_CONFIRMATION_SENT &&
        trans->state == SIXP_TRANS_STATE_CONFIRMATION_SENDING &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP))) {
+       trans->mode == SIXP_TRANS_MODE_3_STEP))
+    )
+  {
       LOG_INFO("6P-trans: trans %p state changes from %u to %u\n",
                trans, trans->state, new_state);
 

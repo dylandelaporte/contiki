@@ -441,16 +441,17 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
      type == SIXP_PKT_TYPE_RESPONSE &&
      sixp_trans_get_cmd(trans) != SIXP_PKT_CMD_CLEAR &&
      code.value != SIXP_PKT_RC_ERR_VERSION &&
-     code.value != SIXP_PKT_RC_ERR_SFID &&
-     (nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
+     code.value != SIXP_PKT_RC_ERR_SFID
+     )
+  if ((nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
     LOG_ERR("6P: sixp_output() fails because of no memory for another nbr\n");
     return -1;
   }
 
   /* set SeqNum */
   if(type == SIXP_PKT_TYPE_REQUEST) {
-    if(nbr == NULL &&
-       (nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
+    if(nbr == NULL)
+    if((nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
       LOG_ERR("6P: sixp_output() fails because it fails to allocate a nbr\n");
       return -1;
     }
