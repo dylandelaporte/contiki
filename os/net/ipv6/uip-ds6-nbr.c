@@ -395,10 +395,11 @@ uip_ds6_nbr_get_ll(const uip_ds6_nbr_t *nbr)
   if(nbr == NULL) {
     return NULL;
   }
-  return (const uip_lladdr_t *)nbr_table_get_lladdr(uip_ds6_nbr_entries,
-                                                    nbr->nbr_entry);
+  return (const uip_lladdr_t *)nbr_table_idx_lladdr(
+                  uip_ds6_nbr_entries_index_from_item(nbr->nbr_entry));
 #else
-  return (const uip_lladdr_t *)nbr_table_get_lladdr(ds6_neighbors, nbr);
+  return (const uip_lladdr_t *)nbr_table_idx_lladdr(
+                  ds6_neighbors_index_from_item(nbr));
 #endif /* UIP_DS6_NBR_MULTI_IPV6_ADDRS */
 }
 /*---------------------------------------------------------------------------*/

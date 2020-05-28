@@ -191,8 +191,8 @@ static uip_lladdr_t *
 uip_ds6_route_nexthop_lladdr(uip_ds6_route_t *route)
 {
   if(route != NULL) {
-    return (uip_lladdr_t *)nbr_table_get_lladdr(nbr_routes,
-                                                route->neighbor_routes);
+    return (uip_lladdr_t *)nbr_table_idx_lladdr(
+                    nbr_routes_index_from_item( route->neighbor_routes));
   } else {
     return NULL;
   }

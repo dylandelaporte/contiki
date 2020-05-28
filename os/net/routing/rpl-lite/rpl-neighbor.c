@@ -245,7 +245,7 @@ rpl_neighbor_rank_via_nbr(rpl_nbr_t *nbr)
 const linkaddr_t *
 rpl_neighbor_get_lladdr(rpl_nbr_t *nbr)
 {
-  return nbr_table_get_lladdr(rpl_neighbors, nbr);
+  return nbr_table_idx_lladdr(rpl_neighbors_index_from_item(nbr));
 }
 /*---------------------------------------------------------------------------*/
 uip_ipaddr_t *

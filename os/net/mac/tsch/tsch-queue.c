@@ -134,7 +134,7 @@ tsch_queue_get_time_source(void)
 linkaddr_t *
 tsch_queue_get_nbr_address(const struct tsch_neighbor *n)
 {
-  return nbr_table_get_lladdr(tsch_neighbors, n);
+  return nbr_table_idx_lladdr(tsch_neighbors_index_from_item(n));
 }
 /*---------------------------------------------------------------------------*/
 /* Update TSCH time source */

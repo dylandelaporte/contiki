@@ -146,7 +146,7 @@ remove_uc_link(const linkaddr_t *linkaddr)
    * (lookup all route next hops) */
   nbr_table_item_t *item = nbr_table_head(nbr_routes);
   while(item != NULL) {
-    linkaddr_t *addr = nbr_table_get_lladdr(nbr_routes, item);
+    linkaddr_t *addr = nbr_table_idx_lladdr(nbr_routes_index_from_item(item));
     if(timeslot == get_node_timeslot(addr)) {
       /* Yes, this timeslot is being used, return */
       return;
