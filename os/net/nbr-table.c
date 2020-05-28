@@ -512,14 +512,18 @@ nbr_table_get_from_lladdr(nbr_table_t *table, const linkaddr_t *lladdr)
 }
 /*---------------------------------------------------------------------------*/
 /* Removes a neighbor from the current table (unset "used" bit) */
-int
-nbr_table_remove(nbr_table_t *table, void *item)
+int nbr_table_idx_remove(nbr_table_t *table, nbr_idx_t item_index)
 {
-  nbr_idx_t item_index = index_from_item(table, item);
   int ret = nbr_set_bit_idx(used_map, table, item_index, 0);
   nbr_set_bit_idx(locked_map, table, item_index, 0);
   return ret;
 }
+
+int nbr_table_remove(nbr_table_t *table, void *item)
+{
+    return nbr_table_idx_remove(table, index_from_item(table, item));
+}
+
 /*---------------------------------------------------------------------------*/
 /* Lock a neighbor for the current table (set "locked" bit) */
 int

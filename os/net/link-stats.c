@@ -84,7 +84,7 @@ link_stats_from_lladdr(const linkaddr_t *lladdr)
 const linkaddr_t *
 link_stats_get_lladdr(const struct link_stats *stat)
 {
-  return nbr_table_idx_lladdr(link_stats_index_from_item(stat));
+  return (const linkaddr_t *)link_stats_lladr_item(stat);
 }
 /*---------------------------------------------------------------------------*/
 /* Are the statistics fresh? */
@@ -295,7 +295,7 @@ link_stats_reset(void)
   struct link_stats *stats;
   stats = nbr_table_head(link_stats);
   while(stats != NULL) {
-    nbr_table_remove(link_stats, stats);
+    link_stats_remove_item(stats);
     stats = nbr_table_next(link_stats, stats);
   }
 }

@@ -68,10 +68,18 @@ typedef int nbr_idx_t;
     static inline type* name##_item_from_index(nbr_idx_t index) {\
         if (index >= 0) \
             return (type *)name->data + index; \
-        return NULL; }\
+        return NULL; } \
     static inline nbr_idx_t name##_index_from_item(const type* item) {\
         if (item != NULL)\
             return (item - (const type *)(name->data));\
+        return -1;} \
+    static inline linkaddr_t* name##_lladr_item(const type* item) {\
+        if (item != NULL)\
+            return nbr_table_idx_lladdr( item - (const type *)(name->data) );\
+        return NULL;} \
+    static inline int name##_remove_item(nbr_table_item_t* item) {\
+        if (item != NULL)\
+            return nbr_table_idx_remove(name, (const type*)item - (const type *)(name->data) );\
         return -1;}
 
 /** \brief A static neighbor table. To be initialized through nbr_table_register(name) */
@@ -85,11 +93,13 @@ typedef int nbr_idx_t;
 #define NBR_TABLE_GLOBAL(type, name) \
   static type _##name##_mem[NBR_TABLE_MAX_NEIGHBORS]; \
   static nbr_table_t name##_struct = { 0, sizeof(type), NULL, (nbr_table_item_t *)_##name##_mem }; \
-  nbr_table_t *name = &name##_struct; \
-  NBR_TABLE_INLINES(type, name)
+  nbr_table_t *name = &name##_struct;
 
 /** \brief Declaration of non-static neighbor tables */
-#define NBR_TABLE_DECLARE(name) extern nbr_table_t *name
+#define NBR_TABLE_DECLARE(type, name) extern nbr_table_t *name;\
+                    NBR_TABLE_INLINES(type, name)
+
+
 
 typedef enum {
         NBR_TABLE_REASON_UNDEFINED,
@@ -122,6 +132,7 @@ nbr_table_item_t *nbr_table_get_from_lladdr(nbr_table_t *table, const linkaddr_t
 /** \name Neighbor tables: set flags (unused, locked, unlocked) */
 /** @{ */
 int nbr_table_remove(nbr_table_t *table, nbr_table_item_t *item);
+int nbr_table_idx_remove(nbr_table_t *table, nbr_idx_t idx);
 int nbr_table_lock(nbr_table_t *table, nbr_table_item_t *item);
 int nbr_table_unlock(nbr_table_t *table, nbr_table_item_t *item);
 /** @} */

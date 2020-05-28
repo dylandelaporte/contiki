@@ -306,7 +306,7 @@ uip_ds6_nbr_rm(uip_ds6_nbr_t *nbr)
     uip_packetqueue_free(&nbr->packethandle);
 #endif /* UIP_CONF_IPV6_QUEUE_PKT */
     NETSTACK_ROUTING.neighbor_state_changed(nbr);
-    return nbr_table_remove(ds6_neighbors, nbr);
+    return ds6_neighbors_remove_item(nbr);
   }
   return 0;
 #endif /* UIP_DS6_NBR_MULTI_IPV6_ADDRS */
@@ -398,8 +398,7 @@ uip_ds6_nbr_get_ll(const uip_ds6_nbr_t *nbr)
   return (const uip_lladdr_t *)nbr_table_idx_lladdr(
                   uip_ds6_nbr_entries_index_from_item(nbr->nbr_entry));
 #else
-  return (const uip_lladdr_t *)nbr_table_idx_lladdr(
-                  ds6_neighbors_index_from_item(nbr));
+  return (const uip_lladdr_t *)ds6_neighbors_lladr_item(nbr);
 #endif /* UIP_DS6_NBR_MULTI_IPV6_ADDRS */
 }
 /*---------------------------------------------------------------------------*/

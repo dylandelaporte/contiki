@@ -205,7 +205,7 @@ remove_neighbor(rpl_nbr_t *nbr)
   if(nbr == curr_instance.dag.unicast_dio_target) {
     curr_instance.dag.unicast_dio_target = NULL;
   }
-  nbr_table_remove(rpl_neighbors, nbr);
+  rpl_neighbors_remove_item(nbr);
   rpl_timers_schedule_state_update(); /* Updating from here is unsafe; postpone */
 }
 /*---------------------------------------------------------------------------*/
@@ -245,7 +245,7 @@ rpl_neighbor_rank_via_nbr(rpl_nbr_t *nbr)
 const linkaddr_t *
 rpl_neighbor_get_lladdr(rpl_nbr_t *nbr)
 {
-  return nbr_table_idx_lladdr(rpl_neighbors_index_from_item(nbr));
+  return rpl_neighbors_lladr_item(nbr);
 }
 /*---------------------------------------------------------------------------*/
 uip_ipaddr_t *

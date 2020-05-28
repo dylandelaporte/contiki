@@ -68,8 +68,6 @@
 
 #endif /* UIP_CONF_MAX_ROUTES */
 
-NBR_TABLE_DECLARE(nbr_routes);
-
 void uip_ds6_route_init(void);
 
 #ifndef UIP_CONF_UIP_DS6_NOTIFICATIONS
@@ -197,6 +195,10 @@ typedef struct uip_ds6_defrt {
   struct stimer lifetime;
   uint8_t isinfinite;
 } uip_ds6_defrt_t;
+
+
+
+NBR_TABLE_DECLARE(struct uip_ds6_route_neighbor_routes, nbr_routes);
 
 /** \name Default router list basic routines */
 /** @{ */

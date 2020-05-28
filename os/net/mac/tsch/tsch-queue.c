@@ -134,7 +134,7 @@ tsch_queue_get_time_source(void)
 linkaddr_t *
 tsch_queue_get_nbr_address(const struct tsch_neighbor *n)
 {
-  return nbr_table_idx_lladdr(tsch_neighbors_index_from_item(n));
+  return tsch_neighbors_lladr_item(n);
 }
 /*---------------------------------------------------------------------------*/
 /* Update TSCH time source */
@@ -219,7 +219,7 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
       tsch_queue_flush_nbr_queue(n);
 
       /* Free neighbor */
-      nbr_table_remove(tsch_neighbors, n);
+      tsch_neighbors_remove_item(n);
     }
   }
 }
