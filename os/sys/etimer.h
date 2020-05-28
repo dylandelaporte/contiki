@@ -78,6 +78,7 @@ struct etimer {
   struct etimer *next;
   struct process *p;
 };
+typedef struct etimer etimer_t;
 
 /**
  * \name Functions called from application programs
