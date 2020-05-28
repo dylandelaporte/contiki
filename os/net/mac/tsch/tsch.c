@@ -574,12 +574,15 @@ int tsch_rx_process_pending()
     } else if(is_eb) {
       eb_input(current_input);
     }
-    return 1;
+    else
+        return 0;
+
 #if BUILD_WITH_MSF
     msf_callback_packet_recv(&current_input->rx_asn,
                              (const linkaddr_t *)frame.src_addr);
 #endif /* BUILD_WITH_MSF */
 
+    return 1;
   }
   return 0;
 }
