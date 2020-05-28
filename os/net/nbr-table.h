@@ -127,6 +127,7 @@ nbr_table_item_t *nbr_table_next(nbr_table_t *table, nbr_table_item_t *item);
 /** @{ */
 nbr_table_item_t *nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_reason_t reason, void *data);
 nbr_table_item_t *nbr_table_get_from_lladdr(nbr_table_t *table, const linkaddr_t *lladdr);
+nbr_table_item_t *nbr_table_get_from_idx(nbr_table_t *table, nbr_idx_t idx);
 /** @} */
 
 /** \name Neighbor tables: set flags (unused, locked, unlocked) */

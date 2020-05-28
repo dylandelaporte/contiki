@@ -504,8 +504,12 @@ void *
 nbr_table_get_from_lladdr(nbr_table_t *table, const linkaddr_t *lladdr)
 {
   nbr_idx_t idx = index_from_lladdr(lladdr);
-  if (idx < 0)
-      return NULL;
+  return nbr_table_get_from_idx(table, idx);
+}
+
+void* nbr_table_get_from_idx(nbr_table_t *table, nbr_idx_t idx){
+    if (idx < 0)
+        return NULL;
   if (nbr_get_bit_idx(used_map, table, idx))
       return item_from_index(table, idx);
   return NULL;
@@ -551,11 +555,13 @@ nbr_table_unlock(nbr_table_t *table, void *item)
 linkaddr_t *
 nbr_table_get_lladdr(nbr_table_t *table, const void *item)
 {
+  // TODO:need check nbr_get_bit( . ) ?
   nbr_table_key_t *key = key_from_item(table, item);
   return key != NULL ? &key->lladdr : NULL;
 }
 
 linkaddr_t *nbr_table_idx_lladdr(nbr_idx_t idx){
+    // TODO:need check nbr_get_bit( . ) ?
     nbr_table_key_t *key = key_from_index(idx);
     return key != NULL ? &key->lladdr : NULL;
 }
