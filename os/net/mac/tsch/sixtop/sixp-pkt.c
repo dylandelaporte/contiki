@@ -51,7 +51,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "6top"
+#define LOG_MODULE "6top pkt"
 #define LOG_LEVEL LOG_LEVEL_6TOP
 
 static int32_t get_metadata_offset(sixp_pkt_type_t type, sixp_pkt_code_t code);

@@ -48,7 +48,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "6top"
+#define LOG_MODULE "6top-trans"
 #define LOG_LEVEL LOG_LEVEL_6TOP
 
 /**
@@ -100,6 +100,7 @@ handle_trans_timeout(void *ptr)
 static void
 start_trans_timer(sixp_trans_t *trans)
 {
+  LOG_DBG("trans(%p) timeout(%p) %d\n", trans, &trans->timer, trans->sf->timeout_interval);
   ctimer_set(&trans->timer, trans->sf->timeout_interval,
              handle_trans_timeout, trans);
 }
@@ -116,6 +117,10 @@ process_trans(void *ptr)
 
   /* make sure that the timer is stopped */
   ctimer_stop(&trans->timer);
+
+  LOG_DBG("trans [peer_addr:");
+  LOG_DBG_LLADDR((const linkaddr_t *)&trans->peer_addr);
+  LOG_DBG_(", seqno:%u]... \n", trans->seqno);
 
   /* state-specific operation */
   if(trans->state == SIXP_TRANS_STATE_TERMINATING) {
@@ -169,6 +174,8 @@ sixp_trans_free(sixp_trans_t *trans)
   if(trans == NULL) {
     return;
   }
+
+  LOG_INFO("trans %p (state %x) free\n", trans, trans->state);
 
   if (trans->state == SIXP_TRANS_STATE_WAIT_FREE) {
     trans->state = SIXP_TRANS_STATE_UNAVAILABLE;
@@ -228,6 +235,8 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
 
   assert(trans != NULL);
   assert(new_state != SIXP_TRANS_STATE_UNAVAILABLE);
+  LOG_INFO("trans %p state %x->%x\n", trans, trans->state, new_state);
+
   /* enforce state transition rules  */
   if(trans != NULL &&
      (new_state == SIXP_TRANS_STATE_TERMINATING ||
@@ -425,6 +434,10 @@ sixp_trans_alloc(const sixp_pkt_t *pkt, const linkaddr_t *peer_addr)
   trans->mode = determine_trans_mode(pkt);
   list_add(trans_list, trans);
   start_trans_timer(trans);
+
+  LOG_DBG("new trans(%p) sf%u [peer_addr:", trans, trans->sf->sfid);
+  LOG_DBG_LLADDR((const linkaddr_t *)&trans->peer_addr);
+  LOG_DBG_(", seqno:%u] code:%x\n", trans->seqno, trans->cmd);
 
   return trans;
 }
