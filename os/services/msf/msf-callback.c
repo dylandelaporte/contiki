@@ -62,6 +62,7 @@ msf_callback_joining_network(void)
 void
 msf_callback_leavning_network(void)
 {
+  LOG_DBG("leaving net\n");
   msf_deactivate();
   tsch_rpl_callback_leaving_network();
 }

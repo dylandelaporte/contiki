@@ -101,12 +101,9 @@ void
 msf_sixp_get_cell_params(const uint8_t *buf,
                          uint16_t *slot_offset, uint16_t *channel_offset)
 {
-  if(buf == NULL || slot_offset == NULL || channel_offset == NULL) {
-    /* do nothing */
-  } else {
+  assert((buf != NULL) && (slot_offset != NULL) && (channel_offset != NULL));
     *slot_offset = buf[0] + (buf[1] << 8);
     *channel_offset = buf[2] + (buf[3] << 8);
-  }
 }
 /*---------------------------------------------------------------------------*/
 bool

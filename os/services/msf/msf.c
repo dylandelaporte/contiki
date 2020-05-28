@@ -222,7 +222,9 @@ timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
 {
   assert(peer_addr != NULL);
   if(cmd == SIXP_PKT_CMD_ADD) {
-    LOG_INFO("ADD transaction ends because of timeout\n");
+    LOG_INFO("ADD transaction ->");
+    LOG_WARN_LLADDR(peer_addr);
+    LOG_INFO_(" ends because of timeout\n");
     msf_reserved_cell_delete_all(peer_addr);
   } else {
     /* do nothing */

@@ -57,6 +57,11 @@
 #define LOG_MODULE "MSF"
 #define LOG_LEVEL LOG_LEVEL_MSF
 
+// this is list elements as:
+//  [tsch_link_t:]
+//  [       data ]  -> [msf_negotiated_cell_data_t:]
+//  [tsch_link_t:] <-  [next:                      ]
+//  [       data ]  -> [msf_negotiated_cell_data_t:]
 typedef struct {
   tsch_link_t *next;
   uint16_t num_tx;
