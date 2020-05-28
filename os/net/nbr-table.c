@@ -64,7 +64,7 @@ static void handle_periodic_timer(void *ptr);
 static struct ctimer periodic_timer;
 static uint8_t initialized = 0;
 static void print_table();
-#define PRINTF(...) LOG_DBG(__VA_ARGS__)
+#define PRINTF(...) printf(__VA_ARGS__)
 #else
 #define PRINTF(...)
 #endif
@@ -116,6 +116,7 @@ LIST(nbr_table_keys);
 #else
 #define ASSERT_NBR( x )
 #define IN_MEMB(m, index) 1
+#define IN_MAPS(m, index) 1
 #define IN_BITMAP(m, index) 1
 #endif
 
@@ -302,7 +303,7 @@ nbr_table_allocate(nbr_table_reason_t reason, void *data)
     lladdr = NBR_TABLE_FIND_REMOVABLE(reason, data);
     if(lladdr == NULL) {
       /* Nothing found that can be deleted - return NULL to indicate failure */
-      PRINTF("*** Not removing entry to allocate new\n");
+      LOG_INFO("*** Not removing entry to allocate new\n");
       return NULL;
     } else {
       /* used least_used_key to indicate what is the least useful entry */
@@ -315,7 +316,7 @@ nbr_table_allocate(nbr_table_reason_t reason, void *data)
       }
       /* Allow delete of locked item? */
       if(least_used_key != NULL && locked) {
-        PRINTF("Deleting locked item!\n");
+        LOG_INFO("Deleting locked item!\n");
         ASSERT_NBR( (index >= 0) && IN_MAPS(locked_map, index) );
         locked_map[index] = 0;
       }
@@ -535,7 +536,7 @@ nbr_table_lock(nbr_table_t *table, void *item)
 {
 #if DEBUG
   int i = index_from_item(table, item);
-  PRINTF("*** Lock %d\n", i);
+  LOG_DBG("*** Lock %d\n", i);
 #endif
   return nbr_set_bit(locked_map, table, item, 1);
 }
@@ -546,7 +547,7 @@ nbr_table_unlock(nbr_table_t *table, void *item)
 {
 #if DEBUG
   int i = index_from_item(table, item);
-  PRINTF("*** Unlock %d\n", i);
+  LOG_DBG("*** Unlock %d\n", i);
 #endif
   return nbr_set_bit(locked_map, table, item, 0);
 }
