@@ -426,6 +426,27 @@ tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe,
   }
   return NULL;
 }
+
+tsch_link_t *tsch_schedule_get_any_link_by_timeslot(tsch_slotframe_t *slotframe,
+                                        tsch_slot_offset_t timeslot)
+{
+  if(!tsch_is_locked()) {
+    if(slotframe != NULL) {
+      struct tsch_link *l = list_head(slotframe->links_list);
+      /* Loop over all items. Assume there is max one link per timeslot and channel_offset */
+      while(l != NULL) {
+        if(l->timeslot == timeslot) {
+          return l;
+        }
+        l = list_item_next(l);
+      }
+      return l;
+    }
+  }
+  return NULL;
+}
+
+
 /*---------------------------------------------------------------------------*/
 static struct tsch_link *
 default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
