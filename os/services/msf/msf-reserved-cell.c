@@ -36,6 +36,7 @@
  */
 
 #include "contiki.h"
+#include <stdint.h>
 #include "assert.h"
 
 #include "lib/random.h"
@@ -45,6 +46,8 @@
 #include "msf-autonomous-cell.h"
 #include "msf-housekeeping.h"
 #include "msf-negotiated-cell.h"
+#include "msf-reserved-cell.h"
+#include "msf-avoid-cell.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
@@ -54,33 +57,43 @@
 extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
 
 /* static functions */
-static int32_t find_unused_slot_offset(tsch_slotframe_t *slotframe);
+static long find_unused_slot_offset(tsch_slotframe_t *slotframe);
+static uint16_t  find_unused_slot_chanel(uint16_t slot);
 
 /*---------------------------------------------------------------------------*/
-static int32_t
-find_unused_slot_offset(tsch_slotframe_t *slotframe)
+static
+long find_unused_slot_offset(tsch_slotframe_t *slotframe)
 {
-  int32_t ret, slot_offset;
-  uint16_t slot_offset_base;
+  long ret;
+  uint16_t slot_offset;
   const tsch_link_t *autonomous_rx_cell = msf_autonomous_cell_get_rx();
 
   assert(autonomous_rx_cell != NULL);
 
-  slot_offset_base = random_rand() % slotframe->size.val;
+  slot_offset = random_rand() % slotframe->size.val;
   ret = -1;
-  for(int i = 0; i < slotframe->size.val; i++) {
-    slot_offset = (slot_offset_base + i) % slotframe->size.val;
-    tsch_link_t* sheduled_link = tsch_schedule_get_link_by_timeslot(slotframe, slot_offset
-                                    , autonomous_rx_cell->channel_offset);
-    if(sheduled_link == NULL &&
-       slot_offset != 0 &&
-       slot_offset != autonomous_rx_cell->timeslot) {
+  for(int i = 0; i < slotframe->size.val; ++i, ++slot_offset) {
+    if (slot_offset >= slotframe->size.val)
+        slot_offset = 0;
+    tsch_link_t* sheduled_link = tsch_schedule_get_any_link_by_timeslot(slotframe, slot_offset);
+    if(sheduled_link != NULL)
+        continue;
+
+    if (!msf_is_avoid_nbr_slot(slot_offset, NULL)){
+        // this slot is not alocated by own cells, so can share it with other
+        //      neighbors by channel resolve
+        if (ret < 0)
+            ret = slot_offset;
+    }
+
+    if (!msf_is_avoid_slot(slot_offset))
+    {
       /*
        * avoid using the slot offset of 0, which is used by the
-       * minimal schedule, as well as the slot offset of the autonoous
+       * minimal schedule, as well as the slot offset of the autonoüous
        * RX cell
        */
-      ret = slot_offset;
+      return slot_offset;
       break;
     } else {
       /* try the next one */
@@ -88,6 +101,33 @@ find_unused_slot_offset(tsch_slotframe_t *slotframe)
   }
   return ret;
 }
+
+#if defined( __GNUC__ )
+static inline
+int ffz( unsigned int x ){  return __builtin_ctz(~x); }
+#elif  _XOPEN_SOURCE >= 700 \
+        || ! (_POSIX_C_SOURCE >= 200809L) \
+        || /* Glibc since 2.19: */ _DEFAULT_SOURCE \
+        || /* Glibc versions <= 2.19: */ _BSD_SOURCE \
+        || _SVID_SOURCE
+static inline
+int ffz( unsigned int x ){  return ffs(~x); }
+#elif defined(__CTZ)
+static inline
+int ffz( unsigned int x ){  return __CTZ(~x); }
+#endif
+
+static
+uint16_t  find_unused_slot_chanel(uint16_t slot){
+    msf_chanel_mask_t busych =  msf_avoid_slot_chanels(slot);
+    if (busych != ~0ul) {
+        return ffz(busych);
+    }
+    // all chanels are busy, select any random for hope
+    uint16_t ch = random_rand();
+    return ch % tsch_hopping_sequence_length.val;
+}
+
 /*---------------------------------------------------------------------------*/
 int
 msf_reserved_cell_get_num_cells(const linkaddr_t *peer_addr)
@@ -118,7 +158,7 @@ msf_reserved_cell_get_num_cells(const linkaddr_t *peer_addr)
 /*---------------------------------------------------------------------------*/
 tsch_link_t *
 msf_reserved_cell_get(const linkaddr_t *peer_addr,
-                      int32_t slot_offset, int32_t channel_offset)
+                      long slot_offset, long channel_offset)
 {
   tsch_slotframe_t *slotframe = msf_negotiated_cell_get_slotframe();
   tsch_link_t *cell;
@@ -186,7 +226,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   if(_slot_offset >= 0) {
     if(channel_offset < 0) {
       /* pick a channel offset */
-      _channel_offset = random_rand() % tsch_hopping_sequence_length.val;
+      _channel_offset = find_unused_slot_chanel(_slot_offset);
     } else if (channel_offset > (tsch_hopping_sequence_length.val - 1)) {
       /* invalid channel offset */
       _channel_offset = -1;
@@ -210,6 +250,10 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
               "slot_offset:%ld, channel_offset:%ld\n",
               _slot_offset, _channel_offset);
     }
+  }
+  else{
+      LOG_DBG("reserve miss at slot_offset:%u, channel_offset:%u\n",
+              (uint16_t)slot_offset, (uint16_t)channel_offset);
   }
 
   return cell;
@@ -241,4 +285,3 @@ msf_reserved_cell_delete_all(const linkaddr_t *peer_addr)
     }
   }
 }
-/*---------------------------------------------------------------------------*/

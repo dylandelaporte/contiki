@@ -45,6 +45,7 @@
 #include "msf-autonomous-cell.h"
 #include "msf-housekeeping.h"
 #include "msf-negotiated-cell.h"
+#include "msf-avoid-cell.h"
 #include "msf-num-cells.h"
 
 #include "sys/log.h"
@@ -203,6 +204,7 @@ msf_callback_tsch_nbr_removed(tsch_neighbor_t *nbr)
   } else {
     /* delete an autnomous cell for the peer if it exists */
     msf_autonomous_cell_delete_tx(tsch_queue_get_nbr_address(nbr));
+    msf_unvoid_nbr_cells(nbr);
   }
 }
 /*---------------------------------------------------------------------------*/

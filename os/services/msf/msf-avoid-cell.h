@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inria.
+ * Copyright (c) 2020, Alexrayne.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,54 +34,55 @@
  */
 /**
  * \file
- *         MSF Reserved Cell APIs
+ *         MSF Avoiding Cell APIs
  * \author
- *         Yasuyuki Tanaka <yasuyuki.tanaka@inria.fr>
+ *         alexrayne <alexraynepe196@gmail.com>
  */
 
-#ifndef _MSF_RESERVED_CELL_H_
-#define _MSF_RESERVED_CELL_H_
+#ifndef _MSF_AVOID_CELL_H_
+#define _MSF_AVOID_CELL_H_
 
 #include <stdint.h>
 
 #include "net/linkaddr.h"
 #include "net/mac/tsch/tsch.h"
-#include "msf-negotiated-cell.h"
+#include "net/mac/tsch/sixtop/sixp-pkt.h"
 
-/**
- * \brief Return the number of reserved cells for a peer
- * \param peer_addr The MAC address of the target peer
- */
-int msf_reserved_cell_get_num_cells(const linkaddr_t *peer_addr);
+typedef sixp_cell_t msf_cell_t;
 
-/**
- * \brief Return a reserved cell matching conditions
- * \param peer_addr The MAC address of a target cell
- * \param slot_offset The slot offset of a target cell
- * \param channel_offset The channel offset of a target cell
- * \return non-NULL if found, otherwise NULL
- */
-tsch_link_t *msf_reserved_cell_get(const linkaddr_t *peer_addr,
-                                   long slot_offset,
-                                   long channel_offset);
+static inline
+msf_cell_t msf_cell_of_link(const tsch_link_t* x){
+    msf_cell_t cell;
+    cell.field.slot    = x->timeslot;
+    cell.field.chanel  = x->channel_offset;
+    return cell;
+}
 
-/**
- * \brief Add (reserve) a cell in the slotframe for negotiated cells
- * \param peer_addr The MAC address of the peer
- * \param cell_type Type of a reserved cell (TX or RX)
- * \param slot_offset The slot offset of a reserved cell
- * \param channel_offset The channel offset of a reserved cell
- */
-tsch_link_t *msf_reserved_cell_add(const linkaddr_t *peer_addr,
-                                   msf_negotiated_cell_type_t cell_type,
-                                   int32_t slot_offset,
-                                   int32_t channel_offset);
 
-/**
- * \brief Delete all the cells reserved for a peer
- * \param peer_addr The MAC address of the peer
- */
-void msf_reserved_cell_delete_all(const linkaddr_t *peer_addr);
+// same as reset all
+void msf_unvoid_all_cells();
+
+void msf_avoid_cell(msf_cell_t x);
+void msf_unvoid_cell(msf_cell_t x);
+
+void msf_avoid_link_cell(const tsch_link_t* x);
+void msf_unvoid_link_cell(const tsch_link_t* x);
+
+int  msf_is_avoid_cell(msf_cell_t x);
+int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset);
+int  msf_is_avoid_slot(uint16_t slot_offset);
+
+typedef int msf_chanel_mask_t;
+msf_chanel_mask_t  msf_avoid_slot_chanels(uint16_t slot_offset);
+
+void msf_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+void msf_unvoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+void msf_unvoid_nbr_cells(const tsch_neighbor_t* n);
+
+int  msf_is_avoid_cell_from(msf_cell_t x, const linkaddr_t *peer_addr);
+int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
+
 
 
 #endif /* _MSF_RESERVED_CELL_H_ */

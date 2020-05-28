@@ -52,6 +52,7 @@
 #include "msf-housekeeping.h"
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
+#include "msf-avoid-cell.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
@@ -159,6 +160,7 @@ msf_negotiated_cell_activate(void)
   slotframe = tsch_schedule_get_slotframe_by_handle(
     MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS);
   assert(slotframe != NULL);
+  msf_unvoid_all_cells();
 }
 /*---------------------------------------------------------------------------*/
 void
