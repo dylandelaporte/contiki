@@ -44,6 +44,7 @@
 #include "net/nbr-table.h"
 
 #include "sixp.h"
+#include "sixp-nbr.h"
 
 /* Log configuration */
 #include "sys/log.h"
@@ -57,14 +58,18 @@
  * multiple SFs. It's unclear whether we should use a different generation
  * counter for each SFs.
  */
-typedef struct sixp_nbr {
-  struct sixp_nbr *next;
-  linkaddr_t addr;
-  uint8_t next_seqno;
-} sixp_nbr_t;
 
-NBR_TABLE(sixp_nbr_t, sixp_nbrs);
+NBR_TABLE_GLOBAL(sixp_nbr_t, sixp_nbrs);
 
+/*---------------------------------------------------------------------------*/
+
+sixp_nbr_t* sixp_nbr_head(void){
+    return nbr_table_head(sixp_nbrs);
+}
+
+sixp_nbr_t* sixp_nbr_next(sixp_nbr_t *nbr){
+    return nbr_table_next(sixp_nbrs, nbr);
+}
 /*---------------------------------------------------------------------------*/
 sixp_nbr_t *
 sixp_nbr_find(const linkaddr_t *addr)
