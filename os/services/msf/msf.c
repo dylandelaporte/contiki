@@ -73,7 +73,8 @@ static void error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd,
                           uint8_t seqno, const linkaddr_t *peer_addr);
 
 /* variables */
-static bool activated = false;
+bool msf_activated = false;
+#define activated msf_activated
 
 /*---------------------------------------------------------------------------*/
 const struct MSFConstantInfo msf_constants_patern[] = {
@@ -253,12 +254,6 @@ error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
   if(err == SIXP_ERROR_SCHEDULE_INCONSISTENCY) {
     msf_negotiated_cell_delete_all(peer_addr);
   }
-}
-/*---------------------------------------------------------------------------*/
-bool
-msf_is_activated(void)
-{
-  return activated;
 }
 /*---------------------------------------------------------------------------*/
 bool

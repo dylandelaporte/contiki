@@ -230,12 +230,6 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
   }
 }
 /*---------------------------------------------------------------------------*/
-const linkaddr_t *
-msf_housekeeping_get_parent_addr(void)
-{
-  return (const linkaddr_t *)parent_addr;
-}
-/*---------------------------------------------------------------------------*/
 void
 msf_housekeeping_delete_cell_to_relocate(void)
 {

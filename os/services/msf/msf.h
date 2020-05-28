@@ -93,7 +93,12 @@ extern const sixtop_sf_t msf;
  * \brief Return whether MSF is activated or not
  * \return true if MSF is activated, otherwise false
  */
-bool msf_is_activated(void);
+static inline
+bool msf_is_activated(void) {
+  extern bool msf_activated;
+  return msf_activated;
+}
+
 
 /**
  * \brief Return if MSF schedules are ready for advertising the
