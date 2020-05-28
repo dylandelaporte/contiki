@@ -529,6 +529,15 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
   return 0;
 }
 /*---------------------------------------------------------------------------*/
+#include "sixp-pkt-ex.h"
+int
+sixp_pkt_output(SIXPeerHandle* peer, uint8_t sfid,
+            sixp_sent_callback_t func, void *arg, uint16_t arg_len){
+    return sixp_output(peer->h.type, peer->h.code, sfid
+                       , peer->h.body, peer->h.body_len, peer->addr
+                       , func, arg, arg_len);
+}
+/*---------------------------------------------------------------------------*/
 void
 sixp_init(void)
 {

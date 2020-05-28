@@ -53,7 +53,6 @@ typedef uint8_t sixp_pkt_reserved_t;
 typedef uint16_t sixp_pkt_metadata_t;
 typedef uint16_t sixp_pkt_max_num_cells_t;
 typedef uint16_t sixp_pkt_offset_t;
-typedef uint32_t sixp_pkt_cell_t;
 typedef uint16_t sixp_pkt_total_num_cells_t;
 
 /**
@@ -114,6 +113,20 @@ typedef enum {
   SIXP_PKT_CELL_OPTION_RX     = 0x02, /**< RX Cell */
   SIXP_PKT_CELL_OPTION_SHARED = 0x04  /**< SHARED Cell */
 } sixp_pkt_cell_option_t;
+
+//typedef uint32_t sixp_pkt_cell_t;
+//an application structure
+union sixp_cell {
+    uint32_t    raw;
+    struct __attribute__((packed)) cell_t {
+        uint16_t    slot;
+        uint16_t    chanel;
+    }           field;
+};
+typedef union sixp_cell sixp_cell_t;
+
+// an packet structure
+typedef union sixp_cell sixp_pkt_cell_t __attribute__((aligned (1)));
 
 /**
  * \brief 6top IE Structure
