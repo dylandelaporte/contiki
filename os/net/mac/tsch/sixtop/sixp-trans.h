@@ -131,6 +131,12 @@ const linkaddr_t *sixp_trans_get_peer_addr(sixp_trans_t *trans);
 void sixp_trans_invoke_callback(sixp_trans_t *trans,
                                 sixp_output_status_t status);
 
+static inline
+sixp_trans_t* sixp_trans_now(){
+    extern sixp_trans_t* sixp_current_trans;
+    return sixp_current_trans;
+}
+
 /**
  * \brief Set an output callback to a specified transaction
  * \param trans The pointer to a transaction

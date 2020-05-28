@@ -370,6 +370,8 @@ sixp_trans_get_peer_addr(sixp_trans_t *trans)
   }
 }
 /*---------------------------------------------------------------------------*/
+sixp_trans_t* sixp_current_trans = NULL;
+
 void
 sixp_trans_invoke_callback(sixp_trans_t *trans, sixp_output_status_t status)
 {
@@ -378,6 +380,7 @@ sixp_trans_invoke_callback(sixp_trans_t *trans, sixp_output_status_t status)
   if(trans == NULL || trans->callback.func == NULL) {
     return;
   }
+  sixp_current_trans = trans;
   trans->callback.func(trans->callback.arg, trans->callback.arg_len,
                        &trans->peer_addr, status);
 }
