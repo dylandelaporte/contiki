@@ -72,8 +72,8 @@ struct tsch_neighbor *tsch_queue_get_nbr(const linkaddr_t *addr);
  */
 static inline
 struct tsch_neighbor *tsch_queue_get_time_source(void){
-    extern struct tsch_neighbor *n_time_source;
-    return n_time_source;
+    extern struct tsch_neighbor *tsch_time_source;
+    return tsch_time_source;
 }
 /**
  * \brief Get the address of a neighbor.
