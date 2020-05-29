@@ -40,6 +40,7 @@
 
 #include "sixp.h"
 #include "sixp-pkt.h"
+#include <stdbool.h>
 
 /**
  * \brief 6P Transaction States (for internal use)
@@ -185,11 +186,27 @@ void sixp_trans_free(sixp_trans_t *trans);
  */
 sixp_trans_t *sixp_trans_find(const linkaddr_t *peer_addr);
 
+// @brief checks that have any active transaction
+// @return true - some transaction are active
+bool    sixp_trans_any();
+
 /**
  * \brief Initialize Memory and List for 6P transactions
  * This function removes and frees existing transactions.
  */
 int sixp_trans_init(void);
 
+
+
 /*---------------------------------------------------------------------------*/
+
+/* callbacks */
+#ifdef SIXP_AFTER_TRANS_FREE
+void SIXP_AFTER_TRANS_FREE(void);
+#else
+#define SIXP_AFTER_TRANS_FREE(...)
+#endif
+
+/*---------------------------------------------------------------------------*/
+
 /** @} */

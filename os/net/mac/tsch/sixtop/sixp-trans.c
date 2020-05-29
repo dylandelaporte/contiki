@@ -197,6 +197,7 @@ sixp_trans_free(sixp_trans_t *trans)
   } else {
     memset(trans, 0, sizeof(sixp_trans_t));
     memb_free(&trans_memb, trans);
+    SIXP_AFTER_TRANS_FREE();
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -445,6 +446,18 @@ sixp_trans_alloc(const sixp_pkt_t *pkt, const linkaddr_t *peer_addr)
   return trans;
 }
 /*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_head(){
+    return list_head(trans_list);
+}
+
+sixp_trans_t *sixp_trans_next(sixp_trans_t* x){
+    return x->next;
+}
+
+bool sixp_trans_any(){
+    return list_head(trans_list) != NULL;
+}
+
 sixp_trans_t *
 sixp_trans_find(const linkaddr_t *peer_addr)
 {

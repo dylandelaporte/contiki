@@ -43,6 +43,8 @@
 #ifndef _SIXTOP_6P_PACKET_H_
 #define _SIXTOP_6P_PACKET_H_
 
+#include <stdint.h>
+
 #define SIXP_PKT_VERSION  0x00
 
 /* typedefs for code readability */
