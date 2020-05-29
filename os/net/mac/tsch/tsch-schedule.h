@@ -133,6 +133,15 @@ struct tsch_link *tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slot
                                         tsch_slot_offset_t timeslot, uint16_t channel_offset);
 
 /**
+ * \brief Looks within a slotframe for a first link with a given timeslot
+ * \param slotframe The desired slotframe
+ * \param timeslot The desired timeslot
+ * \return The link if found, NULL otherwise
+ */
+tsch_link_t *tsch_schedule_get_any_link_by_timeslot(tsch_slotframe_t *slotframe,
+                                        tsch_slot_offset_t timeslot);
+
+/**
  * \brief Removes a link
  * \param slotframe The slotframe the link belongs to
  * \param l The link to be removed
