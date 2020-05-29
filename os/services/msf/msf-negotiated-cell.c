@@ -262,29 +262,17 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
   return new_cell == NULL ? -1 : 0;
 }
 /*---------------------------------------------------------------------------*/
-void
-msf_negotiated_cell_delete(tsch_link_t *cell)
-{
-  linkaddr_t peer_addr;
-  const char *cell_type_str;
-  tsch_link_t *curr_cell, *prev_cell;
-  uint16_t slot_offset, channel_offset;
+static
+void msf_negotiated_drop_tx_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
+    if (nbr->negotiated_tx_cell == NULL)
+        return;
 
-  assert(slotframe != NULL);
-  assert(cell != NULL);
-  linkaddr_copy(&peer_addr, &cell->addr);
-
-  if(cell->link_options == LINK_OPTION_TX) {
-    tsch_neighbor_t *nbr;
-    cell_type_str = "TX";
-
-    nbr = tsch_queue_get_nbr(&peer_addr);
-    assert(nbr != NULL);
-    assert(nbr->negotiated_tx_cell != NULL);
     /* update the chain of the negotiated cells */
+    tsch_link_t *curr_cell, *prev_cell;
     for(curr_cell = nbr->negotiated_tx_cell, prev_cell = NULL;
         curr_cell != NULL;
-        curr_cell = ((msf_negotiated_cell_data_t *)curr_cell->data)->next) {
+        curr_cell = ((msf_negotiated_cell_data_t *)curr_cell->data)->next) 
+    {
       if(curr_cell == cell) {
         if(prev_cell == NULL) {
           nbr->negotiated_tx_cell =
@@ -299,6 +287,45 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
         prev_cell = curr_cell;
       }
     }
+}
+
+static
+void msf_negotiated_drop_all_tx(tsch_neighbor_t *nbr){
+    if (nbr->negotiated_tx_cell == NULL)
+        return;
+
+    /* update the chain of the negotiated cells */
+    tsch_link_t *curr_cell, *next_cell;
+    for(curr_cell = nbr->negotiated_tx_cell;
+        curr_cell != NULL;
+        curr_cell = next_cell)
+    {
+        next_cell = ((msf_negotiated_cell_data_t *)curr_cell->data)->next;
+        memb_free(&msf_negotiated_cell_data_memb, curr_cell);
+    }
+
+    nbr->negotiated_tx_cell = NULL;
+}
+
+void
+msf_negotiated_cell_delete(tsch_link_t *cell)
+{
+  linkaddr_t peer_addr;
+  const char *cell_type_str;
+  uint16_t slot_offset, channel_offset;
+
+  assert(slotframe != NULL);
+  assert(cell != NULL);
+  linkaddr_copy(&peer_addr, &cell->addr);
+
+  tsch_neighbor_t *nbr = NULL;
+  if(cell->link_options == LINK_OPTION_TX) {
+    cell_type_str = "TX";
+
+    nbr = tsch_queue_get_nbr(&cell->addr);
+    assert(nbr != NULL);
+    assert(nbr->negotiated_tx_cell != NULL);
+    msf_negotiated_drop_tx_cell(nbr, cell);
   } else {
     assert(cell->link_options == LINK_OPTION_RX);
     cell_type_str = "RX";
@@ -320,18 +347,33 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
   assert(slotframe);
 
   {
-    tsch_neighbor_t *nbr;
+    tsch_neighbor_t *nbr = NULL;
     tsch_link_t *next_cell;
-    if((nbr = tsch_queue_get_nbr(peer_addr)) != NULL) {
+    if(peer_addr == NULL) {
+        for(cell = list_head(slotframe->links_list);
+            cell != NULL;
+            cell = next_cell)
+        {
+          next_cell = list_item_next(cell);
+          nbr = tsch_queue_get_nbr(&cell->addr);
+          assert(nbr != NULL);
+          msf_negotiated_drop_all_tx(nbr);
+          cell->link_options = LINK_OPTION_RESERVED_LINK;
+          msf_negotiated_cell_delete(cell);
+          //msf_housekeeping_delete_cell_later(cell);
+        }
+        LOG_INFO("removed all negotiated cells\n");
+    } else {
+      nbr = tsch_queue_get_nbr(peer_addr);
+      assert(nbr != NULL);
+      if (nbr == NULL)
+            //strange this
+            return;
+
       for(cell = list_head(slotframe->links_list);
           cell != NULL;
           cell = next_cell) {
         next_cell = list_item_next(cell);
-        if(peer_addr == NULL){
-            msf_negotiated_cell_delete(cell);
-            continue;
-        }
-        else
         if(linkaddr_cmp(&cell->addr, peer_addr) &&
            (cell->link_options & LINK_OPTION_LINK_TO_DELETE) == 0) {
           msf_negotiated_cell_delete(cell);
