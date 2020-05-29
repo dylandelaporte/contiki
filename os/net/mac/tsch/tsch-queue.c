@@ -251,9 +251,6 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
         p = memb_alloc(&packet_memb);
         if(p != NULL) {
           /* Enqueue packet */
-#ifdef TSCH_CALLBACK_PACKET_READY
-          TSCH_CALLBACK_PACKET_READY();
-#endif
           p->qb = queuebuf_new_from_packetbuf();
           if(p->qb != NULL) {
             p->sent = sent;
