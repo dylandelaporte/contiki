@@ -372,6 +372,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
           //msf_housekeeping_delete_cell_later(cell);
         }
         LOG_INFO("removed all negotiated cells\n");
+        MSF_AFTER_CELL_CLEAN(NULL);
     } else {
       nbr = tsch_queue_get_nbr(peer_addr);
       assert(nbr != NULL);
@@ -392,6 +393,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
         }
       }
       nbr->negotiated_tx_cell = NULL;
+      MSF_AFTER_CELL_CLEAN(nbr);
     }
   }
 }

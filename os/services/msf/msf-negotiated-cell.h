@@ -188,7 +188,7 @@ void MSF_AFTER_CELL_RELEASE(tsch_neighbor_t *nbr, tsch_link_t *cell);
 #endif
 
 #ifdef MSF_AFTER_CELL_CLEAN
-void MSF_AFTER_CELL_CLEAN( void);
+void MSF_AFTER_CELL_CLEAN( tsch_neighbor_t *nbr );
 #else
 #define MSF_AFTER_CELL_CLEAN(...)
 #endif
