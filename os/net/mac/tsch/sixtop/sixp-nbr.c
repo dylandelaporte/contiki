@@ -59,7 +59,7 @@
  * counter for each SFs.
  */
 
-NBR_TABLE_GLOBAL(sixp_nbr_t, sixp_nbrs);
+NBR_TABLE(sixp_nbr_t, sixp_nbrs);
 
 /*---------------------------------------------------------------------------*/
 
