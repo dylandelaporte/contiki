@@ -78,6 +78,16 @@
 #define LOG_MODULE "TSCH"
 #define LOG_LEVEL LOG_LEVEL_MAC
 
+// turn on TSCH_PRINT if have some LOG_LEVEL_MAC
+#if LOG_CONF_LEVEL_MAC > LOG_LEVEL_NONE
+#define DEBUG   (DEBUG_PRINT)
+#else
+#define DEBUG   0
+#endif
+#include "net/net-debug.h"
+
+
+
 /* The address of the last node we received an EB from (other than our time source).
  * Used for recovery */
 static linkaddr_t last_eb_nbr_addr;
