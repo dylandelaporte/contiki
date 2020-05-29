@@ -147,8 +147,7 @@ msf_callback_packet_sent(uint16_t slot_offset,
   }
 }
 /*---------------------------------------------------------------------------*/
-void
-msf_callback_packet_recv(const struct tsch_asn_t *asn,
+int msf_callback_packet_recv(const struct tsch_asn_t *asn,
                          const linkaddr_t *src_addr)
 {
   /*
@@ -174,6 +173,7 @@ msf_callback_packet_recv(const struct tsch_asn_t *asn,
     }
     msf_negotiated_cell_rx_is_used(src_addr, slot_offset);
   }
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 void

@@ -72,7 +72,7 @@ void msf_callback_packet_sent(uint16_t slot_offset,
  * \param asn ASN at which the reception occurs
  * \param src_addr The source address of the received frame
  */
-void msf_callback_packet_recv(const struct tsch_asn_t *asn,
+int msf_callback_packet_recv(const struct tsch_asn_t *asn,
                               const linkaddr_t *src_addr);
 
 /**

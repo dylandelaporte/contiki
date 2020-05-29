@@ -49,16 +49,12 @@
 #include "net/mac/tsch/tsch-schedule.h"
 #include "net/mac/mac.h"
 
-/*********** Callbacks *********/
-
 /***** External Variables *****/
 
 /* Broadcast and EB virtual neighbors */
 extern struct tsch_neighbor *n_broadcast;
 extern struct tsch_neighbor *n_eb;
 
-//* private variable for xxx_time_source methods. do ton use it directly
-extern struct tsch_neighbor *n_time_source;
 /********** Functions *********/
 
 /**
@@ -78,8 +74,8 @@ struct tsch_neighbor *tsch_queue_get_nbr(const linkaddr_t *addr);
  */
 static inline
 struct tsch_neighbor *tsch_queue_get_time_source(void){
-    extern struct tsch_neighbor *n_time_source;
-    return n_time_source;
+    extern struct tsch_neighbor *tsch_time_source;
+    return tsch_time_source;
 }
 /**
  * \brief Get the address of a neighbor.

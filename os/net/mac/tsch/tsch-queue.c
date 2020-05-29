@@ -120,12 +120,12 @@ tsch_queue_get_nbr(const linkaddr_t *addr)
 }
 /*---------------------------------------------------------------------------*/
 /* Get a TSCH time source (we currently assume there is only one) */
-struct tsch_neighbor *n_time_source = NULL;
+struct tsch_neighbor *tsch_time_source = NULL;
 /*---------------------------------------------------------------------------*/
 linkaddr_t *
 tsch_queue_get_nbr_address(const struct tsch_neighbor *n)
 {
-  return nbr_table_get_lladdr(tsch_neighbors, n);
+  return tsch_neighbors_lladr_item(n);
 }
 /*---------------------------------------------------------------------------*/
 /* Update TSCH time source */
@@ -170,7 +170,7 @@ tsch_queue_update_time_source(const linkaddr_t *new_addr)
         if(old_time_src != NULL) {
           old_time_src->is_time_source = 0;
         }
-        n_time_source = new_time_src;
+        tsch_time_source = new_time_src;
 
         tsch_stats_reset_neighbor_stats();
 
@@ -230,7 +230,7 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
 #endif /* BUILD_WITH_MSF */
 
       /* Free neighbor */
-      nbr_table_remove(tsch_neighbors, n);
+      tsch_neighbors_remove_item(n);
     }
   }
 }
@@ -262,9 +262,6 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
         p = memb_alloc(&packet_memb);
         if(p != NULL) {
           /* Enqueue packet */
-#ifdef TSCH_CALLBACK_PACKET_READY
-          TSCH_CALLBACK_PACKET_READY();
-#endif
           p->qb = queuebuf_new_from_packetbuf();
           if(p->qb != NULL) {
             p->sent = sent;

@@ -76,13 +76,11 @@
 #endif /* TSCH_LOG_CONF_LEVEL */
 
 #ifndef DEBUG
-// turn on TSCH_PRINT if have some LOG_LEVEL_MAC
-#if LOG_CONF_LEVEL_MAC > LOG_LEVEL_NONE
-#define DEBUG   (DEBUG_PRINT)
+// TSCH_PRINT use net-debug.h debug printer
+// so need to:
+//  #define DEBUG (DEBUG_PRINT)
+//  #include "net/net-debug.h"
 #endif
-#endif
-
-#include "net/net-debug.h"
 
 
 
@@ -107,11 +105,7 @@
 #if TSCH_LOG_LEVEL < 2 /* For log level 0 or 1, the logging functions do nothing */
 
 #define TSCH_IS_LOG  0
-#if ((DEBUG) & DEBUG_PRINT)
-#define TSCH_IS_PRINT 1
-#else
-#define TSCH_IS_PRINT 0
-#endif
+#define TSCH_IS_PRINT ((DEBUG) & DEBUG_PRINT)
 
 #define tsch_log_init()
 #define tsch_log_process_pending()  0
