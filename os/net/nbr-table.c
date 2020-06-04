@@ -392,7 +392,7 @@ nbr_table_register(nbr_table_t *table, nbr_table_callback *callback)
     table->index = num_tables++;
     table->callback = callback;
     all_tables[table->index] = table;
-    LOG_DBG("registen new table %p ->[%u]\n", table, num_tables);
+    LOG_DBG("register table %p ->[%u]\n", table, num_tables);
     return 1;
   } else {
     /* Maximum number of tables exceeded */
@@ -576,7 +576,7 @@ print_table()
   PRINTF("NBR TABLE:\n");
   for(i = 0; i < NBR_TABLE_MAX_NEIGHBORS; i++) {
     if(used_map[i] > 0) {
-      PRINTF(" %02d %02d",i , key_from_index(i)->lladdr.u8[LINKADDR_SIZE - 1]);
+      PRINTF(" %02d %03d",i , key_from_index(i)->lladdr.u8[LINKADDR_SIZE - 1]);
       for(j = 0; j < num_tables; j++) {
         PRINTF(" [%d:%d]", (used_map[i] & (1 << j)) != 0,
                (locked_map[i] & (1 << j)) != 0);
