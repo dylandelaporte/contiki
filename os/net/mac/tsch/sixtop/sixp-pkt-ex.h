@@ -44,18 +44,6 @@
 
 
 
-// initates pkt for outgoing
-void sixp_pkt_init(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
-
-//  same as sixp_pkt_init, but init for incoming
-void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
-
-// sixp_pkt_alloc demcoposed as -> sixp_pkt_init + sixp_pkt_build
-int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
-                    const uint8_t *body, uint16_t body_len );
-
-
-
 struct SIXPHandle {
     const uint8_t*  body;
     unsigned        body_len;

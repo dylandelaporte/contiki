@@ -943,12 +943,18 @@ input(sixp_pkt_type_t type, sixp_pkt_code_t code,
   sixp_pkt_cmd_t cmd;
   int i;
 
+  sixp_pkt_t pkt;
+  sixp_pkt_init_in(&pkt, type, code, SF_PLUGTEST_SFID);
+  pkt.body = body;
+  pkt.body_len = body_len;
+
   switch(type) {
     case SIXP_PKT_TYPE_REQUEST:
       cmd = code.cmd;
       break;
     case SIXP_PKT_TYPE_RESPONSE:
-      if((trans = sixp_trans_find(src_addr)) == NULL) {
+      trans = sixp_trans_find_for_pkt(src_addr, &pkt);
+      if(trans == NULL) {
         LOG_ERR("internal error; cannot find a trans\n");
         return;
       }

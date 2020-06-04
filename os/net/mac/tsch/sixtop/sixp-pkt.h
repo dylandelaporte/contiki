@@ -490,5 +490,16 @@ int sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
                     const uint8_t *body, uint16_t body_len,
                     sixp_pkt_t *pkt);
 
+
+// initates pkt for outgoing request
+void sixp_pkt_init(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
+
+//  same as sixp_pkt_init, but init for incoming request
+void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
+
+// sixp_pkt_create demcoposed as -> sixp_pkt_init + sixp_pkt_build
+int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
+                    const uint8_t *body, uint16_t body_len );
+
 #endif /* !_SIXP_PKT_H_ */
 /** @} */
