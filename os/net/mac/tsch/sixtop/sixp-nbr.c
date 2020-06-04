@@ -48,7 +48,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "6top"
+#define LOG_MODULE "6top nbr"
 #define LOG_LEVEL LOG_LEVEL_6TOP
 
 /**
@@ -98,6 +98,9 @@ sixp_nbr_alloc(const linkaddr_t *addr)
     LOG_ERR_("]\n");
     return NULL;
   }
+  LOG_DBG("sixp_nbr_alloc() [peer_addr:");
+  LOG_DBG_LLADDR((const linkaddr_t *)addr);
+  LOG_DBG_("]\n");
 
   if((nbr = (sixp_nbr_t *)nbr_table_add_lladdr(sixp_nbrs,
                                                addr,
@@ -118,6 +121,9 @@ sixp_nbr_free(sixp_nbr_t *nbr)
 {
   assert(nbr != NULL);
   if(nbr != NULL) {
+      LOG_DBG("sixp_nbr_free() [peer_addr:");
+      LOG_DBG_LLADDR(sixp_nbrs_lladr_item(nbr));
+      LOG_DBG_("]\n");
     (void)nbr_table_remove(sixp_nbrs, nbr);
   }
 }

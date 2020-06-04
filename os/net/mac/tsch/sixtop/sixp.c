@@ -279,6 +279,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
          * RC_ERR_SEQNUM. in this case, we don't want to allocate
          * another transaction for this new request.
          */
+        LOG_DBG("seq break: %u expects %u\n", pkt.seqno, seqno);
         handle_schedule_inconsistency(sf, (const sixp_pkt_t *)&pkt, src_addr);
         return;
       } else {
@@ -322,10 +323,11 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
     /* Inconsistency Management */
     if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
        ( ( (pkt.seqno != 0) && (nbr == NULL) )
-       ||( (pkt.seqno == 0) && (nbr != NULL) && (sixp_nbr_get_next_seqno(nbr) != 0))
+       ||( (pkt.seqno == 0) && (nbr != NULL) && (sixp_nbr_get_next_seqno(nbr) > 0))
        )
       )
     {
+      LOG_DBG("seq break: %u vs expected %d\n", pkt.seqno, sixp_nbr_get_next_seqno(nbr) );
       if(trans != NULL) {
         sixp_trans_transit_state(trans,
                                  SIXP_TRANS_STATE_REQUEST_RECEIVED);

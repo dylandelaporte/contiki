@@ -237,11 +237,16 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
   int ret_val;
 
   assert(trans != NULL);
+  if(trans == NULL) {
+      /* trans == NULL */
+      LOG_ERR("6top: invalid argument, trans is NULL\n");
+      return -1;
+  }
+
   assert(new_state != SIXP_TRANS_STATE_UNAVAILABLE);
   LOG_INFO("trans %p state %x->%x\n", trans, trans->state, new_state);
 
   /* enforce state transition rules  */
-  if(trans != NULL){
       bool ok = (new_state == SIXP_TRANS_STATE_TERMINATING);
       if (!ok){
           // check that trans direction keep allowed, or comes to final (indirected) state
@@ -257,9 +262,6 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
               ok = (trans->mode == SIXP_TRANS_MODE_3_STEP);
       }
   if (ok){
-      LOG_INFO("6P-trans: trans %p state changes from %x to %x\n",
-               trans, trans->state, new_state);
-
       if(new_state == SIXP_TRANS_STATE_REQUEST_SENT) {
         /* next_seqno should have been updated in sixp_output() */
       } else if(new_state == SIXP_TRANS_STATE_RESPONSE_SENT) {
@@ -291,11 +293,6 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
     }
     ret_val = -1;
   }// if (ok)
-  } else {
-    /* trans == NULL */
-    LOG_ERR("6top: invalid argument, trans is NULL\n");
-    ret_val = -1;
-  }
   return ret_val;
 }
 /*---------------------------------------------------------------------------*/
@@ -517,7 +514,8 @@ sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr
             // every request - is a new incomig transaction, or outgoing
             //  so look for trans that are request-related
             if (dir == pkt->dir){
-                LOG_DBG("trans(%p)[%x] mutch for %x pkt:%d\n", trans, trans->state
+                LOG_DBG("trans(%p)[%x/%u] mutch for %x pkt:%d\n"
+                                , trans, trans->state, trans->seqno
                                                             , pkt->dir, pkt->type);
                 return trans;
             }
@@ -526,7 +524,8 @@ sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr
         case SIXP_PKT_TYPE_RESPONSE:
             // responces comes in for outgoing inrequest, or comes out for incoming
             if (dir == pkt_back){
-                LOG_DBG("trans(%p)[%x] mutch for %x pkt:%d\n", trans, trans->state
+                LOG_DBG("trans(%p)[%x/%u] mutch for %x pkt:%d\n"
+                                 , trans, trans->state, trans->seqno
                                                             , pkt->dir, pkt->type);
                 return trans;
             }
