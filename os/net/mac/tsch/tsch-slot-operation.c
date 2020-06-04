@@ -443,48 +443,6 @@ tsch_get_network_uptime_ticks(void)
   return uptime_ticks;
 }
 
-/* Post TX: Update neighbor state after a transmission */
-static int
-update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet *p,
-                      struct tsch_link *link, uint8_t mac_tx_status)
-{
-  int in_queue = 1;
-  int is_shared_link = link->link_options & LINK_OPTION_SHARED;
-  int is_unicast = !n->is_broadcast;
-
-  if(mac_tx_status == MAC_TX_OK) {
-    /* Successful transmission */
-    tsch_queue_remove_packet_from_queue(n);
-    in_queue = 0;
-
-    /* Update CSMA state in the unicast case */
-    if(is_unicast) {
-      if(is_shared_link || tsch_queue_is_empty(n)) {
-        /* If this is a shared link, reset backoff on success.
-         * Otherwise, do so only is the queue is empty */
-        tsch_queue_backoff_reset(n);
-      }
-    }
-  } else {
-    /* Failed transmission */
-    if(p->transmissions >= TSCH_MAC_MAX_FRAME_RETRIES + 1) {
-      /* Drop packet */
-      tsch_queue_remove_packet_from_queue(n);
-      in_queue = 0;
-    }
-    /* Update CSMA state in the unicast case */
-    if(is_unicast) {
-      /* Failures on dedicated (== non-shared) leave the backoff
-       * window nor exponent unchanged */
-      if(is_shared_link) {
-        /* Shared link: increment backoff exponent, pick a new window */
-        tsch_queue_backoff_inc(n);
-      }
-    }
-  }
-
-  return in_queue;
-}
 /*---------------------------------------------------------------------------*/
 //* TSCH use state of RF to plan next timeslot operation
 enum tsch_rf_states{
