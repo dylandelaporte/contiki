@@ -249,7 +249,9 @@ tsch_reset(void)
   tsch_slot_operation_stop();
   frame802154_set_pan_id(0xffff);
   /* First make sure pending packet callbacks are sent etc */
+  if(tsch_status > tschINITIALISED){
   process_post_synch(&tsch_pending_events_process, PROCESS_EVENT_POLL, NULL);
+  }
   /* Reset neighbor queues */
   tsch_queue_reset();
   /* Remove unused neighbors */
