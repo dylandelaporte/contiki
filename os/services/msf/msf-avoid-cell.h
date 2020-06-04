@@ -47,6 +47,7 @@
 #include "net/linkaddr.h"
 #include "net/mac/tsch/tsch.h"
 #include "net/mac/tsch/sixtop/sixp-pkt.h"
+#include "net/mac/tsch/sixtop/sixp-pkt-ex.h"
 
 typedef sixp_cell_t msf_cell_t;
 
@@ -82,6 +83,15 @@ void msf_unvoid_nbr_cells(const tsch_neighbor_t* n);
 int  msf_is_avoid_cell_from(msf_cell_t x, const linkaddr_t *peer_addr);
 int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
 int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
+
+//@return - amount of avoid cells
+int msf_avoid_num_cells();
+
+// @result - cells->head.num_cells= amount of filled cells
+// @return - >0 - amount of cells append
+// @return - =0 - no cells to enumerate
+// @return - <0 - no cells append, not room to <cells>
+int msf_avoid_enum_cells(SIXPCellsPkt* cells, unsigned limit);
 
 
 

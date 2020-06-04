@@ -185,7 +185,9 @@ void msf_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
     if (msf_is_avoid_nbr_cell(x, n))
         return;
     if (avoids_list_num < MSF_USED_LIST_LIMIT){
-        LOG_DBG("avoid %lx:%p\n", (unsigned long)(x.raw), n);
+        LOG_DBG("avoid %u+%u ->", (unsigned)(x.field.slot), (unsigned)(x.field.chanel));
+        LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
+        LOG_DBG_("\n");
         avoids_list[avoids_list_num] = x;
         avoids_nbrs[avoids_list_num] = n;
         ++avoids_list_num;
@@ -206,8 +208,11 @@ void msf_unvoid_cell(msf_cell_t x){
 void msf_unvoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
     int idx = msf_avoids_nbr_cell_idx(x, n);
     if (idx >= 0){
-        LOG_DBG("free %xl:%p\n", (unsigned long)(avoids_list[idx].raw), avoids_nbrs[idx]);
-        avoids_list[idx].raw = cellFREE;
+        msf_cell_t* cell = avoids_list + idx;
+        LOG_DBG("free %u+%u ->", (unsigned)(cell->field.slot), (unsigned)(cell->field.chanel));
+        LOG_DBG_LLADDR( tsch_queue_get_nbr_address(avoids_nbrs[idx]) );
+        LOG_DBG_("\n");
+        cell->raw = cellFREE;
         avoids_nbrs[idx]     = NULL;
         nouse_free_count++;
         if (nouse_free_count >= cellFREE_COUNT_TRIGGER){
@@ -238,7 +243,7 @@ void msf_unvoid_nbr_cells(const tsch_neighbor_t* n){
 
         if (cells[idx].raw != cellFREE)
             ++nouse_free_count;
-        LOG_DBG("free %xl\n", (unsigned long)cells[idx].raw);
+        LOG_DBG("free %u+%u\n", (unsigned)cells[idx].field.slot, (unsigned)cells[idx].field.chanel);
         cells[idx].raw = cellFREE;
     }
     if (nouse_free_count >= cellFREE_COUNT_TRIGGER){
@@ -274,4 +279,46 @@ void msf_unuse_cleanup(){
         idx = k-2;
     }
     nouse_free_count = 0;
+}
+
+//@return - amount of avoid cells
+int msf_avoid_num_cells(){
+    int res = 0;
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
+        if (avoids_nbrs[idx] != NULL)
+            continue;
+        if (cell->raw != cellFREE)
+            ++res;
+    }
+    return res;
+}
+
+// @result - cells->head.num_cells= amount of filled cells
+// @return - >0 - amount of cells append
+// @return - =0 - no cells to enumerate
+// @return - <0 - no cells append, not room to <cells>
+int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit){
+    if ( pkt->head.num_cells >= limit)
+        return -1;
+
+    int res = 0;
+    msf_cell_t* cell = avoids_list;
+
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
+        if (avoids_nbrs[idx] != NULL)
+            continue;
+        if (cell->raw != cellFREE){
+            if ( pkt->head.num_cells < limit){
+                msf_cell_t* x = pkt->cells + pkt->head.num_cells;
+                x->field.slot   = cell->field.slot;
+                x->field.chanel = cell->field.chanel;
+                ++res;
+                ++pkt->head.num_cells;
+                if (pkt->head.num_cells >= limit)
+                    return res;
+            }
+        }
+    }
+    return res;
 }
