@@ -358,6 +358,12 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
     }
   }
 
+  if (nbr == NULL)
+  if ((nbr = sixp_nbr_alloc(src_addr)) == NULL) {
+    LOG_ERR("6P: sixp_input() fails because of no memory for another nbr\n");
+    return;
+  }
+
   /* state transition */
   assert(trans != NULL);
   switch(pkt.type) {
