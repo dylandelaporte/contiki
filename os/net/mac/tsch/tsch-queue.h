@@ -184,5 +184,13 @@ void tsch_queue_update_all_backoff_windows(const linkaddr_t *dest_addr);
  */
 void tsch_queue_init(void);
 
+/**
+ * \brief Add a TSCH neighbors traverse head
+ * \param addr The link-layer address of the neighbor to be added
+ */
+struct tsch_neighbor *tsch_neighbors_head(void);
+struct tsch_neighbor *tsch_neighbors_next(struct tsch_neighbor *);
+
+
 #endif /* __TSCH_QUEUE_H__ */
 /** @} */
