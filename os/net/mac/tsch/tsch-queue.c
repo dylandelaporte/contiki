@@ -76,6 +76,17 @@ NBR_TABLE(struct tsch_neighbor, tsch_neighbors);
 struct tsch_neighbor *n_broadcast;
 struct tsch_neighbor *n_eb;
 
+
+
+/*---------------------------------------------------------------------------*/
+struct tsch_neighbor *tsch_neighbors_head(void){
+    return (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+}
+
+struct tsch_neighbor *tsch_neighbors_next(struct tsch_neighbor *n){
+    return (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Add a TSCH neighbor */
 struct tsch_neighbor *
@@ -387,9 +398,9 @@ tsch_queue_reset(void)
 {
   /* Deallocate unneeded neighbors */
   if(!tsch_is_locked()) {
-    struct tsch_neighbor *n = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *n = tsch_neighbors_head();
     while(n != NULL) {
-      struct tsch_neighbor *next_n = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+      struct tsch_neighbor *next_n = tsch_neighbors_next(n);
       /* Flush queue */
       tsch_queue_flush_nbr_queue(n);
       /* Reset backoff exponent */
@@ -410,9 +421,9 @@ void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style)
 {
   /* Deallocate unneeded neighbors */
   if(!tsch_is_locked()) {
-    struct tsch_neighbor *n = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *n = tsch_neighbors_head();
     while(n != NULL) {
-      struct tsch_neighbor *next_n = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+      struct tsch_neighbor *next_n = tsch_neighbors_next(n);
       /* Queue is empty, no tx link to this neighbor: deallocate.
        * Always keep time source and virtual broadcast neighbors. */
       if(!n->is_broadcast && !n->is_time_source && !n->tx_links_count){
@@ -484,10 +495,10 @@ struct tsch_packet *
 tsch_queue_get_unicast_packet_for_any(struct tsch_neighbor **n, struct tsch_link *link)
 {
   if(!tsch_is_locked()) {
-    struct tsch_neighbor *curr_nbr = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *curr_nbr = tsch_neighbors_head();
     struct tsch_packet *p = NULL;
     for(; curr_nbr != NULL
-        ; curr_nbr = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, curr_nbr) )
+        ; curr_nbr = tsch_neighbors_next( curr_nbr ) )
     {
       if(!curr_nbr->is_broadcast && curr_nbr->tx_links_count == 0) {
         /* Only look up for non-broadcast neighbors we do not have a tx link to */
@@ -543,14 +554,18 @@ tsch_queue_update_all_backoff_windows(const linkaddr_t *dest_addr)
 {
   if(!tsch_is_locked()) {
     int is_broadcast = linkaddr_cmp(dest_addr, &tsch_broadcast_address);
-    struct tsch_neighbor *n = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *n = tsch_neighbors_head();
     while(n != NULL) {
       if(n->backoff_window != 0 /* Is the queue in backoff state? */
-         && ((n->tx_links_count == 0 && is_broadcast)
-             || (n->tx_links_count > 0 && linkaddr_cmp(dest_addr, tsch_queue_get_nbr_address(n))))) {
+         && ((n->tx_links_count == 0 && is_broadcast) // why?
+             || (n->tx_links_count > 0
+                 && linkaddr_cmp(dest_addr, tsch_queue_get_nbr_address(n))
+             ))
+         )
+      {
         n->backoff_window--;
       }
-      n = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+      n = tsch_neighbors_next(n);
     }
   }
 }
