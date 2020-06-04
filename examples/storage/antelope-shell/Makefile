@@ -10,4 +10,6 @@ PLATFORMS_ONLY= cc2538dk zoul
 CONTIKI_PROJECT = shell-db
 all: $(CONTIKI_PROJECT)
 
+CONTIKI_WITH_RIME = 1
+
 include $(CONTIKI)/Makefile.include

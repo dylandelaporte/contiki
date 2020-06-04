@@ -50,7 +50,7 @@
 #ifndef IEEE802154_CONF_DEFAULT_CHANNEL
 #define IEEE802154_CONF_DEFAULT_CHANNEL 26
 #endif /* IEEE802154_CONF_DEF_CHANNEL */
-
+/*---------------------------------------------------------------------------*/
 /* QUEUEBUF_CONF_NUM specifies the number of queue buffers. Queue
    buffers are used throughout the Contiki netstack but the
    configuration option can be tweaked to save memory. Performance can
@@ -78,6 +78,12 @@
 #define NETSTACK_MAX_ROUTE_ENTRIES 16
 #endif /* NETSTACK_MAX_ROUTE_ENTRIES */
 
+/* NETSTACK_CONF_WITH_IPV6 specifies whether or not IPv6 should be used. If IPv6
+   is not used, IPv4 is used instead. */
+#ifndef NETSTACK_CONF_WITH_IPV6
+#define NETSTACK_CONF_WITH_IPV6 0
+#endif /* NETSTACK_CONF_WITH_IPV6 */
+
 /* UIP_CONF_BUFFER_SIZE specifies how much memory should be reserved
    for the uIP packet buffer. This sets an upper bound on the largest
    IP packet that can be received by the system. */
@@ -93,14 +99,31 @@
 
 /* UIP_CONF_IPV6_RPL tells whether the RPL routing protocol is running,
     whether implemented as RPL Lite or RPL Classic */
+#if ROUTING_CONF_NULLROUTING
+#undef UIP_CONF_IPV6_RPL
+#define UIP_CONF_IPV6_RPL 0
+#elif !defined(UIP_CONF_IPV6_RPL)
 #define UIP_CONF_IPV6_RPL (ROUTING_CONF_RPL_LITE || ROUTING_CONF_RPL_CLASSIC)
+#endif
 
 /* If RPL is enabled also enable the RPL NBR Policy */
-#if UIP_CONF_IPV6_RPL
 #ifndef NBR_TABLE_FIND_REMOVABLE
+#if UIP_CONF_IPV6_RPL
 #define NBR_TABLE_FIND_REMOVABLE rpl_nbr_policy_find_removable
-#endif /* NBR_TABLE_FIND_REMOVABLE */
 #endif /* UIP_CONF_IPV6_RPL */
+#endif /* NBR_TABLE_FIND_REMOVABLE */
+
+/* UIP_CONF_MAX_ROUTES specifies the maximum number of routes that each
+   node will be able to handle. */
+#ifndef UIP_CONF_MAX_ROUTES
+#define UIP_CONF_MAX_ROUTES 20
+#endif /* UIP_CONF_MAX_ROUTES */
+
+/* RPL_NS_CONF_LINK_NUM specifies the maximum number of links a RPL root
+ * will maintain in non-storing mode. */
+#ifndef RPL_NS_CONF_LINK_NUM
+#define RPL_NS_CONF_LINK_NUM 20
+#endif /* RPL_NS_CONF_LINK_NUM */
 
 /* UIP_CONF_UDP specifies if UDP support should be included or
    not. Disabling UDP saves memory but breaks a lot of stuff. */
@@ -129,6 +152,13 @@
 #define UIP_CONF_TCP_CONNS 0
 #endif /* UIP_CONF_TCP */
 #endif /* UIP_CONF_TCP_CONNS */
+
+/* UIP_CONF_TCP_SPLIT enables a performance optimization hack, where
+   each maximum-sized TCP segment is split into two, to avoid the
+   performance degradation that is caused by delayed ACKs. */
+#ifndef UIP_CONF_TCP_SPLIT
+#define UIP_CONF_TCP_SPLIT 0
+#endif /* UIP_CONF_TCP_SPLIT */
 
 /* UIP_CONF_ND6_SEND_RA enables standard IPv6 Router Advertisement.
  * We enable it by default when IPv6 is used without RPL. */
@@ -202,5 +232,6 @@
 #ifndef SICSLOWPAN_CONF_COMPRESSION
 #define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_IPHC
 #endif /* SICSLOWPAN_CONF_COMPRESSION */
+
 
 #endif /* CONTIKI_DEFAULT_CONF_H */

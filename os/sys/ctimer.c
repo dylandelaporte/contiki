@@ -44,7 +44,9 @@
 
 #include "sys/ctimer.h"
 #include "contiki.h"
+#include <assert.h>
 #include "lib/list.h"
+#include "sys/clock.h"
 
 LIST(ctimer_list);
 
@@ -72,17 +74,42 @@ PROCESS_THREAD(ctimer_process, ev, data)
 
   while(1) {
     PROCESS_YIELD_UNTIL(ev == PROCESS_EVENT_TIMER);
-    for(c = list_head(ctimer_list); c != NULL; c = c->next) {
-      if(&c->etimer == data) {
-        list_remove(ctimer_list, c);
-        PROCESS_CONTEXT_BEGIN(c->p);
-        if(c->f != NULL) {
-          c->f(c->ptr);
+    PRINTF("ctimer on %p\n", data);
+    assert(data != NULL);
+
+    //protect vs recursive messages passed on starts exired timers
+    if ( etimer_expired((struct etimer *)data) ){
+        const unsigned etimer_offs = (uintptr_t)&(((struct ctimer *)NULL)->etimer);
+        c = (struct ctimer *)((uintptr_t)data - etimer_offs);
+        bool removed = list_remove(ctimer_list, c);
+        if (removed)
+        {
+            PROCESS_CONTEXT_BEGIN(c->p);
+            if(c->f != NULL) {
+              c->f(c->ptr);
+            }
+            PROCESS_CONTEXT_END(c->p);
         }
-        PROCESS_CONTEXT_END(c->p);
-        break;
-      }
+        else
+            PRINTF("not my ctimer\n");
     }
+
+    /*
+    for(c = list_head(ctimer_list); c != NULL; c = c->next) {
+      if(&c->etimer != data)
+          continue;
+
+      if(etimer_expired(&c->etimer))
+      {
+          list_remove(ctimer_list, c);
+          PROCESS_CONTEXT_BEGIN(c->p);
+          if(c->f != NULL) {
+            c->f(c->ptr);
+          }
+          PROCESS_CONTEXT_END(c->p);
+      }
+        break;
+    }*/
   }
   PROCESS_END();
 }
@@ -106,14 +133,24 @@ void
 ctimer_set_with_process(struct ctimer *c, clock_time_t t,
                         void (*f)(void *), void *ptr, struct process *p)
 {
-  PRINTF("ctimer_set %p %lu\n", c, (unsigned long)t);
+  PRINTF("ctimer_set %p %lu<-%p\n", c, (unsigned long)t, ptr);
   c->p = p;
   c->f = f;
   c->ptr = ptr;
   if(initialized) {
+    if (t > 0) {
     PROCESS_CONTEXT_BEGIN(&ctimer_process);
     etimer_set(&c->etimer, t);
     PROCESS_CONTEXT_END(&ctimer_process);
+    }
+    else {
+        PRINTF("ctimer_set %p wake\n", c);
+        c->etimer.timer.start = clock_time();
+        // this ensures that expired timer is signals
+        process_post(&ctimer_process, PROCESS_EVENT_TIMER, &c->etimer);
+        list_push(ctimer_list, c);
+        return;
+    }
   } else {
     c->etimer.timer.interval = t;
   }
@@ -148,6 +185,7 @@ ctimer_restart(struct ctimer *c)
 void
 ctimer_stop(struct ctimer *c)
 {
+  PRINTF("ctimer_stop %p\n", c);
   if(initialized) {
     etimer_stop(&c->etimer);
   } else {

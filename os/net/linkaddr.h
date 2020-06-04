@@ -65,10 +65,20 @@ typedef union {
   unsigned char u8[LINKADDR_SIZE];
 #if LINKADDR_SIZE == 2
   uint16_t u16;
+#elif LINKADDR_SIZE == 4
+  uint16_t u16[2];
+  uint32_t u32;
 #else
   uint16_t u16[LINKADDR_SIZE/2];
+  uint16_t u32[LINKADDR_SIZE/4];
 #endif /* LINKADDR_SIZE == 2 */
 } linkaddr_t;
+
+typedef union {
+  uint8_t u8[8];
+  uint16_t u16[4];
+  uint32_t u32[2];
+} linkaddr_extended_t;
 
 /**
  * \brief      Copy a link-layer address

@@ -29,6 +29,22 @@
  */
 /*---------------------------------------------------------------------------*/
 /**
+ * \addtogroup platform
+ * @{
+ *
+ * \defgroup cc26xx-platforms TI CC26xx-powered Platforms
+ * @{
+ *
+ * \defgroup cc26xx The TI CC26xx and CC13xx CPUs
+ *
+ * This group documents the TI CC26xx and CC13xx CPUs. The two CPU families are
+ * very similar, with the main difference being related to radio capability.
+ *
+ * Documentation in this group should be considered to be applicable to both
+ * families, unless explicitly stated otherwise.
+ *
+ * @{
+ *
  * \addtogroup cc26xx-clocks
  * @{
  *
@@ -46,6 +62,7 @@
 #include "contiki.h"
 
 #include "ti-lib.h"
+#include <sys/rtimer.h>
 /*---------------------------------------------------------------------------*/
 static volatile uint64_t count;
 /*---------------------------------------------------------------------------*/
@@ -121,7 +138,13 @@ update_clock_variable(void)
   } while(aon_rtc_secs_now != aon_rtc_secs_now2);
 
   /* Convert AON RTC ticks to clock tick counter */
-  count = (aon_rtc_secs_now * CLOCK_SECOND) + (aon_rtc_ticks_now >> 9);
+#if RTIMER_SECOND == RTIMER_ARCH_SECOND_NORM
+  const unsigned CLK2RT_RATIO = (RTIMER_SECOND/CLOCK_SECOND);
+  count = (aon_rtc_secs_now * CLOCK_SECOND) + (aon_rtc_ticks_now / CLK2RT_RATIO);
+#else
+  uint64_t rtc_now = ((uint64_t)aon_rtc_secs_now<<16)|aon_rtc_ticks_now;
+  count = rtc_now * CLOCK_SECOND / RTIMER_SECOND;
+#endif
 }
 /*---------------------------------------------------------------------------*/
 clock_time_t
@@ -145,17 +168,14 @@ clock_update(void)
 unsigned long
 clock_seconds(void)
 {
-  bool interrupts_disabled;
   uint32_t secs_now;
-
-  interrupts_disabled = ti_lib_int_master_disable();
-
   secs_now = ti_lib_aon_rtc_sec_get();
 
-  /* Re-enable interrupts */
-  if(!interrupts_disabled) {
-    ti_lib_int_master_enable();
-  }
+  /*
+  uint32_t secs_now2;
+  while (secs_now2 = ti_lib_aon_rtc_sec_get(), (secs_now2 != secs_now) )
+      secs_now = secs_now2;
+  */
 
   return (unsigned long)secs_now;
 }
@@ -212,6 +232,9 @@ clock_delay(unsigned int i)
 }
 /*---------------------------------------------------------------------------*/
 /**
+ * @}
+ * @}
+ * @}
  * @}
  * @}
  */

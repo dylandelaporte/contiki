@@ -28,9 +28,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*---------------------------------------------------------------------------*/
+/** \addtogroup cc2538-char-io
+ * @{ */
+/**
+ * \file
+ *     Implementation of arch-specific functions required by the dbg_io API in
+ *     cpu/arm/common/dbg-io
+ */
 #include "contiki.h"
 
+#include "dbg.h"
 #include "dev/uart.h"
 #include "usb/usb-serial.h"
 
@@ -48,10 +55,13 @@
 #define flush()
 #endif
 /*---------------------------------------------------------------------------*/
+#undef putchar
+#undef puts
+
 #define SLIP_END     0300
 /*---------------------------------------------------------------------------*/
 int
-dbg_putchar(int c)
+putchar(int c)
 {
 #if DBG_CONF_SLIP_MUX
   static char debug_frame = 0;
@@ -70,7 +80,7 @@ dbg_putchar(int c)
     write_byte(SLIP_END);
     debug_frame = 0;
 #endif
-    flush();
+    dbg_flush();
   }
   return c;
 }
@@ -90,3 +100,18 @@ dbg_send_bytes(const unsigned char *s, unsigned int len)
   return i;
 }
 /*---------------------------------------------------------------------------*/
+int
+puts(const char *s)
+{
+  unsigned int i = 0;
+
+  while(s && *s != 0) {
+    putchar(*s++);
+    i++;
+  }
+  putchar('\n');
+  return i;
+}
+/*---------------------------------------------------------------------------*/
+
+/** @} */

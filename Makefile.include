@@ -58,7 +58,14 @@ TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERC
 CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
-CFLAGS += -Wno-unused-const-variable
+#CFLAGS += -Wno-unused-const-variable
+
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+endif
 
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
@@ -79,14 +86,12 @@ endif
 
 define oname
 ${patsubst %.c,%.o, \
+${patsubst %.cpp,%.o, \
 ${patsubst %.S,%.o, \
 ${patsubst %.s,%.o, \
 $(1) \
-}}}
+}}}}
 endef
-
-CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
-PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
 
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
@@ -102,6 +107,7 @@ else
   ifneq (1, ${words $(target_makefile)})
     ${error More than one TARGET Makefile found: $(target_makefile)}
   endif
+  $(info target make by $(target_makefile) )
   include $(target_makefile)
 endif
 
@@ -134,8 +140,17 @@ endif # $(BOARD) not empty
 
 PLATFORM_ACTION ?= build
 
+$(BUILD_DIR):
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
+
+# Provide path for *.map file
+$(BUILD_DIR_BOARD): | $(BUILD_DIR)
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
+
 # Provide way to create $(OBJECTDIR) if it has been removed by make clean
-$(OBJECTDIR):
+$(OBJECTDIR): | $(BUILD_DIR)
 	$(TRACE_MKDIR)
 	$(Q)mkdir -p $@
 
@@ -143,6 +158,47 @@ ifneq ($(BOARD),)
   TARGET_BOARD_UPPERCASE := ${strip ${shell echo $(BOARD) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
   CFLAGS += -DCONTIKI_BOARD_$(TARGET_BOARD_UPPERCASE)=1
   CFLAGS += -DCONTIKI_BOARD_STRING=\"$(BOARD)\"
+endif
+
+# Include IPv6, IPv4, and/or Rime
+
+
+ifneq ($(MAKE_NET),)
+  HAS_STACK = 1
+else
+  HAS_STACK = 0
+endif
+
+ifeq ($(CONTIKI_WITH_IPV4),1)
+  HAS_STACK = 1
+  MAKE_NET ?= MAKE_NET_IPV4
+endif
+
+ifeq ($(CONTIKI_WITH_RIME),1)
+  HAS_STACK = 1
+  MAKE_NET ?= MAKE_NET_RIME
+endif
+
+# Make IPv6 the default stack
+ifeq ($(HAS_STACK),0)
+ifneq ($(CONTIKI_WITH_IPV6),0)
+$(info enable IPV6 by default)
+CONTIKI_WITH_IPV6 ?= 1
+endif
+endif
+
+ifeq ($(CONTIKI_WITH_IPV6),1)
+  MAKE_NET ?= MAKE_NET_IPV6
+  ifneq ($(CONTIKI_WITH_RPL),0)
+  	CONTIKI_WITH_RPL ?= 1
+  endif
+endif
+
+ifeq ($(CONTIKI_WITH_RPL),1)
+    CFLAGS += -DUIP_CONF_IPV6_RPL=1
+    MAKE_ROUTING ?= MAKE_ROUTING_RPL_LITE
+else
+    CFLAGS += -DUIP_CONF_IPV6_RPL=0
 endif
 
 # Configure MAC layer
@@ -186,6 +242,8 @@ endif
 MAKE_NET_NULLNET = 0
 MAKE_NET_IPV6 = 1
 MAKE_NET_OTHER = 2
+MAKE_NET_IPV4 = 3
+MAKE_NET_RIME = 4
 
 # Make IPv6 the default stack
 MAKE_NET ?= MAKE_NET_IPV6
@@ -197,7 +255,17 @@ endif
 
 ifeq ($(MAKE_NET),MAKE_NET_IPV6)
   CFLAGS += -DNETSTACK_CONF_WITH_IPV6=1
-  MODULES += $(CONTIKI_NG_NET_DIR)/ipv6
+  MODULES += $(CONTIKI_NG_NET_DIR)/ipv6 $(CONTIKI_NG_NET_DIR)/ip
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_IPV4)
+  CFLAGS += -DNETSTACK_CONF_WITH_IPV4=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/ipv4 $(CONTIKI_NG_NET_DIR)/ip
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_RIME)
+  CFLAGS += -DNETSTACK_CONF_WITH_RIME=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/rime
 endif
 
 ifeq ($(MAKE_NET),MAKE_NET_OTHER)
@@ -231,10 +299,28 @@ else ifeq ($(MAKE_ROUTING),MAKE_ROUTING_NULLROUTING)
   MODULES += $(CONTIKI_NG_ROUTING_DIR)/nullrouting
 endif
 
-MODULEDIRS = $(MODULES_REL) ${addprefix $(CONTIKI)/, $(MODULES)}
-UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
-MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
-CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
+### Include application makefiles
+
+ifdef APPS
+  $(info apps: $(APPDS))
+  APPDS = ${wildcard ${foreach DIR, $(APPDIRS), ${addprefix $(DIR)/, $(APPS)}}} \
+             ${wildcard ${addprefix $(CONTIKI)/apps/, $(APPS)} \
+             ${addprefix $(OBJECTDIR)/apps/, $(APPS)} \
+             $(APPS)}
+  APPINCLUDES = ${foreach APP, $(APPS), ${wildcard ${foreach DIR, $(APPDS), $(DIR)/Makefile.$(APP)}}}
+  -include $(APPINCLUDES)
+  APP_SOURCES = ${foreach APP, $(APPS), $($(APP)_src)}
+  DSC_SOURCES = ${foreach APP, $(APPS), $($(APP)_dsc)}
+  CONTIKI_SOURCEFILES += $(APP_SOURCES) $(DSC_SOURCES)
+endif
+
+ifdef MODULES
+  $(info modules: $(MODULES))
+  MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(MODULES)}}
+  UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
+  MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
+  MODULES_SOURCES += ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
+  CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
 
 # Include module-specific makefiles
 MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${notdir $(d)}}}
@@ -245,10 +331,22 @@ MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${not
 ### them twice.
 MODULES_INCLUDED_FIRST_PASS := $(MODULES_INCLUDES)
 include $(MODULES_INCLUDED_FIRST_PASS)
+$(info modules 1st pass $(MODULES_INCLUDED_FIRST_PASS) )
 
 # Iterate once more: include the modules added from the previous include.
 # Only works with one level of nested module inclusion.
-include $(filter-out $(MODULES_INCLUDED_FIRST_PASS),$(MODULES_INCLUDES))
+MODULES_INCLUDED_SECOND_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             , $(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_SECOND_PASS)
+$(info modules 2nd pass  $(MODULES_INCLUDED_SECOND_PASS) )
+
+# Iterate once more: include the modules added from the previous include.
+# Only works with one level of nested module inclusion.
+MODULES_INCLUDED_3_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             $(MODULES_INCLUDED_SECOND_PASS) \
+                                             ,$(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_3_PASS)
+$(info modules 3rd pass $(MODULES_INCLUDED_3_PASS) )
 
 # C-include module-specific macros using -imacros
 MODULES_IMACROS = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/module-macros.h}}
@@ -256,23 +354,27 @@ ifneq ($(MODULES_IMACROS),)
   CFLAGS += ${foreach d, $(MODULES_IMACROS), -imacros $(d)}
 endif
 
+endif
+
 ### Verbosity control. Use  make V=1  to get verbose builds.
 
 ifeq ($(V),1)
-  TRACE_CC =
-  TRACE_LD =
-  TRACE_AR =
-  TRACE_AS =
-  TRACE_OBJCOPY  =
-  TRACE_OBJDUMP  =
-  TRACE_MKDIR =
-  TRACE_CP =
+  TRACE_CC = @echo "  CC       " $< "-->" $@
+  TRACE_CCX= @echo "  C++      " $< "-->" $@
+  TRACE_LD = @echo "  LD       " "-->" $@
+  TRACE_AR = @echo "  AR       " "-->" $@
+  TRACE_AS = @echo "  AS       " $< "-->" $@
+  TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
+  TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
+  TRACE_MKDIR = @echo "  MKDIR    " $@
+  TRACE_CP       = @echo "  CP       " $< "-->" $@
   Q=
 else
-  TRACE_CC = @echo "  CC       " $<
+  TRACE_CC = @echo "  CC       " $< "-->" $@
+  TRACE_CCX= @echo "  C++      " $< "-->" $@
   TRACE_LD = @echo "  LD       " $@
   TRACE_AR = @echo "  AR       " $@
-  TRACE_AS = @echo "  AS       " $<
+  TRACE_AS = @echo "  AS       " $< "-->" $@
   TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
   TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
   TRACE_MKDIR = @echo "  MKDIR    " $@
@@ -292,14 +394,22 @@ CONTIKI_TARGET_DIRS_CONCAT = ${addprefix ${dir $(target_makefile)}, \
 CONTIKI_CPU_DIRS_CONCAT    = ${addprefix $(CONTIKI_CPU)/, \
                                $(CONTIKI_CPU_DIRS)}
 
+$(info terget dirs:$(CONTIKI_TARGET_DIRS) -> $(CONTIKI_TARGET_DIRS_CONCAT) )
+$(info cpu dirs:$(CONTIKI_CPU_DIRS) -> $(CONTIKI_CPU_DIRS_CONCAT) )
+$(info external dirs:$(EXTERNALDIRS) )
+
 SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
-              $(CONTIKI_CPU_DIRS_CONCAT) $(MODULEDIRS) $(EXTERNALDIRS)
+             $(CONTIKI_CPU_DIRS_CONCAT) $(MODULEDIRS) $(EXTERNALDIRS) $(APPDS)
+
+
 
 vpath %.c $(SOURCEDIRS)
+vpath %.cpp $(SOURCEDIRS)
 vpath %.S $(SOURCEDIRS)
 vpath %.s $(SOURCEDIRS)
+vpath %.o $(OBJECTDIR)
 
-CFLAGS += ${addprefix -I,$(SOURCEDIRS) $(CONTIKI)}
+CFLAGS += ${addprefix -I, $(call uniq,$(SOURCEDIRS) $(CONTIKI)) }
 
 ### Check for a git repo and pass version if found
 ### git.exe in Windows cmd shells may require no stderr redirection
@@ -314,21 +424,55 @@ else
 CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-NG\"
 endif
 
+CFLAGS_CPU ?=
+CPPFLAGS := ${CPPFLAGS} ${CFLAGS}
+CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
+
+
+### drop excluded objects
+
+ifneq ("$(SOURCE_EXCLUDE)","")
+CONTIKI_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(CONTIKI_SOURCEFILES))
+PROJECT_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(PROJECT_SOURCEFILES))
+endif
+
+
+CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
+PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
+
 ### Automatic dependency generation
 
 ifneq ($(MAKECMDGOALS),clean)
--include ${addprefix $(OBJECTDIR)/,$(CONTIKI_SOURCEFILES:.c=.d) \
-                                   $(PROJECT_SOURCEFILES:.c=.d)}
+OEXT = $(call oname, .c)
+DEPS = $(CONTIKI_OBJECTFILES:${OEXT}=.d) \
+       $(PROJECT_OBJECTFILES:${OEXT}=.d) \
+       $(TARGET_STARTFILES:${OEXT}=.d)
+
+#$(info deps: ${DEPS})
+-include ${DEPS}
 endif
+
+# prevent delete project objects that have deps but not included in contiki lib  
+.SECONDARY : $(PROJECT_OBJECTFILES) $(TARGET_STARTFILES)
 
 ### See http://make.paulandlesley.org/autodep.html#advanced
 
+ifeq ([${WINDIR}],[])
 define FINALIZE_DEPENDENCY
 cp $(@:.o=.d) $(@:.o=.$$$$); \
-sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+sed -e 's/#.*//' -e 's/^[^:].*: *//' -e 's/ *\\$$//' \
     -e '/^$$/ d' -e 's/$$/ :/' < $(@:.o=.$$$$) >> $(@:.o=.d); \
 rm -f $(@:.o=.$$$$)
 endef
+else
+###  windows pathes can contain ':' char, so just allow it
+define FINALIZE_DEPENDENCY
+cp $(@:.o=.d) $(@:.o=.$$$$); \
+sed -e 's/#.*//' -e 's/^.*: *//' -e 's/ *\\$$//' \
+    -e '/^$$/ d' -e 's/$$/ :/' < $(@:.o=.$$$$) >> $(@:.o=.d); \
+rm -f $(@:.o=.$$$$)
+endef
+endif
 
 ### Harmonize filename of a .map file, if the platform's build system wants
 ### to create one
@@ -352,9 +496,15 @@ distclean:
 -include $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.customrules-$(TARGET)
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
+$(info custom object/rule to $(OBJECTDIR))
 $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -MMD -c $< -o $@
+	@$(FINALIZE_DEPENDENCY)
+
+$(OBJECTDIR)/%.o: %.cpp | $(OBJECTDIR)
+	$(TRACE_CCX)
+	$(Q)$(CCX) $(CPPFLAGS) -MMD -c $< -o $@
 	@$(FINALIZE_DEPENDENCY)
 endif
 
@@ -380,21 +530,29 @@ $(OBJECTDIR)/%.e: %.c | $(OBJECTDIR)
 endif
 
 ifndef CUSTOM_RULE_C_TO_O
-%.o: %.c
+%.o: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.cpp | $(BUILD_DIR_BOARD)
+	$(TRACE_CCX)
+	$(Q)$(CCX) $(CPPFLAGS) -c $< -o $@
 endif
 
 ifndef CUSTOM_RULE_C_TO_S
-%.s: %.c
+%.s: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -S $< -o $@
 endif
 
 ifndef CUSTOM_RULE_C_TO_E
-%.e: %.c
+%.e: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -E $< -o $@
+
+$(BUILD_DIR)/%.co: %.cpp | $(BUILD_DIR) $(BUILD_DIR_BOARD)
+	$(TRACE_CCX)
+	$(Q)$(CCX) $(CPPFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 endif
 
 ifndef AROPTS
@@ -402,7 +560,7 @@ ifndef AROPTS
 endif
 
 ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
-$(CONTIKI_NG_TARGET_LIB): $(CONTIKI_OBJECTFILES)
+$(CONTIKI_NG_TARGET_LIB): $(CONTIKI_OBJECTFILES) | $(BUILD_DIR_BOARD)
 	$(TRACE_AR)
 	$(Q)$(AR) $(AROPTS) $@ $^
 endif
@@ -412,10 +570,14 @@ ifndef LD
 endif
 
 ifndef CUSTOM_RULE_LINK
-$(BUILD_DIR_BOARD)/%.$(TARGET): %.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
+$(BUILD_DIR_BOARD)/%.$(TARGET): $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(TARGET_LIBFILES) -o $@
+
+# this objects need for debuger, and need for quick rebuild
+.PRECIOUS: $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) 
+
 endif
 
 %.$(TARGET): $(BUILD_DIR_BOARD)/%.$(TARGET)
@@ -491,6 +653,8 @@ include $(CONTIKI)/Makefile.gcc
 # the match-anything rule below instead.
 %: %.c
 
+%: %.cpp
+
 ifeq ($(PLATFORM_ACTION),skip)
 # Skip this target.
 $(CONTIKI_PROJECT):
@@ -503,5 +667,5 @@ else
 # abstract from the actual binary name. It needs to contain some
 # command in order to be a rule, not just a prerequisite.
 %: %.$(TARGET)
-	@
+	@echo "prepared for $@ prerequesites $(BUILD_DIR)/%.$(TARGET) "
 endif

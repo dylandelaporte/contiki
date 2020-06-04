@@ -54,6 +54,38 @@
 #define LINK_OPTION_RX              2
 #define LINK_OPTION_SHARED          4
 #define LINK_OPTION_TIME_KEEPING    8
+#define LINK_OPTION_LINK_TO_DELETE 64
+#define LINK_OPTION_RESERVED_LINK 128
+//< scheduler skip this slot
+#define LINK_OPTION_DISABLE         0x100
+//< scheduler, when TXslot have no any data to send, turn on option flag LINK_OPTION_DISABLE
+//  this intends to help reduce slot activity when no data sends
+#define LINK_OPTION_IDLED_AUTOOFF   0x200
+//< this feature escapes to activate timesource EB slot to latest possible time, enough
+//      to keep net in timesync
+//  scheduler plan slot with this flag in future to:
+//      N*FrameLen+SlotTime < (TSCH_DESYNC_THRESHOLD_SLOTS - Tryes*FrameLen)
+//  where:
+//      TSCH_DESYNC_THRESHOLD_SLOTS - timeout for timesource EB
+//      Tryes - expected amount of packets loose \sa TSCH_CONF_TIMESYNC_EB_LOOSES
+//  this flag works when active TSCH_SCHEDULE_OMMIT_NOXFER
+#define LINK_OPTION_TIME_EB_ESCAPE  0x400
+//< scheduler forced to stops on this slot. this is like phantom LINK_OPTION_TX
+//      but actualy not affects transmit.
+//      it helpful for TSCH_SCHEDULE_OMMIT_NOXFER policy style, to stop and replan
+//      at desired slot, even if nothing transfers
+#define LINK_OPTION_PLANPOINT       0x800
+
+//> signals TSCH_CALLBACK_LINK_SIGNAL on slot time
+//   this signal is not overlaps by more prioritysed links
+#define LINK_OPTION_SIGNAL           0x1000
+//> same as _SIGNAL, but automatic clears after signaling
+//  but this option clears only on active link
+//  this use by scheduler as temporary flag, for selected active link
+#define LINK_OPTION_SIGNAL_ONCE      0x2000
+
+
+
 
 /* Default IEEE 802.15.4e hopping sequences, obtained from https://gist.github.com/twatteyne/2e22ee3c1a802b685695 */
 /* 16 channels, sequence length 16 */
@@ -69,11 +101,15 @@
 
 /* Max TSCH packet length equal to the length of the packet buffer */
 #define TSCH_PACKET_MAX_LEN PACKETBUF_SIZE
+//#define TSCH_PACKET_MAX_LEN MIN(127,PACKETBUF_SIZE)
 
 /* The jitter to remove in ticks.
  * This should be the sum of measurement errors on Tx and Rx nodes.
  * */
 #define TSCH_TIMESYNC_MEASUREMENT_ERROR US_TO_RTIMERTICKS(32)
+
+//  this value allows faster learn times for statistics accumulation on new timesource
+#define TSCH_DRIFT_SYNC_ESTIMATE_FASTER_INIT   2
 
 /* The approximate number of slots per second */
 #define TSCH_SLOTS_PER_SECOND (1000000 / tsch_timing_us[tsch_ts_timeslot_length])

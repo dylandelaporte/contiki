@@ -40,9 +40,10 @@
 #include "sys/clock.h"
 #include "sys/rtimer.h"
 #include "net/packetbuf.h"
+#include "net/rime/rimestats.h"
 #include "net/linkaddr.h"
 #include "net/netstack.h"
-#include "net/mac/tsch/tsch.h"
+#include "net/rime/rimestats.h"
 #include "sys/energest.h"
 #include "dev/cc2538-rf.h"
 #include "dev/rfcore.h"
@@ -166,17 +167,31 @@ get_channel()
 {
   return rf_channel;
 }
+
+static 
+uint8_t eval_rf_channel()
+{
+  uint8_t chan = REG(RFCORE_XREG_FREQCTRL) & RFCORE_XREG_FREQCTRL_FREQ;
+
+  return (chan - CC2538_RF_CHANNEL_MIN) / CC2538_RF_CHANNEL_SPACING
+         + CC2538_RF_CHANNEL_MIN;
+}
 /*---------------------------------------------------------------------------*/
 /**
  * \brief Set the current operating channel
  * \param channel The desired channel as a value in [11,26]
+ * \return Returns a value in [11,26] representing the current channel
+ *         or a negative value if \e channel was out of bounds
  */
-static void
+static int8_t
 set_channel(uint8_t channel)
 {
   uint8_t was_on = 0;
 
   LOG_INFO("Set Channel\n");
+  if((channel < CC2538_RF_CHANNEL_MIN) || (channel > CC2538_RF_CHANNEL_MAX)) {
+    return CC2538_RF_CHANNEL_SET_ERROR;
+  }
 
   /* Changes to FREQCTRL take effect after the next recalibration */
 
@@ -194,6 +209,8 @@ set_channel(uint8_t channel)
   }
 
   rf_channel = channel;
+
+  return (int8_t)channel;
 }
 /*---------------------------------------------------------------------------*/
 static radio_value_t
@@ -599,6 +616,8 @@ init(void)
 
   rf_flags |= RF_ON;
 
+  ENERGEST_ON(ENERGEST_TYPE_LISTEN);
+
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -685,6 +704,7 @@ transmit(unsigned short transmit_len)
 
   if(send_on_cca) {
     if(channel_clear() == CC2538_RF_CCA_BUSY) {
+      RIMESTATS_ADD(contentiondrop);
       return RADIO_TX_COLLISION;
     }
   }
@@ -694,6 +714,7 @@ transmit(unsigned short transmit_len)
    * receiving. Abort transmission and bail out with RADIO_TX_COLLISION
    */
   if(REG(RFCORE_XREG_FSMSTAT1) & RFCORE_XREG_FSMSTAT1_SFD) {
+    RIMESTATS_ADD(contentiondrop);
     return RADIO_TX_COLLISION;
   }
 
@@ -722,6 +743,8 @@ transmit(unsigned short transmit_len)
   if(was_off) {
     off();
   }
+
+  RIMESTATS_ADD(lltx);
 
   return ret;
 }
@@ -753,6 +776,7 @@ read(void *buf, unsigned short bufsize)
     /* Oops, we must be out of sync. */
     LOG_ERR("RF: bad sync\n");
 
+    RIMESTATS_ADD(badsynch);
     CC2538_RF_CSP_ISFLUSHRX();
     return 0;
   }
@@ -760,6 +784,7 @@ read(void *buf, unsigned short bufsize)
   if(len <= CC2538_RF_MIN_PACKET_LEN) {
     LOG_ERR("RF: too short\n");
 
+    RIMESTATS_ADD(tooshort);
     CC2538_RF_CSP_ISFLUSHRX();
     return 0;
   }
@@ -767,6 +792,7 @@ read(void *buf, unsigned short bufsize)
   if(len - CHECKSUM_LEN > bufsize) {
     LOG_ERR("RF: too long\n");
 
+    RIMESTATS_ADD(toolong);
     CC2538_RF_CSP_ISFLUSHRX();
     return 0;
   }
@@ -812,7 +838,9 @@ read(void *buf, unsigned short bufsize)
   if(crc_corr & CRC_BIT_MASK) {
     packetbuf_set_attr(PACKETBUF_ATTR_RSSI, rssi);
     packetbuf_set_attr(PACKETBUF_ATTR_LINK_QUALITY, crc_corr & LQI_BIT_MASK);
+    RIMESTATS_ADD(llrx);
   } else {
+    RIMESTATS_ADD(badcrc);
     LOG_ERR("Bad CRC\n");
     CC2538_RF_CSP_ISFLUSHRX();
     return 0;
@@ -973,7 +1001,9 @@ set_value(radio_param_t param, radio_value_t value)
        value > CC2538_RF_CHANNEL_MAX) {
       return RADIO_RESULT_INVALID_VALUE;
     }
-    set_channel(value);
+    if(set_channel(value) == CC2538_RF_CHANNEL_SET_ERROR) {
+      return RADIO_RESULT_ERROR;
+    }
     return RADIO_RESULT_OK;
   case RADIO_PARAM_PAN_ID:
     set_pan_id(value & 0xffff);
@@ -1157,12 +1187,16 @@ PROCESS_THREAD(cc2538_rf_process, ev, data)
 void
 cc2538_rf_rx_tx_isr(void)
 {
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
   if(!poll_mode) {
     process_poll(&cc2538_rf_process);
   }
 
   /* We only acknowledge FIFOP so we can safely wipe out the entire SFR */
   REG(RFCORE_SFR_RFIRQF0) = 0;
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -1184,6 +1218,8 @@ cc2538_rf_rx_tx_isr(void)
 void
 cc2538_rf_err_isr(void)
 {
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
   LOG_ERR("Error 0x%08lx occurred\n", REG(RFCORE_SFR_RFERRF));
 
   /* If the error is not an RX FIFO overflow, set a flag */
@@ -1194,6 +1230,8 @@ cc2538_rf_err_isr(void)
   REG(RFCORE_SFR_RFERRF) = 0;
 
   process_poll(&cc2538_rf_process);
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 

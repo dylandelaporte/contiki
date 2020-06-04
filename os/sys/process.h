@@ -219,7 +219,7 @@ typedef unsigned char process_num_events_t;
  * \hideinitializer
  */
 #define PROCESS_PAUSE()             do {				\
-  process_post(PROCESS_CURRENT(), PROCESS_EVENT_CONTINUE, NULL);	\
+  process_post_pause();	\
   PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE);               \
 } while(0)
 
@@ -365,6 +365,11 @@ void process_start(struct process *p, process_data_t data);
 int process_post(struct process *p, process_event_t ev, process_data_t data);
 
 /**
+ * \brief Helper function for PROCESS_PAUSE
+ */
+void process_post_pause(void);
+
+/**
  * Post a synchronous event to a process.
  *
  * \param p A pointer to the process' process structure.
@@ -389,6 +394,17 @@ void process_post_synch(struct process *p,
  */
 void process_exit(struct process *p);
 
+/**
+ * \brief Makes status of current process not running, for silent process exiting
+ *
+ *       exiting of process generates events PROCESS_EVENT_EXITED for all
+ *       active processes, and PROCESS_EVENT_EXIT for current process
+ *       such notification can be useless and wasteful. so process_abort can
+ *       mark process alredy stops, to block notification in process_exit
+ * */
+void process_abort(void);
+
+#define PROCESS_ABORT()             process_abort()
 
 /**
  * Get a pointer to the currently running process.

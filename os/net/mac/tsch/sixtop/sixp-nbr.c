@@ -124,7 +124,7 @@ sixp_nbr_free(sixp_nbr_t *nbr)
       LOG_DBG("sixp_nbr_free() [peer_addr:");
       LOG_DBG_LLADDR(sixp_nbrs_lladr_item(nbr));
       LOG_DBG_("]\n");
-    (void)nbr_table_remove(sixp_nbrs, nbr);
+    (void)sixp_nbrs_remove_item(nbr);
   }
 }
 /*---------------------------------------------------------------------------*/

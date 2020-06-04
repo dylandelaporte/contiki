@@ -67,6 +67,7 @@
 
 #include "contiki.h"
 #include "net/linkaddr.h"
+#include <stdint.h>
 
 #ifdef IEEE802154_CONF_PANID
 #define IEEE802154_PANID           IEEE802154_CONF_PANID
@@ -117,6 +118,7 @@ frame-filtering-friendly on some platforms) */
 
 #define FRAME802154_IEEE802154_2003  (0x00)
 #define FRAME802154_IEEE802154_2006  (0x01)
+#define FRAME802154_IEEE802154E_2012  (0x02)
 #define FRAME802154_IEEE802154_2015  (0x02)
 
 #define FRAME802154_SECURITY_LEVEL_NONE        (0)
@@ -219,9 +221,17 @@ int frame802154_parse(uint8_t *data, int length, frame802154_t *pf);
 void frame802154_parse_fcf(uint8_t *data, frame802154_fcf_t *pfcf);
 
 /* Get current PAN ID */
-uint16_t frame802154_get_pan_id(void);
+static inline
+uint16_t frame802154_get_pan_id(void){
+    extern uint16_t mac_pan_id;
+    return mac_pan_id;
+}
 /* Set current PAN ID */
-void frame802154_set_pan_id(uint16_t pan_id);
+static inline
+void frame802154_set_pan_id(uint16_t pan_id){
+    extern uint16_t mac_pan_id;
+    mac_pan_id = pan_id;
+}
 /* Tells whether a given Frame Control Field indicates a frame with
  * source PANID and/or destination PANID */
 void frame802154_has_panid(frame802154_fcf_t *fcf, int *has_src_pan_id, int *has_dest_pan_id);

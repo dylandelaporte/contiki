@@ -36,19 +36,25 @@
 
 #include "contiki.h"
 
-#include "net/ipv6/tcpip.h"
-#include "net/ipv6/uip.h"
-#include "net/ipv6/uiplib.h"
-#include "net/ipv6/uip-udp-packet.h"
-#include "net/ipv6/simple-udp.h"
-#include "net/ipv6/uip-nameserver.h"
+#include "net/ip/tcpip.h"
+#include "net/ip/uip.h"
+#include "net/ip/uiplib.h"
+#include "net/ip/uip-udp-packet.h"
+#include "net/ip/simple-udp.h"
+#include "net/ip/uip-nameserver.h"
 #include "net/routing/routing.h"
 
+#if NETSTACK_CONF_WITH_IPV6
 #include "net/ipv6/uip-icmp6.h"
 #include "net/ipv6/uip-ds6.h"
-#include "net/ipv6/psock.h"
-#include "net/ipv6/udp-socket.h"
-#include "net/ipv6/tcp-socket.h"
+#endif /* NETSTACK_CONF_WITH_IPV6 */
+
+#include "net/ip/psock.h"
+
+#include "net/ip/udp-socket.h"
+#include "net/ip/tcp-socket.h"
+
+#include "net/rime/rime.h"
 
 #include "net/netstack.h"
 

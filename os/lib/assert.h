@@ -39,6 +39,10 @@
 #define ASSERT_RETURNS 0
 #endif
 
+#ifdef __cplusplus
+extern "C"{
+#endif /* !__cplusplus */
+
 #undef assert
 #ifdef NDEBUG
 #define assert(e) ((void)0)
@@ -56,5 +60,9 @@ void _xassert(const char *, int) CC_NORETURN;
 #define _CTASSERT(x, y)         __CTASSERT(x, y)
 #define __CTASSERT(x, y)        typedef char __assert ## y[(x) ? 1 : -1]
 #endif
+
+#ifdef __cplusplus
+}
+#endif /* !__cplusplus */
 
 #endif /* ASSERT_H_ */

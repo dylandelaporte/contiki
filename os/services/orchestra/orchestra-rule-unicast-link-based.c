@@ -47,6 +47,16 @@
 #include "contiki.h"
 #include "orchestra.h"
 #include "net/packetbuf.h"
+#include "orchestra-rule-unicast-link-based.h"
+
+#include "sys/log.h"
+#define LOG_MODULE "ORCHESTRA"
+#ifdef LOG_LEVEL_ORCHESRTA
+#define LOG_LEVEL LOG_LEVEL_ORCHESRTA
+#else
+#define LOG_LEVEL LOG_LEVEL_NONE
+#endif
+
 
 /*
  * The body of this rule should be compiled only when "nbr_routes" is available,
@@ -56,12 +66,15 @@
 #if UIP_MAX_ROUTES != 0
 
 static uint16_t slotframe_handle = 0;
-static uint16_t local_channel_offset;
-static struct tsch_slotframe *sf_unicast;
+
+uint16_t                orchestra_unb_link_based_choffs;
+struct tsch_slotframe*  orchestra_unb_link_based_sf;
+
+#define local_channel_offset    orchestra_unb_link_based_choffs
+#define sf_unicast              orchestra_unb_link_based_sf
 
 /*---------------------------------------------------------------------------*/
-static uint16_t
-get_node_pair_timeslot(const linkaddr_t *from, const linkaddr_t *to)
+uint16_t get_node_pair_timeslot(const linkaddr_t *from, const linkaddr_t *to)
 {
   if(from != NULL && to != NULL && ORCHESTRA_UNICAST_PERIOD > 0) {
     return ORCHESTRA_LINKADDR_HASH2(from, to) % ORCHESTRA_UNICAST_PERIOD;
@@ -102,28 +115,21 @@ add_uc_links(const linkaddr_t *linkaddr)
     uint16_t timeslot_rx = get_node_pair_timeslot(linkaddr, &linkaddr_node_addr);
     uint16_t timeslot_tx = get_node_pair_timeslot(&linkaddr_node_addr, linkaddr);
 
+    LOG_INFO("add uc rx:%d tx:%d ch+%d\n", timeslot_rx, timeslot_tx, local_channel_offset);
+
     /* Add Tx link */
+    struct tsch_link* tx_link =
     tsch_schedule_add_link(sf_unicast, LINK_OPTION_TX | LINK_OPTION_SHARED, LINK_TYPE_NORMAL, &tsch_broadcast_address,
                            timeslot_tx, local_channel_offset, 0);
     /* Add Rx link */
+    struct tsch_link* rx_link =
     tsch_schedule_add_link(sf_unicast, LINK_OPTION_RX, LINK_TYPE_NORMAL, &tsch_broadcast_address,
                            timeslot_rx, local_channel_offset, 0);
 
-  }
-}
-/*---------------------------------------------------------------------------*/
-static void
-remove_unicast_link(uint16_t timeslot, uint16_t options)
-{
-  struct tsch_link *l = list_head(sf_unicast->links_list);
-  while(l != NULL) {
-    if(l->timeslot == timeslot
-        && l->channel_offset == local_channel_offset
-        && l->link_options == options) {
-      tsch_schedule_remove_link(sf_unicast, l);
-      break;
-    }
-    l = list_item_next(l);
+    (void)tx_link;(void)rx_link;
+#ifdef ORCHESTRA_UNB_LINKBASE_ADD_UC_PAIR
+    ORCHESTRA_UNB_LINKBASE_ADD_UC_PAIR(linkaddr, tx_link, rx_link);
+#endif
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -134,8 +140,11 @@ remove_uc_links(const linkaddr_t *linkaddr)
     uint16_t timeslot_rx = get_node_pair_timeslot(linkaddr, &linkaddr_node_addr);
     uint16_t timeslot_tx = get_node_pair_timeslot(&linkaddr_node_addr, linkaddr);
 
-    remove_unicast_link(timeslot_rx, LINK_OPTION_RX);
-    remove_unicast_link(timeslot_tx, LINK_OPTION_TX | LINK_OPTION_SHARED);
+    LOG_INFO("remove uc rx:%d tx:%d ch+%d\n", timeslot_rx, timeslot_tx, local_channel_offset);
+    tsch_schedule_remove_link_by_timeslot(sf_unicast,
+                                          timeslot_rx, local_channel_offset);
+    tsch_schedule_remove_link_by_timeslot(sf_unicast,
+                                          timeslot_tx, local_channel_offset);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -168,6 +177,13 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
     if(channel_offset != NULL) {
       *channel_offset = get_node_channel_offset(dest);
     }
+    LOG_DBG("Link for ");
+    LOG_INFO_LLADDR(dest);
+    if(timeslot != NULL)
+        LOG_INFO_(" -> slot%d", *timeslot);
+    if (channel_offset != NULL)
+        LOG_INFO_(" ch+%d", *channel_offset);
+    LOG_INFO_("\n");
     return 1;
   }
   return 0;
@@ -179,6 +195,11 @@ new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new
   if(new != old) {
     const linkaddr_t *old_addr = tsch_queue_get_nbr_address(old);
     const linkaddr_t *new_addr = tsch_queue_get_nbr_address(new);
+
+    LOG_INFO("change TS to ");
+    LOG_INFO_LLADDR(new_addr);
+    LOG_INFO_("\n");
+
     if(new_addr != NULL) {
       linkaddr_copy(&orchestra_parent_linkaddr, new_addr);
     } else {
