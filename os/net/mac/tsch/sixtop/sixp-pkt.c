@@ -596,7 +596,8 @@ sixp_pkt_set_cell_list(sixp_pkt_type_t type, sixp_pkt_code_t code,
     LOG_ERR("6P-pkt: cannot set cell_list; body is too short\n");
     return -1;
   } else if((cell_list_len % sizeof(sixp_pkt_cell_t)) != 0) {
-    LOG_ERR("6P-pkt: cannot set cell_list; invalid {body, cell_list}_len\n");
+    LOG_ERR("6P-pkt: cannot set cell_list; invalid {body, cell_list}_len=%u\n"
+            , cell_list_len);
     return -1;
   }
 
@@ -1192,16 +1193,17 @@ SIXPError sixp_pkt_parse_cell_list(SIXPHandle* h, SIXPCellsHandle* dst){
       return sixpFAIL;
     }
 
+    unsigned len = (h->body_len - offset);
     if(h->body_len < offset) {
-      LOG_ERR("cannot set cell_list; body is too short\n");
+      LOG_ERR("cannot parse cell_list; body is too short\n");
       return sixpFAIL;
-    } else if(((h->body_len - offset) % sizeof(sixp_pkt_cell_t)) != 0) {
-      LOG_ERR("cannot set cell_list; invalid {body, cell_list}_len\n");
+    } else if((len % sizeof(sixp_pkt_cell_t)) != 0) {
+      LOG_ERR("cannot parse cell_list; invalid {body, cell_list}_len=%u\n", len);
       return sixpFAIL;
     }
 
     dst->cell_list      = (sixp_pkt_cell_t*)(h->body + offset);
-    dst->cell_list_len  = h->body_len - offset;
+    dst->cell_list_len  = len;
     return sixpOK;
 }
 

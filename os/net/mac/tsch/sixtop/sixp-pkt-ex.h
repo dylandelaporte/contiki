@@ -91,7 +91,7 @@ SIXPError sixp_pkt_parse_cells(SIXPHandle* h, SIXPCellsHandle* dst);
 // strage for generating new cells packet body
 struct __attribute__((aligned (4))) SIXPCellsPkt {
     struct __attribute__((packed)) head_t {
-    uint8_t                 dummy[2]; // align struct for 4bytes
+    sixp_pkt_metadata_t     meta;
     sixp_pkt_cell_options_t cell_options;
     sixp_pkt_num_cells_t    num_cells;
     }                       head;
@@ -106,8 +106,8 @@ void sixp_pkt_cells_init(SIXPCellsPkt* pkt, unsigned size){
 
 static inline
 void sixp_pkt_cells_assign(SIXPHandle* h, SIXPCellsPkt* pkt){
-    h->body             = &pkt->head.cell_options;
-    h->body_len         = 2+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
+    h->body             = (const uint8_t*)&pkt->head;
+    h->body_len         = sizeof(pkt->head)+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
 }
 
 static inline
