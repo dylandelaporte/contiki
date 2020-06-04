@@ -259,7 +259,9 @@ tsch_reset(void)
   tsch_slot_operation_stop();
   frame802154_set_pan_id(0xffff);
   /* First make sure pending packet callbacks are sent etc */
+  if(tsch_status > tschINITIALISED){
   process_post_synch(&tsch_pending_events_process, PROCESS_EVENT_POLL, NULL);
+  }
   /* Reset neighbor queues */
   tsch_queue_reset();
   /* Remove unused neighbors */
@@ -651,10 +653,6 @@ tsch_start_coordinator(void)
 
   LOG_INFO("starting as coordinator, PAN ID %x, asn-%x.%lx\n",
       frame802154_get_pan_id(), tsch_current_asn.ms1b, (long)tsch_current_asn.ls4b);
-
-#ifdef TSCH_CALLBACK_JOINING_NETWORK
-      TSCH_CALLBACK_JOINING_NETWORK();
-#endif
 
 #ifdef TSCH_CALLBACK_JOINING_NETWORK
       TSCH_CALLBACK_JOINING_NETWORK();
@@ -1484,6 +1482,11 @@ max_payload(void)
   int framer_hdrlen;
   radio_value_t max_radio_payload_len;
   radio_result_t res;
+
+  if(!tsch_is_associated) {
+    LOG_WARN("Cannot compute max payload size: not associated\n");
+    return 0;
+  }
 
   res = NETSTACK_RADIO.get_value(RADIO_CONST_MAX_PAYLOAD_LEN,
                                  &max_radio_payload_len);

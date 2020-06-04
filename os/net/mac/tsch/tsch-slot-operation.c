@@ -403,6 +403,18 @@ get_packet_and_neighbor_for_link(struct tsch_link *link, struct tsch_neighbor **
 
   return p;
 }
+
+static
+void tsch_slot_operation_update_current_bacokff(void){
+    if(current_link != NULL
+        && (current_link->link_options & LINK_OPTION_TX)
+        && (current_link->link_options & LINK_OPTION_SHARED) )
+    {
+      /* Decrement the backoff window for all neighbors able to transmit over
+       * this Tx, Shared link. */
+      tsch_queue_update_all_backoff_windows(&current_link->addr);
+    }
+}
 /*---------------------------------------------------------------------------*/
 uint64_t
 tsch_get_network_uptime_ticks(void)
@@ -431,48 +443,6 @@ tsch_get_network_uptime_ticks(void)
   return uptime_ticks;
 }
 
-/* Post TX: Update neighbor state after a transmission */
-static int
-update_neighbor_state(struct tsch_neighbor *n, struct tsch_packet *p,
-                      struct tsch_link *link, uint8_t mac_tx_status)
-{
-  int in_queue = 1;
-  int is_shared_link = link->link_options & LINK_OPTION_SHARED;
-  int is_unicast = !n->is_broadcast;
-
-  if(mac_tx_status == MAC_TX_OK) {
-    /* Successful transmission */
-    tsch_queue_remove_packet_from_queue(n);
-    in_queue = 0;
-
-    /* Update CSMA state in the unicast case */
-    if(is_unicast) {
-      if(is_shared_link || tsch_queue_is_empty(n)) {
-        /* If this is a shared link, reset backoff on success.
-         * Otherwise, do so only is the queue is empty */
-        tsch_queue_backoff_reset(n);
-      }
-    }
-  } else {
-    /* Failed transmission */
-    if(p->transmissions >= TSCH_MAC_MAX_FRAME_RETRIES + 1) {
-      /* Drop packet */
-      tsch_queue_remove_packet_from_queue(n);
-      in_queue = 0;
-    }
-    /* Update CSMA state in the unicast case */
-    if(is_unicast) {
-      /* Failures on dedicated (== non-shared) leave the backoff
-       * window nor exponent unchanged */
-      if(is_shared_link) {
-        /* Shared link: increment backoff exponent, pick a new window */
-        tsch_queue_backoff_inc(n);
-      }
-    }
-  }
-
-  return in_queue;
-}
 /*---------------------------------------------------------------------------*/
 //* TSCH use state of RF to plan next timeslot operation
 enum tsch_rf_states{
@@ -1370,7 +1340,13 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
       /* There is no packet to send, and this link does not have Rx flag. Instead of doing
        * nothing, switch to the backup link (has Rx flag) if any. */
-      if(current_packet == NULL && !(current_link->link_options & LINK_OPTION_RX) && backup_link != NULL) {
+      if(current_packet == NULL
+         && !(current_link->link_options & LINK_OPTION_RX)
+         && backup_link != NULL)
+      {
+        // skiped TX slot, so refresh it's backoff if one has blocked
+        tsch_slot_operation_update_current_bacokff();
+
         current_link = backup_link;
         current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
 #ifdef TSCH_CALLBACK_LINK_SIGNAL
@@ -1447,14 +1423,7 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       rtimer_clock_t time_to_next_active_slot;
       /* Schedule next wakeup skipping slots if missed deadline */
       do {
-        if(current_link != NULL
-            && (current_link->link_options & LINK_OPTION_TX)
-            && (current_link->link_options & LINK_OPTION_SHARED) )
-        {
-          /* Decrement the backoff window for all neighbors able to transmit over
-           * this Tx, Shared link. */
-          tsch_queue_update_all_backoff_windows(&current_link->addr);
-        }
+        tsch_slot_operation_update_current_bacokff();
 
         /* A burst link was scheduled. Replay the current link at the
         next time offset */
