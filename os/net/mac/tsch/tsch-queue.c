@@ -377,6 +377,10 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
       /* Drop packet */
       tsch_queue_remove_packet_from_queue(n);
       in_queue = 0;
+      TSCH_DBG("retransmition fail seq%d ->(%p)# %x\n"
+                  , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
+                  , n
+                  , TSCH_LOG_ID_FROM_LINKADDR(&link->addr)
     }
     /* Update CSMA state in the unicast case */
     if(is_unicast) {
@@ -385,6 +389,10 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
       if(is_shared_link) {
         /* Shared link: increment backoff exponent, pick a new window */
         tsch_queue_backoff_inc(n);
+        TSCH_DBG("retransmition backoff (%d^e%d) -># %x\n"
+                    , n->backoff_window, n->backoff_exponent
+                    , TSCH_LOG_ID_FROM_LINKADDR(&link->addr)
+                    );
       }
     }
   }
