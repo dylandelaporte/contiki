@@ -138,9 +138,10 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
     }
 
     /* start an ADD or a DELETE transaction if necessary and possible */
-    if(parent_addr != NULL &&
-       sixp_trans_find(parent_addr) == NULL &&
-       msf_sixp_is_request_wait_timer_expired()) {
+    bool need6p= (parent_addr != NULL) && msf_sixp_is_request_wait_timer_expired();
+    if (need6p)
+        need6p = (sixp_trans_find(parent_addr) == NULL);
+    if(need6p) {
       if(cell_to_relocate != NULL) {
         msf_sixp_relocate_send_request(cell_to_relocate);
       } else {

@@ -130,8 +130,8 @@ msf_callback_packet_sent(uint16_t slot_offset,
     tsch_neighbor_t *nbr;
     const linkaddr_t *parent_addr;
 
-    if((nbr = tsch_queue_get_nbr(dest_addr)) == NULL ||
-       tsch_queue_is_empty(nbr)) {
+    nbr = tsch_queue_get_nbr(dest_addr);
+    if((nbr == NULL) || tsch_queue_is_empty(nbr)) {
       /* we don't need to keep the autonomous TX cell */
       msf_autonomous_cell_delete_tx(dest_addr);
     }
