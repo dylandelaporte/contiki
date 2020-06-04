@@ -208,7 +208,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
   sixp_trans_t *trans;
   sixp_nbr_t *nbr;
   const sixtop_sf_t *sf;
-  int16_t seqno;
+  int_fast16_t seqno;
   int ret;
 
   assert(buf != NULL && src_addr != NULL);
@@ -253,12 +253,15 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
 
   /* Transaction Management */
   trans = sixp_trans_find(src_addr);
+  seqno = sixp_trans_get_seqno(trans);
 
   if(pkt.type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
       if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
-         ((pkt.seqno == 0 && sixp_trans_get_seqno(trans) != 0) ||
-          (pkt.seqno != 0 && sixp_trans_get_seqno(trans) == 0))) {
+         (  (pkt.seqno == 0 && (seqno >0) )
+         || (pkt.seqno != 0 && (seqno == 0) )
+         ))
+      {
         /*
          * seems the peer had power-cycle; we're going to send back
          * RC_ERR_SEQNUM. in this case, we don't want to allocate
@@ -270,7 +273,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
         /* Error: not supposed to have another transaction with the peer. */
         LOG_ERR("6P: sixp_input() fails because another request [peer_addr:");
         LOG_ERR_LLADDR((const linkaddr_t *)src_addr);
-        LOG_ERR_(" seqno:%u] is in process\n", sixp_trans_get_seqno(trans));
+        LOG_ERR_(" seqno:%u] is in process\n", seqno);
         /*
          * Although RFC 8480 says in Section 3.4.3 that we MUST send
          * RC_RESET back in this case, we use RC_ERR_BUSY
@@ -288,8 +291,9 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
       }
     }
 
-    if((pkt.code.cmd == SIXP_PKT_CMD_CLEAR) &&
-       (nbr = sixp_nbr_find(src_addr)) != NULL) {
+    nbr = sixp_nbr_find(src_addr);
+    if((pkt.code.cmd == SIXP_PKT_CMD_CLEAR) && (nbr != NULL) )
+    {
       LOG_INFO("6P: sixp_input() reset nbr's next_seqno by CLEAR Request\n");
       sixp_nbr_reset_next_seqno(nbr);
     }
@@ -305,11 +309,11 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
 
     /* Inconsistency Management */
     if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
-       (((nbr = sixp_nbr_find(src_addr)) == NULL &&
-         (pkt.seqno != 0)) ||
-        ((nbr != NULL) &&
-         (sixp_nbr_get_next_seqno(nbr) != 0) &&
-         pkt.seqno == 0))) {
+       ( ( (pkt.seqno != 0) && (nbr == NULL) )
+       ||( (pkt.seqno == 0) && (nbr != NULL) && (sixp_nbr_get_next_seqno(nbr) != 0))
+       )
+      )
+    {
       if(trans != NULL) {
         sixp_trans_transit_state(trans,
                                  SIXP_TRANS_STATE_REQUEST_RECEIVED);
@@ -326,8 +330,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
       LOG_ERR_LLADDR((const linkaddr_t *)src_addr);
       LOG_ERR_("]\n");
       return;
-    } else if((seqno = sixp_trans_get_seqno(trans)) < 0 ||
-              seqno != pkt.seqno) {
+    } else if( seqno != pkt.seqno ) {
       LOG_ERR("6P: sixp_input() fails because of invalid seqno [seqno:%u, %u]\n",
               seqno, pkt.seqno);
       /*
