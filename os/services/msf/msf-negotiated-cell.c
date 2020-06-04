@@ -405,6 +405,39 @@ msf_negotiated_cell_is_scheduled_tx(tsch_neighbor_t *nbr)
   return nbr->negotiated_tx_cell != NULL;
 }
 /*---------------------------------------------------------------------------*/
+bool msf_negotiated_is_scheduled_nbr(tsch_neighbor_t *nbr){
+    if (msf_negotiated_cell_is_scheduled_tx(nbr))
+        return true;
+
+    tsch_link_t *cell;
+    for(cell = list_head(slotframe->links_list);
+        cell != NULL;
+        cell = list_item_next(cell))
+    {
+        if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
+            continue;
+        if ( nbr == tsch_queue_get_nbr(&cell->addr))
+            return true;
+    }
+    return false;
+}
+
+/*---------------------------------------------------------------------------*/
+bool msf_negotiated_is_scheduled_peer(const linkaddr_t *peer_addr){
+    tsch_link_t *cell;
+    for(cell = list_head(slotframe->links_list);
+        cell != NULL;
+        cell = list_item_next(cell))
+    {
+      if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
+          continue;
+      if (linkaddr_cmp(peer_addr, &cell->addr))
+          return true;
+    }
+    return false;
+}
+
+/*---------------------------------------------------------------------------*/
 tsch_link_t *
 msf_negotiated_cell_get_cell_to_delete(const linkaddr_t *peer_addr,
                                        msf_negotiated_cell_type_t cell_type)
@@ -666,6 +699,7 @@ msf_negotiated_cell_rx_is_used(const linkaddr_t *src_addr,
 void
 msf_negotiated_cell_delete_unused_cells(void)
 {
+  LOG_DBG("unused_cells GC\n");
   /*
    * MSF assumes there is constant upward traffic, which is handled by
    * negotiated RX cells if we have descendants. Therefore, if we

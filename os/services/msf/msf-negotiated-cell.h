@@ -110,6 +110,14 @@ void msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr);
 bool msf_negotiated_cell_is_scheduled_tx(tsch_neighbor_t *nbr);
 
 /**
+ * \brief Return whether scheduled any negotiated with a nbr
+ * \param nbr A tsch_neighbor_t object for the peer
+ * \return true if it is the case, otherwise false
+ */
+bool msf_negotiated_is_scheduled_nbr(tsch_neighbor_t *nbr);
+bool msf_negotiated_is_scheduled_peer(const linkaddr_t *peer_addr);
+
+/**
  * \brief Return a negotiated cell to delete
  * \param peer_addr The MAC address of the target peer
  * \param cell_type The type of a negotiated cell to delete
@@ -191,6 +199,12 @@ void MSF_AFTER_CELL_RELEASE(tsch_neighbor_t *nbr, tsch_link_t *cell);
 void MSF_AFTER_CELL_CLEAN( tsch_neighbor_t *nbr );
 #else
 #define MSF_AFTER_CELL_CLEAN(...)
+#endif
+
+#ifdef MSF_ON_NEW_NBR
+void MSF_ON_NEW_NBR( tsch_neighbor_t *nbr );
+#else
+#define MSF_ON_NEW_NBR(...)
 #endif
 
 

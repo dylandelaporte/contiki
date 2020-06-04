@@ -37,6 +37,7 @@
 
 #include "contiki.h"
 #include "assert.h"
+#include <stdbool.h>
 
 #include "net/mac/tsch/tsch.h"
 #include "net/mac/tsch/sixtop/sixtop.h"
@@ -138,6 +139,17 @@ sent_callback_responder(void *arg, uint16_t arg_len,
       channel_offset = reserved_cell->channel_offset;
 
       msf_reserved_cell_delete_all(dest_addr);
+
+      //nbr have no negotiations, so inform about new nbr
+      if ( !msf_negotiated_is_scheduled_peer(dest_addr) ){
+          tsch_neighbor_t *nbr;
+          nbr = tsch_queue_get_nbr(dest_addr);
+          assert(nbr != NULL);
+          if ( nbr != NULL ){
+              MSF_ON_NEW_NBR(nbr);
+          }
+      }
+
       if(msf_negotiated_cell_add(dest_addr, cell_type,
                                  slot_offset, channel_offset) < 0) {
         LOG_ERR("failed to add a negotiated cell\n");
@@ -321,9 +333,20 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       tsch_link_t *reserved_cell;
       uint16_t slot_offset, channel_offset;
       msf_sixp_get_cell_params(cell_list, &slot_offset, &channel_offset);
-      if((reserved_cell =
-          msf_reserved_cell_get(peer_addr,
-                                slot_offset, channel_offset)) != NULL) {
+      reserved_cell = msf_reserved_cell_get(peer_addr,
+                                      slot_offset, channel_offset);
+      if(reserved_cell != NULL) {
+
+          //nbr have no negotiations, so inform about new nbr
+          if ( !msf_negotiated_is_scheduled_peer(peer_addr) ){
+              tsch_neighbor_t *nbr;
+              nbr = tsch_queue_get_nbr(peer_addr);
+              assert(nbr != NULL);
+              if ( nbr != NULL ){
+                  MSF_ON_NEW_NBR(nbr);
+              }
+          }
+
         /* this is a cell which we proposed in the request */
         msf_negotiated_cell_type_t cell_type;
         cell_type = (reserved_cell->link_options & LINK_OPTION_TX)
@@ -332,6 +355,7 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
         msf_reserved_cell_delete_all(peer_addr);
         if(msf_negotiated_cell_add(peer_addr, cell_type,
                                    slot_offset, channel_offset) < 0) {
+
           msf_housekeeping_resolve_inconsistency(peer_addr);
         } else {
           /* delete an autonomous cell if it exists */
