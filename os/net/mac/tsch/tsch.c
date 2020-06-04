@@ -624,10 +624,6 @@ tsch_start_coordinator(void)
       TSCH_CALLBACK_JOINING_NETWORK();
 #endif
 
-#ifdef TSCH_CALLBACK_JOINING_NETWORK
-      TSCH_CALLBACK_JOINING_NETWORK();
-#endif
-
   /* Start slot operation */
   tsch_slot_operation_sync(RTIMER_NOW(), &tsch_current_asn);
 }
