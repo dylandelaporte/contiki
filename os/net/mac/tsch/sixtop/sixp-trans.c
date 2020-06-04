@@ -239,33 +239,22 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
   LOG_INFO("trans %p state %x->%x\n", trans, trans->state, new_state);
 
   /* enforce state transition rules  */
-  if(trans != NULL &&
-     (new_state == SIXP_TRANS_STATE_TERMINATING ||
-      (new_state == SIXP_TRANS_STATE_REQUEST_SENDING &&
-       trans->state == SIXP_TRANS_STATE_INIT) ||
-      (new_state == SIXP_TRANS_STATE_REQUEST_SENT &&
-       trans->state == SIXP_TRANS_STATE_REQUEST_SENDING) ||
-      (new_state == SIXP_TRANS_STATE_REQUEST_RECEIVED &&
-       trans->state == SIXP_TRANS_STATE_INIT) ||
-      (new_state == SIXP_TRANS_STATE_RESPONSE_SENDING &&
-       trans->state == SIXP_TRANS_STATE_REQUEST_RECEIVED) ||
-      (new_state == SIXP_TRANS_STATE_RESPONSE_SENT &&
-       trans->state == SIXP_TRANS_STATE_RESPONSE_SENDING) ||
-      (new_state == SIXP_TRANS_STATE_RESPONSE_RECEIVED &&
-       (trans->state == SIXP_TRANS_STATE_REQUEST_SENDING ||
-        trans->state == SIXP_TRANS_STATE_REQUEST_SENT)) ||
-      (new_state == SIXP_TRANS_STATE_CONFIRMATION_RECEIVED &&
-       (trans->state == SIXP_TRANS_STATE_RESPONSE_SENT ||
-        trans->state == SIXP_TRANS_STATE_RESPONSE_SENDING) &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP) ||
-      (new_state == SIXP_TRANS_STATE_CONFIRMATION_SENDING &&
-       trans->state == SIXP_TRANS_STATE_RESPONSE_RECEIVED &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP) ||
-      (new_state == SIXP_TRANS_STATE_CONFIRMATION_SENT &&
-       trans->state == SIXP_TRANS_STATE_CONFIRMATION_SENDING &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP))
-    )
-  {
+  if(trans != NULL){
+      bool ok = (new_state == SIXP_TRANS_STATE_TERMINATING);
+      if (!ok){
+          // check that trans direction keep allowed, or comes to final (indirected) state
+          ok = ((new_state & SIXP_TRANS_STATE_IO_Msk) == 0)
+             || ((new_state & SIXP_TRANS_STATE_IO_Msk & trans->state) != 0);
+
+          //check that next sten is successed from current
+          if (ok)
+          ok = ((new_state & SIXP_TRANS_STATE_STEP_Msk)
+                  == ( (trans->state& SIXP_TRANS_STATE_STEP_Msk) + SIXP_TRANS_STATE_STEP1));
+          if (ok)
+          if ((new_state & SIXP_TRANS_STATE_STEP_Msk) >= SIXP_TRANS_STATE_STEP4)
+              ok = (trans->mode == SIXP_TRANS_MODE_3_STEP);
+      }
+  if (ok){
       LOG_INFO("6P-trans: trans %p state changes from %u to %u\n",
                trans, trans->state, new_state);
 
@@ -286,7 +275,7 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
       trans->state = new_state;
       schedule_trans_process(trans);
       ret_val = 0;
-  } else if (trans != NULL){
+  } else {
     /* invalid transition */
     LOG_ERR("6P-trans: invalid transition, from %u to %u, on trans %p\n",
             trans->state, new_state, trans);
@@ -299,6 +288,7 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
                 sixp_trans_get_peer_addr(trans));
     }
     ret_val = -1;
+  }// if (ok)
   } else {
     /* trans == NULL */
     LOG_ERR("6top: invalid argument, trans is NULL\n");
