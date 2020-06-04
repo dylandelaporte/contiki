@@ -49,6 +49,7 @@
 #include "sixp.h"
 #include "sixp-pkt.h"
 #include "sixp-pkt-ex.h"
+#include "sixp-trans.h"
 
 /* Log configuration */
 #include "sys/log.h"
@@ -969,6 +970,7 @@ sixp_pkt_parse(const uint8_t *buf, uint16_t len,
   pkt->code.value = buf[1];
   pkt->sfid = buf[2];
   pkt->seqno = buf[3];
+  pkt->dir   = SIXP_TRANS_STATE_IN_REQ;
 
   if(pkt->version != SIXP_PKT_VERSION) {
     /* invalid version; stop parsing */
@@ -1089,6 +1091,22 @@ sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
                 uint8_t sfid, uint8_t seqno,
                 const uint8_t *body, uint16_t body_len, sixp_pkt_t *pkt)
 {
+    sixp_pkt_t tmp;
+    if (pkt == NULL){
+        pkt = &tmp;
+        sixp_pkt_init(pkt, type, code, sfid);
+    }
+    return sixp_pkt_build(pkt, seqno, body, body_len);
+}
+
+int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
+                    const uint8_t *body, uint16_t body_len )
+{
+    assert(pkt != NULL);
+    pkt->seqno = seqno;
+    pkt->body = body;
+    pkt->body_len = body_len;
+
   uint8_t *hdr;
 
   assert((body == NULL && body_len == 0) || (body != NULL && body_len > 0));
@@ -1114,9 +1132,9 @@ sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
   }
   hdr = packetbuf_hdrptr();
   /* header: write the 6top IE header, 4 octets */
-  hdr[0] = (type << 4) | SIXP_PKT_VERSION;
-  hdr[1] = code.value;
-  hdr[2] = sfid;
+  hdr[0] = (pkt->type << 4) | SIXP_PKT_VERSION;
+  hdr[1] = pkt->code.value;
+  hdr[2] = pkt->sfid;
   hdr[3] = seqno;
 
   /* data: write body */
@@ -1125,19 +1143,29 @@ sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
     packetbuf_set_datalen(body_len);
   }
 
-  /* copy information of a sending packet into pkt if necessary */
-  if(pkt != NULL) {
-    pkt->type = type;
-    pkt->code = code;
-    pkt->sfid = sfid;
-    pkt->seqno = seqno;
-    pkt->body = body;
-    pkt->body_len = body_len;
-  }
-
   /* packetbuf is ready to be sent */
   return 0;
 }
+
+void sixp_pkt_init(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid){
+    pkt->type = type;
+    pkt->code = code;
+    pkt->sfid = sfid;
+    pkt->dir   = SIXP_TRANS_STATE_OUT_REQ;
+    pkt->seqno  = 0;
+    pkt->body   = NULL;
+    pkt->body_len = 0;
+}
+
+//  same as sixp_pkt_init, but init for incoming
+void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid){
+    sixp_pkt_init(pkt, type, code, sfid);
+    pkt->dir   = SIXP_TRANS_STATE_IN_REQ;
+}
+
+
+
+//==============================================================================
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 // like memcopy(dst, h->body+offset, len) with packet strick bounds

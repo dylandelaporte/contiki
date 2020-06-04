@@ -41,6 +41,7 @@
 #include "sixp.h"
 #include "sixp-pkt.h"
 #include <stdbool.h>
+#include "sixtop.h"
 
 /**
  * \brief 6P Transaction States (for internal use)
@@ -233,6 +234,10 @@ void sixp_trans_free(sixp_trans_t *trans);
  * \return The pointer to a transaction; NULL on failure
  */
 sixp_trans_t *sixp_trans_find(const linkaddr_t *peer_addr);
+
+/* \brief Find a transaction for pkt - mutch by fsid, type, sequm
+ * */
+sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr, const sixp_pkt_t* pkt);
 
 // @brief checks that have any active transaction
 // @return true - some transaction are active

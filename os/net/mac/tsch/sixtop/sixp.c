@@ -40,10 +40,12 @@
 
 #include "contiki-lib.h"
 #include "lib/assert.h"
+#include <stdbool.h>
 
 #include "sixtop.h"
 #include "sixp-nbr.h"
 #include "sixp-pkt.h"
+#include "sixp-pkt-ex.h"
 #include "sixp-trans.h"
 
 /* Log configuration */
@@ -108,6 +110,7 @@ mac_callback(void *ptr, int status, int transmissions)
      * confirmation, the same transaction will be used for retransmission as
      * long as it doesn't have timeout.
      */
+    LOG_ERR("6P: mac_callback() fail status %d / %d\n", status, transmissions);
     if(current_state == SIXP_TRANS_STATE_REQUEST_SENDING) {
       /* request case */
       new_state = SIXP_TRANS_STATE_TERMINATING;
@@ -136,17 +139,23 @@ static int
 send_back_error(sixp_pkt_type_t type, sixp_pkt_rc_t rc,
                 const sixp_pkt_t *pkt, const linkaddr_t *dest_addr)
 {
-  sixp_trans_t *trans;
+  sixp_trans_t *trans = NULL;
 
   assert(pkt != NULL);
   assert(dest_addr != NULL);
 
-  if((rc == SIXP_PKT_RC_ERR_VERSION) ||
-     (rc == SIXP_PKT_RC_ERR_SFID) ||
-     (rc == SIXP_PKT_RC_ERR_BUSY) ||
-     (rc == SIXP_PKT_RC_ERR_SEQNUM &&
-      (trans = sixp_trans_find(dest_addr)) != NULL &&
-      sixp_trans_get_state(trans) != SIXP_TRANS_STATE_REQUEST_RECEIVED)) {
+  bool no_new_trans = (rc == SIXP_PKT_RC_ERR_VERSION)
+                      || (rc == SIXP_PKT_RC_ERR_SFID)
+                      || (rc == SIXP_PKT_RC_ERR_BUSY)
+                      || (rc == SIXP_PKT_RC_ERR_SEQNUM);
+  if (no_new_trans){
+      trans = sixp_trans_find_for_pkt(dest_addr, pkt);
+      if (trans != NULL)
+          no_new_trans = sixp_trans_get_state(trans) != SIXP_TRANS_STATE_REQUEST_RECEIVED;
+      else
+          no_new_trans = false;
+  }
+  if( no_new_trans ) {
     /* create a 6P packet within packetbuf */
     if(sixp_pkt_create(type, (sixp_pkt_code_t)(uint8_t)rc,
                        pkt->sfid, pkt->seqno, NULL, 0, NULL) < 0) {
@@ -252,8 +261,11 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
   }
 
   /* Transaction Management */
-  trans = sixp_trans_find(src_addr);
-  seqno = sixp_trans_get_seqno(trans);
+  trans = sixp_trans_find_for_pkt(src_addr, &pkt);
+  if (trans!= NULL)
+      seqno = sixp_trans_get_seqno(trans);
+  else
+      seqno = -1;
 
   if(pkt.type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
@@ -289,7 +301,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
         }
         return;
       }
-    }
+    }//if(trans != NULL)
 
     nbr = sixp_nbr_find(src_addr);
     if((pkt.code.cmd == SIXP_PKT_CMD_CLEAR) && (nbr != NULL) )
@@ -383,13 +395,14 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
 {
   sixp_trans_t *trans;
   sixp_nbr_t *nbr;
-  int16_t seqno;
+  int_fast16_t seqno;
   sixp_pkt_t pkt;
 
   assert(dest_addr != NULL);
+  sixp_pkt_init(&pkt, type, code, sfid);
 
   /* validate the state of a transaction with a specified peer */
-  trans = sixp_trans_find(dest_addr);
+  trans = sixp_trans_find_for_pkt(dest_addr, &pkt);
   if(type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
       LOG_ERR("6P: sixp_output() fails because another trans for [peer_addr:");
@@ -406,8 +419,7 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
       LOG_ERR_LLADDR((const linkaddr_t *)dest_addr);
       LOG_ERR_("]\n");
       return -1;
-    } else if(sixp_trans_get_state(trans) !=
-              SIXP_TRANS_STATE_REQUEST_RECEIVED) {
+    } else if(sixp_trans_get_state(trans) != SIXP_TRANS_STATE_REQUEST_RECEIVED) {
       LOG_ERR("6P: sixp_output() fails because of invalid transaction state\n");
       return -1;
     } else {
@@ -419,8 +431,7 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
       LOG_ERR_LLADDR((const linkaddr_t *)dest_addr);
       LOG_ERR_("]\n");
       return -1;
-    } else if(sixp_trans_get_state(trans) !=
-              SIXP_TRANS_STATE_RESPONSE_RECEIVED) {
+    } else if(sixp_trans_get_state(trans) != SIXP_TRANS_STATE_RESPONSE_RECEIVED) {
       LOG_ERR("6P: sixp_output() fails because of invalid transaction state\n");
       return -1;
     } else {
@@ -471,10 +482,7 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
   }
 
   /* create a 6P packet within packetbuf */
-  if(sixp_pkt_create(type, code, sfid,
-                     (uint8_t)seqno,
-                     body, body_len,
-                     type == SIXP_PKT_TYPE_REQUEST ? &pkt : NULL) < 0) {
+  if( sixp_pkt_build(&pkt, (uint8_t)seqno, body, body_len) < 0 ) {
     LOG_ERR("6P: sixp_output() fails to create a 6P packet\n");
     return -1;
   }

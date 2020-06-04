@@ -89,6 +89,8 @@ handle_trans_timeout(void *ptr)
     return;
   }
 
+  LOG_DBG("trans(%p) timeout wake\n", trans);
+
   if(trans->sf->timeout != NULL) {
     trans->sf->timeout(trans->cmd,
                        (const linkaddr_t *)&trans->peer_addr);
@@ -255,7 +257,7 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
               ok = (trans->mode == SIXP_TRANS_MODE_3_STEP);
       }
   if (ok){
-      LOG_INFO("6P-trans: trans %p state changes from %u to %u\n",
+      LOG_INFO("6P-trans: trans %p state changes from %x to %x\n",
                trans, trans->state, new_state);
 
       if(new_state == SIXP_TRANS_STATE_REQUEST_SENT) {
@@ -277,7 +279,7 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
       ret_val = 0;
   } else {
     /* invalid transition */
-    LOG_ERR("6P-trans: invalid transition, from %u to %u, on trans %p\n",
+    LOG_ERR("6P-trans: invalid transition, from %x to %x, on trans %p\n",
             trans->state, new_state, trans);
     /* inform the corresponding SF */
     assert(trans->sf != NULL);
@@ -407,7 +409,8 @@ sixp_trans_alloc(const sixp_pkt_t *pkt, const linkaddr_t *peer_addr)
     return NULL;
   }
 
-  if(sixp_trans_find(peer_addr) != NULL) {
+  if(0) //this check has alredy evaluated by caller
+  if(sixp_trans_find_for_pkt(peer_addr, pkt) != NULL) {
     LOG_ERR("6P-trans: sixp_trans_alloc() fails because another trans with ");
     LOG_ERR_LLADDR((const linkaddr_t *)peer_addr);
     LOG_ERR_("is in process\n");
@@ -474,6 +477,70 @@ sixp_trans_find(const linkaddr_t *peer_addr)
 
   return NULL;
 }
+
+/*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr
+                                        , const sixp_pkt_t* pkt
+                                        )
+{
+  sixp_trans_t *trans;
+
+  assert(peer_addr != NULL);
+  if(peer_addr == NULL) {
+    return NULL;
+  }
+
+  /*
+   * Here support concurrent 6P transactions which is mentioned in
+   * Section 4.3.3, draft-ietf-6tisch-6top-protocol-03.
+   *
+   * The assumption here is that each SF can have transactions to a single peer and
+   *     one from it
+   */
+  sixp_trans_state_t pkt_back = (~pkt->dir) & SIXP_TRANS_STATE_IO_Msk;
+
+  for(trans = list_head(trans_list); trans != NULL; trans = trans->next)
+  {
+    if ( !linkaddr_cmp(peer_addr, &trans->peer_addr) )   continue;
+
+    assert(trans->sf != NULL);
+    if (trans->sf->sfid != pkt->sfid) continue;
+
+    unsigned dir = trans->state & SIXP_TRANS_STATE_IO_Msk;
+
+    //reserved packet - don`t know how to mutch it
+    assert(pkt->type != SIXP_PKT_TYPE_RESERVED);
+
+    switch (pkt->type){
+        case SIXP_PKT_TYPE_REQUEST:
+        case SIXP_PKT_TYPE_CONFIRMATION:
+            // every request - is a new incomig transaction, or outgoing
+            //  so look for trans that are request-related
+            if (dir == pkt->dir){
+                LOG_DBG("trans(%p)[%x] mutch for %x pkt:%d\n", trans, trans->state
+                                                            , pkt->dir, pkt->type);
+                return trans;
+            }
+            break;
+
+        case SIXP_PKT_TYPE_RESPONSE:
+            // responces comes in for outgoing inrequest, or comes out for incoming
+            if (dir == pkt_back){
+                LOG_DBG("trans(%p)[%x] mutch for %x pkt:%d\n", trans, trans->state
+                                                            , pkt->dir, pkt->type);
+                return trans;
+            }
+            break;
+
+        case SIXP_PKT_TYPE_RESERVED:
+            //TODO: reserved incoming packets don`t match any transaction?
+            return NULL;
+    }
+  }
+
+  return NULL;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 sixp_trans_terminate(sixp_trans_t *trans)

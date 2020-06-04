@@ -42,6 +42,20 @@
 #include "sixp.h"
 #include "sixp-pkt.h"
 
+
+
+// initates pkt for outgoing
+void sixp_pkt_init(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
+
+//  same as sixp_pkt_init, but init for incoming
+void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
+
+// sixp_pkt_alloc demcoposed as -> sixp_pkt_init + sixp_pkt_build
+int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
+                    const uint8_t *body, uint16_t body_len );
+
+
+
 struct SIXPHandle {
     const uint8_t*  body;
     unsigned        body_len;
@@ -50,9 +64,12 @@ struct SIXPHandle {
 };
 typedef struct SIXPHandle SIXPHandle;
 
+typedef struct sixp_trans sixp_trans_t;
 struct SIXPeerHandle {
     SIXPHandle          h;
     const linkaddr_t*   addr;
+    // this may be == NULL, if trans not specified
+    sixp_trans_t*       trans;
 };
 typedef struct SIXPeerHandle SIXPeerHandle;
 
@@ -124,6 +141,9 @@ int
 sixp_pkt_output(SIXPeerHandle* h, uint8_t sfid,
             sixp_sent_callback_t func, void *arg, uint16_t arg_len);
 
+
+//==============================================================================
+sixp_trans_t *sixp_trans_find_for_peer(SIXPeerHandle *h);
 
 
 #endif /* CONTIKI_OS_NET_MAC_TSCH_SIXTOP_SIXP_PKT_EX_H_ */

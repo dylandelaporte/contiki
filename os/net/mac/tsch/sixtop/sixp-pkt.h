@@ -139,8 +139,12 @@ typedef struct {
   sixp_pkt_code_t code;       /**< Code */
   uint8_t sfid;               /**< SFID */
   uint8_t seqno;              /**< SeqNum */
-  const uint8_t *body;        /**< Other Fields... */
+  /**< Pkt Direction recv/outgoing @sa sixp_trans_state_t:
+   *        SIXP_TRANS_STATE_IN_REQ/SIXP_TRANS_STATE_OUT_REQ
+   * */
+  uint8_t dir;
   uint16_t body_len;          /**< The length of Other Fields */
+  const uint8_t *body;        /**< Other Fields... */
 } sixp_pkt_t;
 
 /**
