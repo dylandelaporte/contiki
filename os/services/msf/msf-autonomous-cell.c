@@ -79,6 +79,7 @@ static tsch_link_t *
 add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
 {
   const char *type_str;
+  (void)type_str;
   uint8_t link_options;
   uint16_t slot_offset;
   uint16_t channel_offset;
@@ -122,8 +123,9 @@ add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
     LOG_DBG_LLADDR(mac_addr);
     LOG_DBG_(" at slot_offset:%u, channel_offset:%u\n",
              slot_offset, channel_offset);
-    msf_avoid_link_cell(cell);
+
     MSF_AFTER_CELL_USE(NULL, cell);
+    msf_avoid_link_cell(cell);
   }
 
   return cell;
@@ -133,6 +135,7 @@ static void
 delete_cell(tsch_link_t *cell)
 {
   const char *cell_type_str;
+  (void)cell_type_str;
 
   assert(cell != NULL);
   if(cell->link_options & LINK_OPTION_TX) {
@@ -144,13 +147,12 @@ delete_cell(tsch_link_t *cell)
     /* skip this one */
   }
 
-  msf_unvoid_link_cell(cell);
+  // we not unvoid cells right after use, but keep them until nbr is removed
   msf_housekeeping_delete_cell_later(cell);
   LOG_DBG("removed an autonomous %s cell for ", cell_type_str);
   LOG_DBG_LLADDR(&cell->addr);
   LOG_DBG_(" at slot_offset:%u, channel_offset:%u\n",
            cell->timeslot, cell->channel_offset);
-  MSF_AFTER_CELL_RELEASE(NULL, cell);
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -163,6 +165,9 @@ msf_autonomous_cell_activate(void)
   } else {
     our_autonomous_rx_cell = add_cell(MSF_AUTONOMOUS_RX_CELL,
                                       &linkaddr_node_addr);
+    assert(our_autonomous_rx_cell != NULL);
+    msf_avoid_link_cell_default(our_autonomous_rx_cell);
+
   }
   return our_autonomous_rx_cell != NULL ? 0 : -1;
 }
@@ -187,8 +192,13 @@ msf_autonomous_cell_add_tx(const linkaddr_t *peer_addr)
   }
 }
 /*---------------------------------------------------------------------------*/
-void
-msf_autonomous_cell_delete_tx(const linkaddr_t *peer_addr)
+typedef enum DeleteMode {
+    dmTEMPORARY,        //< delete cell, that later willingly use for same peer
+    dmFORGET            //< delete cell, with no later intentions
+} DeleteMode;
+
+static
+void msf_autonomous_cell_delete_tx_how(const linkaddr_t *peer_addr, DeleteMode how)
 {
   if(slotframe == NULL) {
     /* do nothing */
@@ -203,9 +213,21 @@ msf_autonomous_cell_delete_tx(const linkaddr_t *peer_addr)
          (peer_addr == NULL ||
           linkaddr_cmp(peer_addr, &cell->addr))) {
         delete_cell(cell);
+        if (how == dmFORGET){
+            msf_unvoid_link_cell(cell);
+        }
+        MSF_AFTER_CELL_RELEASE(NULL, cell);
       }
     }
   }
+}
+
+void msf_autonomous_cell_delete_tx(const linkaddr_t *peer_addr){
+    msf_autonomous_cell_delete_tx_how(peer_addr, dmTEMPORARY);
+}
+
+void msf_autonomous_cell_forget(const linkaddr_t *peer_addr){
+    msf_autonomous_cell_delete_tx_how(peer_addr, dmFORGET);
 }
 
 /*---------------------------------------------------------------------------*/

@@ -203,7 +203,10 @@ msf_callback_tsch_nbr_removed(tsch_neighbor_t *nbr)
     /* do nothing */
   } else {
     /* delete an autnomous cell for the peer if it exists */
-    msf_autonomous_cell_delete_tx(tsch_queue_get_nbr_address(nbr));
+    msf_autonomous_cell_forget(tsch_queue_get_nbr_address(nbr));
+    //TODO: possibly forget nbr at tsch not used signal - is too hard,
+    //      since it may still present in net, even if thereis no tranfers with it.
+    //      may be better forget nbr by RPL probing signal?
     msf_unvoid_nbr_cells(nbr);
   }
 }

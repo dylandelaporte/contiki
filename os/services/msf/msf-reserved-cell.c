@@ -119,7 +119,7 @@ int ffz( unsigned int x ){  return __CTZ(~x); }
 
 static
 uint16_t  find_unused_slot_chanel(uint16_t slot){
-    msf_chanel_mask_t busych =  msf_avoid_slot_chanels(slot);
+    msf_chanel_mask_t busych =  msf_avoided_slot_chanels(slot);
     if (busych != ~0ul) {
         return ffz(busych);
     }

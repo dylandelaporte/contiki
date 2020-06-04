@@ -84,10 +84,17 @@ const tsch_link_t *msf_autonomous_cell_get_rx(void){
 void msf_autonomous_cell_add_tx(const linkaddr_t *peer_addr);
 
 /**
- * \brief Delete an autonomous TX cell scheduled for a peer
+ * \brief Delete an autonomous TX cell scheduled for a peer. Cells are deleted temporary
+ *          util nex use for peer.
  * \param peer_addr The MAC address of the target peer
  */
 void msf_autonomous_cell_delete_tx(const linkaddr_t *peer_addr);
+
+/**
+ * \brief Delete an autonomous TX cell scheduled for a peer, intends that it not later uses
+ * \param peer_addr The MAC address of the target peer
+ */
+void msf_autonomous_cell_forget(const linkaddr_t *peer_addr);
 
 /**
  * \brief Return whether an autonomous TX cell for a peer is scheduled

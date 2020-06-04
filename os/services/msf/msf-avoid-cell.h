@@ -59,39 +59,84 @@ msf_cell_t msf_cell_of_link(const tsch_link_t* x){
     return cell;
 }
 
+static inline
+msf_cell_t msf_cell_at(uint16_t slot_offset, uint16_t channel_offset){
+    msf_cell_t cell;
+    cell.field.slot    = slot_offset;
+    cell.field.chanel  = channel_offset;
+    return cell;
+}
+
+enum AvoidOption{
+    aoRX    = LINK_OPTION_RX,
+    aoTX    = LINK_OPTION_TX,
+
+    //cell is known by remotes
+    aoDEFAULT       = 0x8,
+
+    //cell is local used, and should be shared to nbrs
+    aoUSE_LOCAL     = 0x10,
+    //cell is remote used
+    aoUSE_REMOTE    = 0x20,
+
+    aoUSE           = aoUSE_LOCAL | aoUSE_REMOTE,
+};
+typedef enum AvoidOption AvoidOption;
 
 // same as reset all
 void msf_unvoid_all_cells();
 
-void msf_avoid_cell(msf_cell_t x);
-void msf_unvoid_cell(msf_cell_t x);
-
+// locals avoid
 void msf_avoid_link_cell(const tsch_link_t* x);
 void msf_unvoid_link_cell(const tsch_link_t* x);
 
+// check that cell have used local or nbr
 int  msf_is_avoid_cell(msf_cell_t x);
 int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset);
 int  msf_is_avoid_slot(uint16_t slot_offset);
 
-typedef int msf_chanel_mask_t;
-msf_chanel_mask_t  msf_avoid_slot_chanels(uint16_t slot_offset);
+// check that cell is used local
+int  msf_is_avoid_local_cell(msf_cell_t x);
 
+typedef int msf_chanel_mask_t;
+msf_chanel_mask_t  msf_avoided_slot_chanels(uint16_t slot_offset);
+
+// avoids of nbr. nbr = NULL - local avoids
 void msf_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+// avoids of nbr by local/remote using. nbr = NULL - local avoids
+void msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n);
+
+// completely unvoids nbr cells (forget nbr)
 void msf_unvoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
 void msf_unvoid_nbr_cells(const tsch_neighbor_t* n);
+
+// unvoids nbr remote using cells
+void msf_release_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+void msf_release_nbr_cells(const tsch_neighbor_t* n);
+// unvoids nbr local using cells
+void msf_release_nbr_cell_local(msf_cell_t x, const tsch_neighbor_t *n);
+void msf_release_nbr_cells_local(const tsch_neighbor_t* n);
 
 int  msf_is_avoid_cell_from(msf_cell_t x, const linkaddr_t *peer_addr);
 int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
 int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
 
+
+// mark avoid cell defult - denotes, that all nbrs are know it.
+//      default cells are ignored in enumerations
+void msf_avoid_link_cell_default(const tsch_link_t* x);
+
 //@return - amount of avoid cells
-int msf_avoid_num_cells();
+int msf_avoid_num_local_cells();
 
 // @result - cells->head.num_cells= amount of filled cells
 // @return - >0 - amount of cells append
 // @return - =0 - no cells to enumerate
 // @return - <0 - no cells append, not room to <cells>
-int msf_avoid_enum_cells(SIXPCellsPkt* cells, unsigned limit);
+int msf_avoid_enum_local_cells(SIXPCellsPkt* cells, unsigned limit);
+
+// clenup cells, that are known by n
+int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* cells, const tsch_neighbor_t *n);
 
 
 

@@ -183,12 +183,14 @@ void msf_negotiated_cell_delete_unused_cells(void);
 
 
 /* callbacks */
+// call after new cell use, but before marked avoiding
 #ifdef MSF_AFTER_CELL_USE
 void MSF_AFTER_CELL_USE(tsch_neighbor_t *nbr, tsch_link_t *cell);
 #else
 #define MSF_AFTER_CELL_USE(...)
 #endif
 
+// call after cell no use/deleted, after unmarked avoiding
 #ifdef MSF_AFTER_CELL_RELEASE
 void MSF_AFTER_CELL_RELEASE(tsch_neighbor_t *nbr, tsch_link_t *cell);
 #else
