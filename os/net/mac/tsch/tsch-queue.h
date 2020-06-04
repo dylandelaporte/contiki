@@ -68,8 +68,6 @@ void TSCH_CALLBACK_PACKET_READY(void);
 extern struct tsch_neighbor *n_broadcast;
 extern struct tsch_neighbor *n_eb;
 
-//* private variable for xxx_time_source methods. do ton use it directly
-extern struct tsch_neighbor *n_time_source;
 /********** Functions *********/
 
 /**
