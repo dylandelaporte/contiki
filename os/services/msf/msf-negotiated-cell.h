@@ -107,7 +107,7 @@ void msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr);
  * \param nbr A tsch_neighbor_t object for the peer
  * \return true if it is the case, otherwise false
  */
-bool msf_negotiated_cell_is_scheduled_tx(tsch_neighbor_t *nbr);
+bool msf_negotiated_nbr_is_scheduled_tx(tsch_neighbor_t *nbr);
 
 /**
  * \brief Return whether scheduled any negotiated with a nbr
@@ -170,7 +170,7 @@ uint16_t msf_negotiated_cell_get_num_tx_ack(tsch_link_t *cell);
  * \param src_addr The src MAC address of a received packet
  * \param slot_offset The slot offste of the target negotiated RX cell
  */
-void msf_negotiated_cell_rx_is_used(const linkaddr_t *src_addr,
+void msf_negotiated_cell_rx_mark_used(const linkaddr_t *src_addr,
                                     uint16_t slot_offset);
 
 /**

@@ -281,7 +281,7 @@ msf_is_ready(void)
         ret = false;
       } else {
         nbr = tsch_queue_get_nbr(parent_addr);
-        ret = msf_negotiated_cell_is_scheduled_tx(nbr);
+        ret = msf_negotiated_nbr_is_scheduled_tx(nbr);
       }
     }
   } else {

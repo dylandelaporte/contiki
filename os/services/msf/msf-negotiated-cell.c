@@ -399,14 +399,14 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
 }
 /*---------------------------------------------------------------------------*/
 bool
-msf_negotiated_cell_is_scheduled_tx(tsch_neighbor_t *nbr)
+msf_negotiated_nbr_is_scheduled_tx(tsch_neighbor_t *nbr)
 {
   assert(nbr != NULL);
   return nbr->negotiated_tx_cell != NULL;
 }
 /*---------------------------------------------------------------------------*/
 bool msf_negotiated_is_scheduled_nbr(tsch_neighbor_t *nbr){
-    if (msf_negotiated_cell_is_scheduled_tx(nbr))
+    if (msf_negotiated_nbr_is_scheduled_tx(nbr))
         return true;
 
     tsch_link_t *cell;

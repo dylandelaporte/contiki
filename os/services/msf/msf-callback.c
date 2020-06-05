@@ -89,7 +89,7 @@ msf_callback_packet_ready(void)
       /* we care only about unicast; do nothing. */
     } else if(msf_autonomous_cell_is_scheduled_tx(dest_addr) ||
               ((nbr = tsch_queue_get_nbr(dest_addr)) != NULL &&
-               msf_negotiated_cell_is_scheduled_tx(nbr) == true)) {
+               msf_negotiated_nbr_is_scheduled_tx(nbr) == true)) {
       /* we've already had at least one TX cell; do nothing. */
     } else {
       /*
@@ -138,7 +138,7 @@ msf_callback_packet_sent(uint16_t slot_offset,
 
     if((parent_addr = msf_housekeeping_get_parent_addr()) !=  NULL)
     if (linkaddr_cmp(dest_addr, parent_addr) &&
-       msf_negotiated_cell_is_scheduled_tx(nbr))
+       msf_negotiated_nbr_is_scheduled_tx(nbr))
     {
       /* update the counters for the negotiated TX cells */
       msf_num_cells_update_tx_used(num_tx);
@@ -171,7 +171,7 @@ int msf_callback_packet_recv(const struct tsch_asn_t *asn,
     } else {
       msf_num_cells_increment_rx_used();
     }
-    msf_negotiated_cell_rx_is_used(src_addr, slot_offset);
+    msf_negotiated_cell_rx_mark_used(src_addr, slot_offset);
   }
   return 0;
 }
