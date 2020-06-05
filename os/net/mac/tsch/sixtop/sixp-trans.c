@@ -465,12 +465,33 @@ sixp_trans_find(const linkaddr_t *peer_addr)
    */
   for(trans = list_head(trans_list);
       trans != NULL; trans = trans->next) {
-    if(memcmp(peer_addr, &trans->peer_addr, sizeof(linkaddr_t)) == 0) {
+    if( linkaddr_cmp(peer_addr, &trans->peer_addr) ) {
       return trans;
     }
   }
 
   return NULL;
+}
+
+/*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_find_for_sfid(const linkaddr_t *peer_addr, uint8_t sfid){
+    sixp_trans_t *trans;
+
+    assert(peer_addr != NULL);
+    if(peer_addr == NULL) {
+      return NULL;
+    }
+
+    for(trans = list_head(trans_list);
+        trans != NULL; trans = trans->next) {
+      if( linkaddr_cmp(peer_addr, &trans->peer_addr) )
+      if( trans->sf->sfid == sfid)
+      {
+        return trans;
+      }
+    }
+
+    return NULL;
 }
 
 /*---------------------------------------------------------------------------*/
