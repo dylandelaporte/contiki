@@ -584,7 +584,7 @@ sixp_trans_abort(sixp_trans_t *trans)
     sixp_trans_terminate(trans);
     sixp_trans_invoke_callback(trans, SIXP_OUTPUT_STATUS_ABORTED);
     /* process_trans() should be scheduled, which we will be stop */
-    assert(ctimer_expired(&trans->timer) == 0);
+    assert( !ctimer_expired(&trans->timer) );
     ctimer_stop(&trans->timer);
     /* call process_trans() directly*/
     sixp_process_trans((void *)trans);
