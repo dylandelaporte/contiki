@@ -63,13 +63,13 @@
 typedef void sub_cmd(shell_output_func output);
 
 /* static functions */
-static void init(void);
-static void input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
+void msf_init(void);
+void msf_input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
                           const uint8_t *body, uint16_t body_len,
                           const linkaddr_t *src_addr);
-static void timeout_handler(sixp_pkt_cmd_t cmd,
+void msf_timeout_handler(sixp_pkt_cmd_t cmd,
                             const linkaddr_t *peer_addr);
-static void error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd,
+void msf_error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd,
                           uint8_t seqno, const linkaddr_t *peer_addr);
 
 /* variables */
@@ -154,8 +154,7 @@ log_constants(){
 }
 
 /*---------------------------------------------------------------------------*/
-static void
-init(void)
+void msf_init(void)
 {
   static bool show_constants_now = true;
   if(show_constants_now) {
@@ -166,8 +165,7 @@ init(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
+void msf_input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
               const uint8_t *body, uint16_t body_len,
               const linkaddr_t *src_addr)
 {
@@ -220,8 +218,7 @@ input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
+void msf_timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
 {
   assert(peer_addr != NULL);
   if(cmd == SIXP_PKT_CMD_ADD) {
@@ -246,8 +243,7 @@ timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
+void msf_error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
               const linkaddr_t *peer_addr)
 {
   LOG_WARN("A 6P transaction for (cmd: %u) with ", cmd);
@@ -347,9 +343,9 @@ const sixtop_sf_t msf = {
   (((2 << (TSCH_MAC_MAX_BE - 1)) - 1) *
    TSCH_MAC_MAX_FRAME_RETRIES *
    MSF_SLOTFRAME_LENGTH * MSF_SLOT_LENGTH_MS / 1000 * CLOCK_SECOND),
-  init,
-  input_handler,
-  timeout_handler,
-  error_handler,
+  msf_init,
+  msf_input_handler,
+  msf_timeout_handler,
+  msf_error_handler,
 };
 /*---------------------------------------------------------------------------*/
