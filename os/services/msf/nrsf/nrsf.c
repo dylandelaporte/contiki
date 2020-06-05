@@ -198,7 +198,11 @@ void nrsf_timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
     /* do nothing */
   }
 
-  if(linkaddr_cmp(peer_addr, msf_housekeeping_get_parent_addr())) {
+  const linkaddr_t * parent = msf_housekeeping_get_parent_addr();
+  if (parent == NULL){
+      // what's up ?
+  }
+  else if( linkaddr_cmp(peer_addr, parent) ) {
     /* we are the initiator */
   } else {
     /* we are the responder */
