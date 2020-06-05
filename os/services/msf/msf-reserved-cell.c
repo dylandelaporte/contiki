@@ -56,13 +56,8 @@
 /* variables */
 extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
 
-/* static functions */
-static long find_unused_slot_offset(tsch_slotframe_t *slotframe);
-static uint16_t  find_unused_slot_chanel(uint16_t slot);
-
 /*---------------------------------------------------------------------------*/
-static
-long find_unused_slot_offset(tsch_slotframe_t *slotframe)
+long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
 {
   long ret;
   uint16_t slot_offset;
@@ -117,8 +112,7 @@ static inline
 int ffz( unsigned int x ){  return __CTZ(~x); }
 #endif
 
-static
-uint16_t  find_unused_slot_chanel(uint16_t slot){
+uint16_t  msf_find_unused_slot_chanel(uint16_t slot){
     msf_chanel_mask_t busych =  msf_avoided_slot_chanels(slot);
     if (busych != ~0ul) {
         return ffz(busych);
@@ -212,7 +206,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   }
 
   if(slot_offset < 0) {
-    _slot_offset = find_unused_slot_offset(slotframe);
+    _slot_offset = msf_find_unused_slot_offset(slotframe);
   } else if(tsch_schedule_get_link_by_timeslot(slotframe
               , slot_offset, channel_offset) != NULL )
   {
@@ -229,7 +223,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   if(_slot_offset >= 0) {
     if(channel_offset < 0) {
       /* pick a channel offset */
-      _channel_offset = find_unused_slot_chanel(_slot_offset);
+      _channel_offset = msf_find_unused_slot_chanel(_slot_offset);
     } else if (channel_offset > (tsch_hopping_sequence_length.val - 1)) {
       /* invalid channel offset */
       _channel_offset = -1;
