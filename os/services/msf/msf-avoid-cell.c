@@ -175,6 +175,18 @@ int  msf_is_avoid_slot(uint16_t slot_offset){
     return 0;
 }
 
+int msf_is_avoid_local_slot(uint16_t slot_offset){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+                return 1;
+        }
+    }
+    return 0;
+}
+
+
 int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
@@ -361,7 +373,7 @@ void msf_unuse_cleanup(){
 //      default cells are ignored in enumerations
 void msf_avoid_link_cell_default(const tsch_link_t* x){
     int idx = msf_avoids_nbr_cell_idx( msf_cell_of_link(x), get_addr_nbr(&x->addr) );
-    if (idx > 0)
+    if (idx >= 0)
         avoids_ops[idx] |= aoDEFAULT;
 }
 

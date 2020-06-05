@@ -79,7 +79,7 @@ long find_unused_slot_offset(tsch_slotframe_t *slotframe)
     if(sheduled_link != NULL)
         continue;
 
-    if (!msf_is_avoid_nbr_slot(slot_offset, NULL)){
+    if (!msf_is_avoid_local_slot(slot_offset)){
         // this slot is not alocated by own cells, so can share it with other
         //      neighbors by channel resolve
         if (ret < 0)
@@ -218,6 +218,9 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   {
     /* this slot is used; we cannot reserve a cell */
     _slot_offset = -1;
+  } else if (msf_is_avoid_local_slot(slot_offset)) {
+      /* this slot is used; we cannot reserve a cell */
+      _slot_offset = -1;
   } else {
     _slot_offset = slot_offset;
   }
@@ -231,7 +234,12 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
       /* invalid channel offset */
       _channel_offset = -1;
     } else {
-      _channel_offset = channel_offset;
+      msf_chanel_mask_t busych =  msf_avoided_slot_chanels(slot_offset);
+      if ( ( (busych >> channel_offset) & 1) == 0)
+          _channel_offset = channel_offset;
+      else
+          //chanel is busy by local or nbr cells
+          _channel_offset = -1;
     }
 
     /* the reserved cell doesn't have any link option on */
