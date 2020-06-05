@@ -70,8 +70,8 @@ typedef struct sixp_trans {
   struct ctimer timer;
 } sixp_trans_t;
 
-static void handle_trans_timeout(void *ptr);
-static void process_trans(void *ptr);
+void sixp_handle_trans_timeout(void *ptr);
+void sixp_process_trans(void *ptr);
 static void schedule_trans_process(sixp_trans_t *trans);
 static sixp_trans_mode_t determine_trans_mode(const sixp_pkt_t *req);
 
@@ -79,8 +79,7 @@ MEMB(trans_memb, sixp_trans_t, SIXTOP_MAX_TRANSACTIONS);
 LIST(trans_list);
 
 /*---------------------------------------------------------------------------*/
-static void
-handle_trans_timeout(void *ptr)
+void sixp_handle_trans_timeout(void *ptr)
 {
   sixp_trans_t *trans = (sixp_trans_t *)ptr;
 
@@ -104,11 +103,10 @@ start_trans_timer(sixp_trans_t *trans)
 {
   LOG_DBG("trans(%p) timeout(%p) %d\n", trans, &trans->timer, trans->sf->timeout_interval);
   ctimer_set(&trans->timer, trans->sf->timeout_interval,
-             handle_trans_timeout, trans);
+          sixp_handle_trans_timeout, trans);
 }
 /*---------------------------------------------------------------------------*/
-static void
-process_trans(void *ptr)
+void sixp_process_trans(void *ptr)
 {
   sixp_trans_t *trans = (sixp_trans_t *)ptr;
 
@@ -166,7 +164,7 @@ schedule_trans_process(sixp_trans_t *trans)
   }
 
   ctimer_stop(&trans->timer);
-  ctimer_set(&trans->timer, 0, process_trans, trans); /* expires immediately */
+  ctimer_set(&trans->timer, 0, sixp_process_trans, trans); /* expires immediately */
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -467,12 +465,33 @@ sixp_trans_find(const linkaddr_t *peer_addr)
    */
   for(trans = list_head(trans_list);
       trans != NULL; trans = trans->next) {
-    if(memcmp(peer_addr, &trans->peer_addr, sizeof(linkaddr_t)) == 0) {
+    if( linkaddr_cmp(peer_addr, &trans->peer_addr) ) {
       return trans;
     }
   }
 
   return NULL;
+}
+
+/*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_find_for_sfid(const linkaddr_t *peer_addr, uint8_t sfid){
+    sixp_trans_t *trans;
+
+    assert(peer_addr != NULL);
+    if(peer_addr == NULL) {
+      return NULL;
+    }
+
+    for(trans = list_head(trans_list);
+        trans != NULL; trans = trans->next) {
+      if( linkaddr_cmp(peer_addr, &trans->peer_addr) )
+      if( trans->sf->sfid == sfid)
+      {
+        return trans;
+      }
+    }
+
+    return NULL;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -565,10 +584,10 @@ sixp_trans_abort(sixp_trans_t *trans)
     sixp_trans_terminate(trans);
     sixp_trans_invoke_callback(trans, SIXP_OUTPUT_STATUS_ABORTED);
     /* process_trans() should be scheduled, which we will be stop */
-    assert(ctimer_expired(&trans->timer) == 0);
+    assert( !ctimer_expired(&trans->timer) );
     ctimer_stop(&trans->timer);
     /* call process_trans() directly*/
-    process_trans((void *)trans);
+    sixp_process_trans((void *)trans);
   }
 }
 /*---------------------------------------------------------------------------*/

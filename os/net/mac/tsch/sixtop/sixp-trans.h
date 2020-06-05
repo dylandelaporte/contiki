@@ -239,6 +239,8 @@ sixp_trans_t *sixp_trans_find(const linkaddr_t *peer_addr);
  * */
 sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr, const sixp_pkt_t* pkt);
 
+sixp_trans_t *sixp_trans_find_for_sfid(const linkaddr_t *peer_addr, uint8_t sfid);
+
 // @brief checks that have any active transaction
 // @return true - some transaction are active
 bool    sixp_trans_any();

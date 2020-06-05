@@ -76,6 +76,10 @@ tsch_slotframe_t * msf_negotiated_cell_get_slotframe(void)
   return msf_negotiate_slotframe;
 }
 
+/* @brief - check, that link is valid in negotiated slotframe
+ * */
+bool msf_is_negotiated_cell(tsch_link_t *cell);
+
 /**
  * \brief Add a negotiated cell
  * \param peer_addr The MAC address of the peer
@@ -107,7 +111,7 @@ void msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr);
  * \param nbr A tsch_neighbor_t object for the peer
  * \return true if it is the case, otherwise false
  */
-bool msf_negotiated_cell_is_scheduled_tx(tsch_neighbor_t *nbr);
+bool msf_negotiated_nbr_is_scheduled_tx(tsch_neighbor_t *nbr);
 
 /**
  * \brief Return whether scheduled any negotiated with a nbr
@@ -145,11 +149,18 @@ void msf_negotiated_cell_update_num_tx(uint16_t slot_offset,
                                        uint16_t num_tx, uint8_t mac_tx_status);
 
 /**
- * \brief Get a cell to relocate
+ * \brief lookup a cell with bad signs/features to relocate
  * \return A pointer to a negotiated TX cell to relocate if any,
  * otherwise NULL
  */
-tsch_link_t *msf_negotiated_cell_get_cell_to_relocate(void);
+tsch_link_t *msf_negotiated_propose_cell_to_relocate(void);
+
+// markup cell for relocation
+void mark_as_relocate(tsch_link_t *cell);
+bool is_marked_as_relocate(const tsch_link_t *cell);
+
+// \brief get negotiated link marked for relocate
+tsch_link_t *msf_negotiated_get_cell_to_relocate(void);
 
 /**
  * \brief Return NumTx of a negotiated TX cell
@@ -170,7 +181,7 @@ uint16_t msf_negotiated_cell_get_num_tx_ack(tsch_link_t *cell);
  * \param src_addr The src MAC address of a received packet
  * \param slot_offset The slot offste of the target negotiated RX cell
  */
-void msf_negotiated_cell_rx_is_used(const linkaddr_t *src_addr,
+void msf_negotiated_cell_rx_mark_used(const linkaddr_t *src_addr,
                                     uint16_t slot_offset);
 
 /**
@@ -179,6 +190,13 @@ void msf_negotiated_cell_rx_is_used(const linkaddr_t *src_addr,
  * thought being inactive will be delete
  */
 void msf_negotiated_cell_delete_unused_cells(void);
+
+/**
+ * \brief Detect and resolve collisions of new link with negotiated links.
+ * \details It try to relocate negotiateg link, that conflicts with cell
+ *          Also cleanup reserved links, that overlaps cell
+ */
+void msf_negotiated_inspect_link(tsch_link_t *cell);
 
 
 

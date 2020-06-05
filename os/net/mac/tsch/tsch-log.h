@@ -144,7 +144,8 @@ struct tsch_log_t {
          tsch_log_message
   } type;
   struct tsch_asn_t asn;
-  struct tsch_link *link;
+  tsch_slot_t   timeslot;
+  tsch_sf_h     slotframe_handle;
   uint8_t burst_count;
   uint8_t channel;
   uint8_t channel_offset;

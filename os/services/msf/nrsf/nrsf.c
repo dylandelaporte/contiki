@@ -99,25 +99,34 @@ void nrsf_check_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
 
 //=============================================================================
 /* static functions */
-static void init(void);
-static void input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
+void nrsf_init(void);
+void nrsf_input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
                           const uint8_t *body, uint16_t body_len,
                           const linkaddr_t *src_addr);
-static void timeout_handler(sixp_pkt_cmd_t cmd,
+void nrsf_timeout_handler(sixp_pkt_cmd_t cmd,
                             const linkaddr_t *peer_addr);
-static void error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd,
+void nrsf_error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd,
                           uint8_t seqno, const linkaddr_t *peer_addr);
+
+const sixtop_sf_t nrsf = {
+  NRSF_SFID,
+  (((2 << (TSCH_MAC_MAX_BE - 1)) - 1) *
+   TSCH_MAC_MAX_FRAME_RETRIES *
+   MSF_SLOTFRAME_LENGTH * MSF_SLOT_LENGTH_MS / 1000 * CLOCK_SECOND),
+  nrsf_init,
+  nrsf_input_handler,
+  nrsf_timeout_handler,
+  nrsf_error_handler,
+};
 
 /*---------------------------------------------------------------------------*/
 static void nrsf_init_tasks();
-static void
-init(void)
+void nrsf_init(void)
 {
     nrsf_init_tasks();
 }
 /*---------------------------------------------------------------------------*/
-static void
-input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
+void nrsf_input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
               const uint8_t *body, uint16_t body_len,
               const linkaddr_t *src_addr)
 {
@@ -180,8 +189,7 @@ input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
+void nrsf_timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
 {
   assert(peer_addr != NULL);
   if(cmd == SIXP_PKT_CMD_ADD) {
@@ -190,7 +198,11 @@ timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
     /* do nothing */
   }
 
-  if(linkaddr_cmp(peer_addr, msf_housekeeping_get_parent_addr())) {
+  const linkaddr_t * parent = msf_housekeeping_get_parent_addr();
+  if (parent == NULL){
+      // what's up ?
+  }
+  else if( linkaddr_cmp(peer_addr, parent) ) {
     /* we are the initiator */
   } else {
     /* we are the responder */
@@ -203,8 +215,7 @@ timeout_handler(sixp_pkt_cmd_t cmd, const linkaddr_t *peer_addr)
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
+void nrsf_error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
               const linkaddr_t *peer_addr)
 {
   LOG_WARN("A 6P transaction for (cmd: %u) with ", cmd);
@@ -214,17 +225,6 @@ error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
     //nrsf_negotiated_cell_delete_all(peer_addr);
   }
 }
-/*---------------------------------------------------------------------------*/
-const sixtop_sf_t nrsf = {
-  NRSF_SFID,
-  (((2 << (TSCH_MAC_MAX_BE - 1)) - 1) *
-   TSCH_MAC_MAX_FRAME_RETRIES *
-   MSF_SLOTFRAME_LENGTH * MSF_SLOT_LENGTH_MS / 1000 * CLOCK_SECOND),
-  init,
-  input_handler,
-  timeout_handler,
-  error_handler,
-};
 /*---------------------------------------------------------------------------*/
 
 static

@@ -84,5 +84,12 @@ tsch_link_t *msf_reserved_cell_add(const linkaddr_t *peer_addr,
 void msf_reserved_cell_delete_all(const linkaddr_t *peer_addr);
 
 
+
+//==============================================================================
+long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe);
+uint16_t  msf_find_unused_slot_chanel(uint16_t slot);
+
+
+
 #endif /* _MSF_RESERVED_CELL_H_ */
 /** @} */
