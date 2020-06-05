@@ -383,7 +383,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
     msf_reserved_cell_delete_all(peer_addr);
     if(rc == SIXP_PKT_RC_ERR_SEQNUM ||
        rc == SIXP_PKT_RC_ERR_CELLLIST) {
-      sixp_trans_abort(sixp_trans_find(peer_addr));
+      sixp_trans_abort(sixp_trans_find_for_sfid(peer_addr, MSF_SFID));
       msf_sixp_clear_send_request(peer_addr);
     } else if(rc == SIXP_PKT_RC_ERR_BUSY) {
       msf_sixp_start_request_wait_timer();

@@ -140,7 +140,7 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
     /* start an ADD or a DELETE transaction if necessary and possible */
     bool need6p= (parent_addr != NULL) && msf_sixp_is_request_wait_timer_expired();
     if (need6p)
-        need6p = (sixp_trans_find(parent_addr) == NULL);
+        need6p = (sixp_trans_find_for_sfid(parent_addr, MSF_SFID) == NULL);
     if(need6p) {
       if(cell_to_relocate != NULL) {
         msf_sixp_relocate_send_request(cell_to_relocate);
@@ -191,7 +191,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
 
   if(parent_addr != NULL) {
     /* CLEAR all the cells scheduled with the old parent */
-    sixp_trans_t *trans = sixp_trans_find(parent_addr);
+    sixp_trans_t *trans = sixp_trans_find_for_sfid(parent_addr, MSF_SFID);
     if(trans != NULL) {
       /* abort the ongoing transaction */
       sixp_trans_abort(trans);
@@ -222,7 +222,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
      * parent
      */
     msf_num_cells_reset(false);
-    if(sixp_trans_find(parent_addr) == NULL) {
+    if(sixp_trans_find_for_sfid(parent_addr, MSF_SFID) == NULL) {
       msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
     } else {
       /* we may have a transaction with the new parent */
@@ -245,7 +245,7 @@ msf_housekeeping_delete_cell_to_relocate(void)
 void
 msf_housekeeping_resolve_inconsistency(const linkaddr_t *peer_addr)
 {
-  sixp_trans_abort(sixp_trans_find(peer_addr));
+  sixp_trans_abort(sixp_trans_find_for_sfid(peer_addr, MSF_SFID));
   msf_sixp_clear_send_request(peer_addr);
 }
 /*---------------------------------------------------------------------------*/
