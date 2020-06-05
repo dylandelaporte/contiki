@@ -207,7 +207,6 @@ msf_negotiated_cell_activate(void)
   slotframe = tsch_schedule_get_slotframe_by_handle(
     MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS);
   assert(slotframe != NULL);
-  msf_unvoid_all_cells();
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -373,6 +372,9 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
 {
   linkaddr_t peer_addr;
   const char *cell_type_str;
+  (void)peer_addr;
+  (void)cell_type_str;
+
   uint16_t slot_offset, channel_offset;
 
   assert(slotframe != NULL);

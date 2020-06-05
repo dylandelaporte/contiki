@@ -54,6 +54,7 @@
 #include "msf-housekeeping.h"
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
+#include "msf-avoid-cell.h"
 #include "msf-sixp.h"
 
 #include "sys/log.h"
@@ -314,13 +315,15 @@ msf_activate(void)
     LOG_ERR("failed to add a slotframe for the negotiated cells\n");
   }
 
+  msf_unvoid_all_cells();
+  /* start the housekeeping process */
+  msf_housekeeping_start();
+  msf_negotiated_cell_activate();
+
   if(msf_autonomous_cell_activate() < 0) {
     LOG_ERR("cannot add the autonomous RX cell; failed to activate MSF\n");
   } else {
-    msf_negotiated_cell_activate();
     activated = true;
-    /* start the housekeeping process */
-    msf_housekeeping_start();
     LOG_INFO("MSF is activated\n");
   }
 }
