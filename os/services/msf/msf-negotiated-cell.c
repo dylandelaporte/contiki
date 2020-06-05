@@ -367,9 +367,24 @@ void msf_negotiated_drop_all_tx(tsch_neighbor_t *nbr){
     nbr->negotiated_tx_cell = NULL;
 }
 
-void
-msf_negotiated_cell_delete(tsch_link_t *cell)
+// if nbr need send, provide it with autonomous cell, if no negotiated have
+static
+void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, tsch_link_t *cell){
+    assert(nbr != NULL);
+    //check that nbr need tx cell
+    if ( !msf_negotiated_nbr_is_scheduled_tx(nbr) )
+    if ( tsch_queue_nbr_packet_count(nbr) > 0){
+        if ( !msf_autonomous_cell_is_scheduled_tx(&cell->addr) )
+            // here leave sending nbr without cells, so provide autonomous for it
+            msf_autonomous_cell_add_tx(&cell->addr);
+    }
+}
+
+typedef enum DeleteOption{ doCAREFUL, doBAREDROP } DeleteOption;
+static
+void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 {
+  // this is for LOG_
   linkaddr_t peer_addr;
   const char *cell_type_str;
   (void)peer_addr;
@@ -385,10 +400,14 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
   if(cell->link_options == LINK_OPTION_TX) {
     cell_type_str = "TX";
 
+    if (how == doCAREFUL) {
+        // manage links and  send queues
     nbr = tsch_queue_get_nbr(&cell->addr);
     assert(nbr != NULL);
-    assert(nbr->negotiated_tx_cell != NULL);
     msf_negotiated_drop_tx_cell(nbr, cell);
+        msf_sending_nbr_ensure_tx(nbr, cell);
+    }
+
   } else {
     assert(cell->link_options == LINK_OPTION_RX);
     cell_type_str = "RX";
@@ -403,6 +422,11 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
             slot_offset, channel_offset);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
 }
+
+void msf_negotiated_cell_delete(tsch_link_t *cell){
+    msf_negotiated_cell_delete_as(cell, doCAREFUL);
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
@@ -425,9 +449,14 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
 
           nbr = tsch_queue_get_nbr(&cell->addr);
           assert(nbr != NULL);
+          if (nbr->negotiated_tx_cell == NULL){
+              // looks that nbr witout tx_links alredy managed for sending
+              msf_negotiated_cell_delete_as(cell, doBAREDROP);
+          }
+          else {
           msf_negotiated_drop_all_tx(nbr);
-          msf_negotiated_cell_delete(cell);
-          //msf_housekeeping_delete_cell_later(cell);
+              msf_negotiated_cell_delete_as(cell, doCAREFUL);
+          }
         }
         LOG_INFO("removed all negotiated cells\n");
         MSF_AFTER_CELL_CLEAN(NULL);
@@ -445,12 +474,14 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
         next_cell = list_item_next(cell);
         if(linkaddr_cmp(&cell->addr, peer_addr) &&
            (cell->link_options & LINK_OPTION_LINK_TO_DELETE) == 0) {
-          msf_negotiated_cell_delete(cell);
+            msf_negotiated_cell_delete_as(cell, doBAREDROP);
         } else {
           /* this cell is not scheduled with peer_addr; ignore it */
           continue;
         }
       }
+
+      msf_sending_nbr_ensure_tx(nbr, cell);
       MSF_AFTER_CELL_CLEAN(nbr);
     }
   }
