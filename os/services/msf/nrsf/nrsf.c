@@ -911,7 +911,7 @@ int nrsf_cells_to_all_nbrs(tsch_neighbor_t *skip_nbr, SIXPCellsPkt* cells, nbr_o
     // WARN: TODO: nbr lladr uses as a key in nbr table.
     linkaddr_t* nbr_key = tsch_queue_get_nbr_address(skip_nbr);
     LOG_DBG("%s hops /# [", info);
-    LOG_INFO_LLADDR(idx);
+    LOG_INFO_LLADDR(nbr_key);
     LOG_DBG_("]\n");
 
 #if 0
