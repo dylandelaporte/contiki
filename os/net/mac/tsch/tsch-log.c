@@ -94,14 +94,14 @@ int tsch_log_process_pending(void)
   }
   if((log_index = ringbufindex_peek_get(&log_ringbuf)) != -1) {
     struct tsch_log_t *log = &log_array[log_index];
-    if(log->link == NULL) {
+    struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->slotframe_handle);
+    if(sf == NULL) {
         LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, (unsigned long)log->asn.ls4b);
     } else {
-      struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->link->slotframe_handle);
       LOG_PRINTF("TSCH: {asn-%x.%lx link-%u:%u*%u[%u+%u] ch%u} ",
              log->asn.ms1b, (unsigned long)log->asn.ls4b,
-             log->link->slotframe_handle, sf ? sf->size.val : 0, 
-             log->burst_count, log->link->timeslot, log->channel_offset,
+             log->slotframe_handle, sf ? sf->size.val : 0,
+             log->burst_count, log->timeslot, log->channel_offset,
              log->channel);
     }
     switch(log->type) {
@@ -133,7 +133,7 @@ int tsch_log_process_pending(void)
         LOG_PRINTF(", edr %d\n", (int)log->rx.estimated_drift);
         break;
       case tsch_log_message:
-          LOG_PRINTF("%s\n", log->message);
+          LOG_PRINTF("%.*s\n", sizeof(log->message), log->message);
         break;
       case tsch_log_text:
           LOG_PRINTF(log->text);
@@ -206,9 +206,16 @@ tsch_log_prepare_add(void)
   if(log_index != -1) {
     struct tsch_log_t *log = &log_array[log_index];
     log->asn = tsch_current_asn;
-    log->link = current_link;
-    log->burst_count = tsch_current_burst_count;
-    log->channel = tsch_current_channel;
+    if (current_link != NULL){
+    log->slotframe_handle   = current_link->slotframe_handle;
+    log->timeslot           = current_link->timeslot;
+    }
+    else {
+        log->slotframe_handle = -1;
+        log->timeslot         = -1;
+    }
+    log->burst_count    = tsch_current_burst_count;
+    log->channel        = tsch_current_channel;
     log->channel_offset = tsch_current_channel_offset;
     return log;
   } else {
