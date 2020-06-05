@@ -255,6 +255,11 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
   assert(parent_addr != NULL);
   assert(cell_to_relocate != NULL);
 
+  LOG_INFO("sent a RELOCATE [%u+%u] request to the parent: "
+          , cell_to_relocate->timeslot, cell_to_relocate->channel_offset);
+  LOG_INFO_LLADDR(parent_addr);
+  LOG_INFO_("\n");
+
   msf_sixp_set_cell_params(relocation_cell_list, cell_to_relocate);
   /* RELOCATION can happen only with negotiated TX cells */
   candidate_cell_list_len = msf_sixp_fill_cell_list(
@@ -286,15 +291,9 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
     msf_sixp_start_request_wait_timer();
   } else if(sixp_output(type, code, MSF_SFID, body, body_len, parent_addr,
                         sent_callback_initiator, NULL, 0) < 0) {
-    LOG_ERR("failed to send a RELOCATE request to \n");
-    LOG_ERR_LLADDR(parent_addr);
-    LOG_ERR_("\n");
+    LOG_ERR("failed to send a RELOCATE request \n");
     msf_reserved_cell_delete_all(parent_addr);
     msf_sixp_start_request_wait_timer();
-  } else {
-    LOG_INFO("sent a RELOCATE request to the parent: ");
-    LOG_INFO_LLADDR(parent_addr);
-    LOG_INFO_("\n");
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -379,7 +378,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       }
     }
   } else {
-    LOG_ERR("ADD transaction failed\n");
+    LOG_ERR("REL transaction failed\n");
     msf_reserved_cell_delete_all(peer_addr);
     if(rc == SIXP_PKT_RC_ERR_SEQNUM ||
        rc == SIXP_PKT_RC_ERR_CELLLIST) {

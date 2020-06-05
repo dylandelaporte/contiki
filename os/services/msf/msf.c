@@ -177,7 +177,9 @@ input_handler(sixp_pkt_type_t type, sixp_pkt_code_t code,
   if(activated == false) {
     LOG_ERR("MSF is not activated; ignore the input 6P packet\n");
     return;
-  } else if((trans = sixp_trans_find(src_addr)) == NULL) {
+  }
+  trans = sixp_trans_find_for_sfid(src_addr, MSF_SFID);
+  if(trans == NULL) {
     LOG_ERR("cannot find a 6P transaction of a received 6P packet\n");
     return;
   } else {
