@@ -72,9 +72,19 @@ const linkaddr_t * msf_housekeeping_get_parent_addr(void){
 }
 
 /**
+ * \brief initiate relocation for cell
+ */
+void msf_housekeeping_request_cell_to_relocate(tsch_link_t *cell);
+
+/**
  * \brief Delete a cell to be relocated
  */
 void msf_housekeeping_delete_cell_to_relocate(void);
+
+/**
+ * \brief ckecks that cell not conflicts with any, and rquest relocations if need
+ */
+void msf_housekeeping_inspect_cell_consintensy(tsch_link_t *cell);
 
 /**
  * \brief Resolve schedule inconsistency

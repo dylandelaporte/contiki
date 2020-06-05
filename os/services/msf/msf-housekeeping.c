@@ -50,6 +50,7 @@
 #include "msf-negotiated-cell.h"
 #include "msf-num-cells.h"
 #include "msf-sixp.h"
+#include "msf-housekeeping.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
@@ -61,6 +62,8 @@ const linkaddr_t* msf_housekeeping_parent_addr;
 #define parent_addr msf_housekeeping_parent_addr
 
 static tsch_link_t *cell_to_relocate;
+static process_event_t PROCESS_EVENT_MSF_RELOCATE   = PROCESS_EVENT_POLL;
+static process_event_t PROCESS_EVENT_MSF_RESOLVE    = PROCESS_EVENT_POLL;
 
 PROCESS(msf_housekeeping_process, "MSF housekeeping");
 
@@ -101,10 +104,17 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
   etimer_set(&et, slotframe_interval);
   timer_set(&t_col, MSF_HOUSEKEEPING_COLLISION_PERIOD_MIN * 60 * CLOCK_SECOND);
   timer_set(&t_gc, MSF_HOUSEKEEPING_GC_PERIOD_MIN * 60 * CLOCK_SECOND);
+  if (PROCESS_EVENT_MSF_RELOCATE == PROCESS_EVENT_POLL)
+      PROCESS_EVENT_MSF_RELOCATE = process_alloc_event();
+  if (PROCESS_EVENT_MSF_RESOLVE == PROCESS_EVENT_POLL)
+        PROCESS_EVENT_MSF_RESOLVE = process_alloc_event();
 
   while(1) {
-    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_POLL ||
-                             etimer_expired(&et));
+    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_POLL
+                            || ev == PROCESS_EVENT_MSF_RELOCATE
+                            || ev == PROCESS_EVENT_MSF_RESOLVE
+                            || etimer_expired(&et)
+                            );
     etimer_reset(&et);
 
     if(ev == PROCESS_EVENT_POLL) {
@@ -116,12 +126,18 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
         /* stopping this process */
         break;
       }
+    } else if(ev == PROCESS_EVENT_MSF_RELOCATE){
+        LOG_DBG("housekeep: on relocate\n");
+    } else if(ev == PROCESS_EVENT_MSF_RESOLVE){
+        LOG_DBG("housekeep: inspects\n");
+        if (msf_is_negotiated_cell((tsch_link_t *)data))
+            msf_negotiated_inspect_link((tsch_link_t *)data);
     } else {
       /* etimer_expired(&et); go through */
-    }
 
     /* update the counters */
     msf_num_cells_update();
+    }
 
     if(timer_expired(&t_gc)) {
       /* handle unused negotiated cells */
@@ -132,7 +148,9 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
     if(timer_expired(&t_col)) {
       /* decide to relocate a cell or not */
       if(cell_to_relocate == NULL && parent_addr) {
-        cell_to_relocate = msf_negotiated_cell_get_cell_to_relocate();
+        cell_to_relocate = msf_negotiated_propose_cell_to_relocate();
+        if (cell_to_relocate == NULL)
+            cell_to_relocate = msf_negotiated_get_cell_to_relocate();
       }
       timer_restart(&t_col);
     }
@@ -143,7 +161,12 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
         need6p = (sixp_trans_find_for_sfid(parent_addr, MSF_SFID) == NULL);
     if(need6p) {
       if(cell_to_relocate != NULL) {
+        // check that cell still exists
+        if (msf_is_negotiated_cell(cell_to_relocate))
         msf_sixp_relocate_send_request(cell_to_relocate);
+        else
+            msf_housekeeping_delete_cell_to_relocate();
+
       } else {
         msf_num_cells_trigger_6p_transaction();
       }
@@ -234,13 +257,32 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
 void
 msf_housekeeping_delete_cell_to_relocate(void)
 {
-  if(cell_to_relocate == NULL) {
-    /* do nothing */
-  } else {
+  if(cell_to_relocate != NULL) {
     msf_negotiated_cell_delete(cell_to_relocate);
     cell_to_relocate = NULL;
   }
+  msf_housekeeping_request_cell_to_relocate( msf_negotiated_get_cell_to_relocate() );
 }
+
+void msf_housekeeping_request_cell_to_relocate(tsch_link_t *cell){
+    if (cell == NULL)
+        return;
+    LOG_DBG("housekeep: relocate cell %u+%u\n", cell->timeslot, cell->channel_offset);
+    mark_as_relocate(cell);
+    if (cell_to_relocate == NULL){
+        cell_to_relocate = cell;
+        process_post(&msf_housekeeping_process, PROCESS_EVENT_MSF_RELOCATE, cell);
+    }
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief ckecks that cell not conflicts with any, and rquest relocations if need
+ */
+void msf_housekeeping_inspect_cell_consintensy(tsch_link_t *cell){
+    process_post(&msf_housekeeping_process, PROCESS_EVENT_MSF_RESOLVE, cell);
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_housekeeping_resolve_inconsistency(const linkaddr_t *peer_addr)

@@ -124,6 +124,9 @@ add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
     LOG_DBG_(" at slot_offset:%u, channel_offset:%u\n",
              slot_offset, channel_offset);
 
+    //inspect link in housekeep process
+    msf_housekeeping_inspect_cell_consintensy(cell);
+
     MSF_AFTER_CELL_USE(NULL, cell);
     msf_avoid_link_cell(cell);
   }
