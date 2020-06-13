@@ -76,17 +76,22 @@ static void nrsf_init_tasks();
 static void nrsf_tasks_poll_use();
 static void nrsf_tasks_poll_del();
 
-// @return - amount of modify/new cells
-// TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
-//          текущее решение - хранится использование локальное + ближайший сосед.
-// TODO:    Необходимо детектирование конкуренции за одну ячейку, и политика
-//              релокации ячеек, если обнаруживается конкуренция.
-//     Возможные решения:
-//      - согласовывать новую ячейку, если идет конкуренция за автономную TX ячейку
-//        должен ли так разруливаться конфликт за RXячейку?
-//        кто должен инициировать согласование?
+
+
+//=============================================================================
+/*
+ * @return - amount of modify/new cells
+ * TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
+ *          текущее решение - хранится использование локальное + ближайший сосед.
+ * TODO:    Необходимо детектирование конкуренции за одну ячейку, и политика
+ *              релокации ячеек, если обнаруживается конкуренция.
+ *     Возможные решения:
+ *      - согласовывать новую ячейку, если идет конкуренция за автономную TX ячейку
+ *        должен ли так разруливаться конфликт за RXячейку?
+ *        кто должен инициировать согласование?
+ */
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
-    tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
+     tsch_neighbor_t* n = tsch_queue_get_nbr(hpeer->addr);
 
     NRSFMeta meta;
     meta.raw = hcells->meta;
@@ -106,26 +111,32 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
 
         if (avoiduse <= NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP )
         //if (avoiduse < aoUSE_REMOTE_3HOP)
-        if (should_relay >= 0)
+        if (should_relay >= arEXIST_CHANGE)
             ++rel;
+
+        if (should_relay >= arEXIST_CHANGE){
+            msf_housekeeping_inspect_cell_consintensy(c, n, hcells->cell_options);
+        }
     }
 
-    // start DPC flush new avoids
+    // start DPC to flush new avoids
     if (rel > 0)
         nrsf_tasks_poll_use();
 }
 
-// here reaction on external request for unused cells.
-//  we unuse remote cell too, and if it is not far - relay it
-//
-// TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
-//         Запрос может удалить не свою ячейку. надо выявлять этот конфликт.
-//         Существующее решение - более дальняя команда игнорируется,
-//                  а при удалении ближней ячейки, система остается без информации
-//                    о дальней.
-//          Возможный выход - при приходе запроса удаления на локальную ячейку,
-//              форсировать отправку команды её занятости - это обновит у соседей
-//              актуальную занятость ячейки.
+/*
+ * here reaction on external request for unused cells.
+ *  we unuse remote cell too, and if it is not far - relay it
+ *
+ * TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
+ *         Запрос может удалить не свою ячейку. надо выявлять этот конфликт.
+ *         Существующее решение - более дальняя команда игнорируется,
+ *                  а при удалении ближней ячейки, система остается без информации
+ *                    о дальней.
+ *          Возможный выход - при приходе запроса удаления на локальную ячейку,
+ *              форсировать отправку команды её занятости - это обновит у соседей
+ *              актуальную занятость ячейки.
+ */
 void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     int avoiduse;
     int rel = 0;
@@ -136,7 +147,7 @@ void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
 
         //drop remote cell in NRSF_RANGE_HOPS, and unuse if far cells
         avoiduse = msf_unvoid_drop_nbr_cell(c, n, NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP );
-        if (avoiduse > 0)
+        if (avoiduse > arEXIST_CHANGE)
             ++rel;
     }
 
