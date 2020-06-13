@@ -94,32 +94,40 @@ enum AvoidOption{
 };
 typedef enum AvoidOption AvoidOption;
 
+enum AvoidResult{
+    arNEW = 1 ,             //< for new cell appends
+    arEXIST_CHANGE = 0,     //< for updates present cell
+    arEXIST_KEEP = -1       //< for keep unchanged present cell
+};
+typedef enum AvoidResult AvoidResult;
+
 // same as reset all
 void msf_unvoid_all_cells();
 
 // locals avoid
-// @return true - cell appedn/change
-//         false - cell alredy have
-bool msf_avoid_link_cell(const tsch_link_t* x);
+AvoidResult msf_avoid_link_cell(const tsch_link_t* x);
 void msf_unvoid_link_cell(const tsch_link_t* x);
 
-// check that cell have used local or nbr
+/* check that cell have used local or nbr
+ * @return < 0 - no cell found
+ *         >= 0 - have some cell
+ */
 int  msf_is_avoid_cell(msf_cell_t x);
 int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset);
 int  msf_is_avoid_slot(uint16_t slot_offset);
 
-// check that cell is used local
+/* @brief check that cell is used local
+ * @return < 0 - no cell found
+ *         >= 0 - have some cell
+*/
 int  msf_is_avoid_local_cell(msf_cell_t x);
 int  msf_is_avoid_local_slot(uint16_t slot_offset);
 
 typedef int msf_chanel_mask_t;
 msf_chanel_mask_t  msf_avoided_slot_chanels(uint16_t slot_offset);
 
-// avoids of nbr. nbr = NULL - local avoids
-// @return true - cell appedn/change
-//         false - cell alredy have
-// avoids of nbr by local/remote using. nbr = NULL - local avoids
-bool msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange);
+// avoids of nbr by local/remote using.
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange);
 
 // completely unvoids nbr cells (forget nbr)
 void msf_unvoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
@@ -132,7 +140,9 @@ void msf_release_nbr_cells(const tsch_neighbor_t* n);
 void msf_release_nbr_cell_local(msf_cell_t x, const tsch_neighbor_t *n);
 void msf_release_nbr_cells_local(const tsch_neighbor_t* n);
 
-int  msf_is_avoid_cell_from(msf_cell_t x, const linkaddr_t *peer_addr);
+/* @return < 0 - no cell found
+ *         >= 0 - AvoidOptions for cell
+ * */
 int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
 int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
 

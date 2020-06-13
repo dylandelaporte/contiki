@@ -74,14 +74,14 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
     if(sheduled_link != NULL)
         continue;
 
-    if (!msf_is_avoid_local_slot(slot_offset)){
+    if (msf_is_avoid_local_slot(slot_offset) < 0){
         // this slot is not alocated by own cells, so can share it with other
         //      neighbors by channel resolve
         if (ret < 0)
             ret = slot_offset;
     }
 
-    if (!msf_is_avoid_slot(slot_offset))
+    if (msf_is_avoid_slot(slot_offset) < 0)
     {
       /*
        * avoid using the slot offset of 0, which is used by the
@@ -212,7 +212,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   {
     /* this slot is used; we cannot reserve a cell */
     _slot_offset = -1;
-  } else if (msf_is_avoid_local_slot(slot_offset)) {
+  } else if ( msf_is_avoid_local_slot(slot_offset) >= 0) {
       /* this slot is used; we cannot reserve a cell */
       _slot_offset = -1;
   } else {

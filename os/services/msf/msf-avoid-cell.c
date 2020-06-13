@@ -91,26 +91,23 @@ tsch_neighbor_t* get_addr_nbr(const linkaddr_t *addr){
 
 
 int msf_is_avoid_cell(msf_cell_t x){
-    return msf_avoids_cell_idx(x) >= 0;
+    return msf_avoids_cell_idx(x);
 }
 
 int  msf_is_avoid_local_cell(msf_cell_t x){
-    return msf_uses_cell_idx(x, aoUSE_LOCAL) >= 0;
+    return msf_uses_cell_idx(x, aoUSE_LOCAL);
 }
 
 int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return msf_is_avoid_cell( msf_cell_at(slot_offset, channel_offset) );
 }
 
-int msf_is_avoid_cell_from(msf_cell_t x, const linkaddr_t *peer_addr){
-    if (peer_addr == NULL)
-        return msf_is_avoid_cell(x);
-    else
-        return msf_is_avoid_nbr_cell(x, get_addr_nbr(peer_addr));
-}
-
-int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
-    return msf_avoids_nbr_cell_idx(x, n) >= 0;
+int  msf_is_avoid_nbr_cell(msf_cell_t cell, const tsch_neighbor_t *n){
+    int x = msf_avoids_nbr_cell_idx(cell, n);
+    if (x < 0)
+        return x;
+    x = avoids_ops[x];
+    return x;
 }
 
 static
@@ -172,7 +169,7 @@ int  msf_is_avoid_slot(uint16_t slot_offset){
         if (cell->field.slot == slot_offset)
             return 1;
     }
-    return 0;
+    return -1;
 }
 
 int msf_is_avoid_local_slot(uint16_t slot_offset){
@@ -180,10 +177,10 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
         if (cell->field.slot == slot_offset){
             if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
-                return 1;
+                return avoids_ops[idx];
         }
     }
-    return 0;
+    return -1;
 }
 
 
@@ -192,20 +189,24 @@ int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->field.slot == slot_offset){
             if (avoids_nbrs[idx] == n)
-                return 1;
+                return avoids_ops[idx];
         }
     }
-    return 0;
+    return -1;
 }
 
 
-// @return > 0 - appends new cell, or change current
+/*
+ * @return > 0 - appends new cell
+ *         = 0 - change current
+ *         < 0 - nothing change for exist cell
+ */
 static
-bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
+AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
     int idxnbr = msf_avoids_nbr_cell_idx(x, n);
     if (idxnbr>=0){
         avoids_ops[idxnbr] = ops | (avoids_ops[idxnbr] & ~aoUSE);
-        return 1;
+        return arEXIST_CHANGE;
     }
 
     //local and close cells are sure valid, and so it ready for concurent
@@ -228,9 +229,9 @@ bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned op
 
         avoids_nbrs[avoids_list_num] = n;
         avoids_ops[idx]  = ops | (was & ~aoUSE);
-        return avoids_ops[idx] != was;
+        return (avoids_ops[idx] != was)? arEXIST_CHANGE: arEXIST_KEEP;
         }
-        return false;
+        return arEXIST_KEEP;
     }
     }// if (!force_new)
 
@@ -248,15 +249,15 @@ bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned op
     else {
         LOG_WARN("rich limit reserve for cell %x\n", x.raw);
     }
-    return true;
+    return arNEW;
 }
 
-bool msf_avoid_link_cell(const tsch_link_t* x){
+AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
     return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
                                 , aoUSE_LOCAL);
 }
 
-bool msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
     return msf_avoid_mark_nbr_cell(x, n, userange);
 }
 
@@ -534,7 +535,7 @@ int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
         msf_cell_t x;
         x.field.slot    = cell->field.slot;
         x.field.chanel  = cell->field.chanel;
-        if (!msf_is_avoid_nbr_cell(x, n)){
+        if (msf_is_avoid_nbr_cell(x, n) < 0 ){
             pkt->cells[res] = *cell;
             ++res;
         }
