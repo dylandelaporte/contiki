@@ -60,13 +60,13 @@ static bool is_valid_request(sixp_pkt_cell_options_t cell_options,
                              uint16_t relocation_cell_list_len,
                              const uint8_t *candidate_cell_list,
                              uint16_t candidate_cell_list_len);
-static void sent_callback_initiator(void *arg, uint16_t arg_len,
+void msf_rel_sent_callback_initiator(void *arg, uint16_t arg_len,
                                              const linkaddr_t *dest_addr,
                                              sixp_output_status_t status);
-static void sent_callback_responder(void *arg, uint16_t arg_len,
+void msf_rel_sent_callback_responder(void *arg, uint16_t arg_len,
                                              const linkaddr_t *dest_addr,
                                              sixp_output_status_t status);
-static void send_response(const linkaddr_t *peer_addr,
+void msf_rel_send_response(const linkaddr_t *peer_addr,
                                    sixp_pkt_cell_options_t cell_options,
                                    sixp_pkt_num_cells_t num_cells,
                                    const uint8_t *relocation_cell_list,
@@ -107,8 +107,7 @@ is_valid_request(sixp_pkt_cell_options_t cell_options,
   return ret;
 }
 /*---------------------------------------------------------------------------*/
-static void
-sent_callback_initiator(void *arg, uint16_t arg_len,
+void msf_rel_sent_callback_initiator(void *arg, uint16_t arg_len,
                                  const linkaddr_t *dest_addr,
                                  sixp_output_status_t status)
 {
@@ -126,8 +125,7 @@ sent_callback_initiator(void *arg, uint16_t arg_len,
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-sent_callback_responder(void *arg, uint16_t arg_len,
+void msf_rel_sent_callback_responder(void *arg, uint16_t arg_len,
                                  const linkaddr_t *dest_addr,
                                  sixp_output_status_t status)
 {
@@ -155,13 +153,18 @@ sent_callback_responder(void *arg, uint16_t arg_len,
 
       /* RELOCATE can happen only with negotiated RX cells */
       if(msf_negotiated_cell_add(dest_addr, MSF_NEGOTIATED_CELL_TYPE_RX,
-                                 slot_offset, channel_offset) < 0) {
-        /* this allocation failure could cause schedule inconsistency */
-        LOG_ERR("failed to relocate\n");
-        /* don't try to resolve the inconsitency from the responder */
+                                 slot_offset, channel_offset) >= 0)
+      {
+          if (msf_is_negotiated_cell(cell_to_relocate))
+              /* all good */
+              msf_negotiated_cell_delete(cell_to_relocate);
+          else{
+              LOG_ERR("relocated cell loosed!\n");
+          }
       } else {
-        msf_negotiated_cell_delete(cell_to_relocate);
-        /* all good */
+          /* this allocation failure could cause schedule inconsistency */
+          LOG_ERR("failed to relocate\n");
+          /* don't try to resolve the inconsitency from the responder */
       }
     }
   } else {
@@ -172,8 +175,7 @@ sent_callback_responder(void *arg, uint16_t arg_len,
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-send_response(const linkaddr_t *peer_addr,
+void msf_rel_send_response(const linkaddr_t *peer_addr,
                        sixp_pkt_cell_options_t cell_options,
                        sixp_pkt_num_cells_t num_cells,
                        const uint8_t *relocation_cell_list,
@@ -219,7 +221,7 @@ send_response(const linkaddr_t *peer_addr,
                  MSF_SFID,
                  reserved_cell == NULL ? NULL : (uint8_t *)&cell_to_return,
                  reserved_cell == NULL ? 0 : sizeof(sixp_pkt_cell_t),
-                 peer_addr, sent_callback_responder, cell_to_relocate,
+                 peer_addr, msf_rel_sent_callback_responder, cell_to_relocate,
                  reserved_cell == NULL ? 0 : sizeof(tsch_link_t)) < 0) {
     LOG_ERR("failed to send a response to ");
     LOG_ERR_LLADDR(peer_addr);
@@ -290,7 +292,7 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
     msf_reserved_cell_delete_all(parent_addr);
     msf_sixp_start_request_wait_timer();
   } else if(sixp_output(type, code, MSF_SFID, body, body_len, parent_addr,
-                        sent_callback_initiator, NULL, 0) < 0) {
+                        msf_rel_sent_callback_initiator, NULL, 0) < 0) {
     LOG_ERR("failed to send a RELOCATE request \n");
     msf_reserved_cell_delete_all(parent_addr);
     msf_sixp_start_request_wait_timer();
@@ -327,7 +329,7 @@ msf_sixp_relocate_recv_request(const linkaddr_t *peer_addr,
                                 body, body_len) < 0) {
     LOG_ERR("parse error\n");
   } else {
-    send_response(peer_addr, cell_options, num_cells,
+    msf_rel_send_response(peer_addr, cell_options, num_cells,
                   relocation_cell_list, relocation_cell_list_len,
                   candidate_cell_list, candidate_cell_list_len);
   }

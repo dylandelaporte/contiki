@@ -44,6 +44,7 @@
 
 #include "net/linkaddr.h"
 #include "net/mac/tsch/tsch.h"
+#include "msf-avoid-cell.h"
 
 /* definitions */
 /**
@@ -54,6 +55,45 @@ typedef enum {
   MSF_NEGOTIATED_CELL_TYPE_RX   /**< Negotiated RX cell */
 } msf_negotiated_cell_type_t;
 
+
+
+//----------------------------------------------------------------------------
+// @brief compact cell link id, for pass as process event parameter
+//  MSF rely on assumption that RF have <= 255 channels
+union MSFCellID{
+    struct {
+        uint16_t    slot;
+        uint8_t     chanel;
+        uint8_t     link_options;
+    }           field;
+    //unsigned long   raw;
+    void*           as_void;
+};
+typedef union MSFCellID MSFCellID;
+
+static inline
+MSFCellID   msf_cellid_of_link(const tsch_link_t* x){
+    MSFCellID cell;
+    cell.field.slot         = x->timeslot;
+    assert(x->channel_offset <= 0xff);
+    cell.field.chanel       = x->channel_offset;
+    cell.field.link_options = (uint8_t)x->link_options;
+    return cell;
+}
+
+static inline
+MSFCellID   msf_cellid_of_sixp(msf_cell_t x, sixp_pkt_cell_options_t opts){
+    MSFCellID cell;
+    cell.field.slot         = x.field.slot;
+    assert(x.field.chanel <= 0xff);
+    cell.field.chanel       = x.field.chanel;
+    cell.field.link_options = (uint8_t)opts;
+    return cell;
+}
+
+
+
+//----------------------------------------------------------------------------
 /**
  * \brief Activate the negotiated cell scheduling
  */
@@ -191,12 +231,20 @@ void msf_negotiated_cell_rx_mark_used(const linkaddr_t *src_addr,
  */
 void msf_negotiated_cell_delete_unused_cells(void);
 
+enum MSFInspectResult{
+    irNOCELL    = -1,   //< for no cells recognised - is no negotiated cell
+    irFAIL      = 0,    //< conflicts not solves
+    irOK        = 1,    //< no conflicts
+    irRELOCATE  = 2,    //< requested relocation for conflict resolve
+};
+typedef enum MSFInspectResult MSFInspectResult;
 /**
  * \brief Detect and resolve collisions of new link with negotiated links.
  * \details It try to relocate negotiateg link, that conflicts with cell
  *          Also cleanup reserved links, that overlaps cell
  */
-void msf_negotiated_inspect_link(tsch_link_t *cell);
+MSFInspectResult msf_negotiated_inspect_vs_link(tsch_link_t *cell);
+MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID cell);
 
 
 

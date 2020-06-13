@@ -137,11 +137,11 @@ msf_callback_packet_sent(uint16_t slot_offset,
     }
 
     if((parent_addr = msf_housekeeping_get_parent_addr()) !=  NULL)
-    if (linkaddr_cmp(dest_addr, parent_addr) &&
-       msf_negotiated_nbr_is_scheduled_tx(nbr))
+    if (linkaddr_cmp(dest_addr, parent_addr) && (nbr != NULL))
+    if ( msf_negotiated_nbr_is_scheduled_tx(nbr) )
     {
       /* update the counters for the negotiated TX cells */
-      msf_num_cells_update_tx_used(num_tx);
+      msf_num_cells_update_parent_tx_used(num_tx);
       msf_negotiated_cell_update_num_tx(slot_offset, num_tx, mac_tx_status);
     }
   }
@@ -165,11 +165,9 @@ int msf_callback_packet_recv(const struct tsch_asn_t *asn,
      */
   } else {
     const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
-    if(parent_addr == NULL ||
-       linkaddr_cmp(parent_addr, src_addr) == 0) {
-      /* nothing to do */
-    } else {
-      msf_num_cells_increment_rx_used();
+    if (parent_addr != NULL)
+    if (linkaddr_cmp(parent_addr, src_addr)) {
+        msf_num_cells_increment_parent_rx_used();
     }
     msf_negotiated_cell_rx_mark_used(src_addr, slot_offset);
   }

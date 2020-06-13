@@ -251,7 +251,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
   if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL) {
     LOG_ERR("failed to add a negotiated %s cell because nbr is not available\n",
             cell_type_str);
-    return -1;
+    return irNOCELL;
   }
 
   new_cell = tsch_schedule_add_link(slotframe, cell_options,
@@ -317,6 +317,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
       }
     }
     MSF_AFTER_CELL_USE(nbr, new_cell);
+    msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
   }
 
   return new_cell == NULL ? -1 : 0;
@@ -369,14 +370,14 @@ void msf_negotiated_drop_all_tx(tsch_neighbor_t *nbr){
 
 // if nbr need send, provide it with autonomous cell, if no negotiated have
 static
-void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, tsch_link_t *cell){
+void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, const linkaddr_t* peer_addr){
     assert(nbr != NULL);
     //check that nbr need tx cell
     if ( !msf_negotiated_nbr_is_scheduled_tx(nbr) )
     if ( tsch_queue_nbr_packet_count(nbr) > 0){
-        if ( !msf_autonomous_cell_is_scheduled_tx(&cell->addr) )
+        if ( !msf_autonomous_cell_is_scheduled_tx(peer_addr) )
             // here leave sending nbr without cells, so provide autonomous for it
-            msf_autonomous_cell_add_tx(&cell->addr);
+            msf_autonomous_cell_add_tx(peer_addr);
     }
 }
 
@@ -405,7 +406,7 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
     nbr = tsch_queue_get_nbr(&cell->addr);
     assert(nbr != NULL);
     msf_negotiated_drop_tx_cell(nbr, cell);
-        msf_sending_nbr_ensure_tx(nbr, cell);
+        msf_sending_nbr_ensure_tx(nbr, &cell->addr);
     }
 
   } else {
@@ -420,6 +421,8 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);
+
+  msf_unvoid_link_cell(cell);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
 }
 
@@ -481,7 +484,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
         }
       }
 
-      msf_sending_nbr_ensure_tx(nbr, cell);
+      msf_sending_nbr_ensure_tx(nbr, peer_addr);
       MSF_AFTER_CELL_CLEAN(nbr);
     }
   }
@@ -852,21 +855,30 @@ msf_negotiated_cell_delete_unused_cells(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-void msf_negotiated_inspect_link(tsch_link_t* x){
+MSFInspectResult msf_negotiated_inspect_vs_link(tsch_link_t* x){
+    return msf_negotiated_inspect_vs_cellid( msf_cellid_of_link(x) );
+}
+
+MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
+{
     /* mark cells to keep with "is_kept" */
     tsch_link_t *cell;
     for(cell = list_head(slotframe->links_list);
         cell != NULL;
         cell = list_item_next(cell))
     {
-      if (cell->timeslot != x->timeslot) continue;
+      if (cell->timeslot != x.field.slot) continue;
       if (cell->link_options & LINK_OPTION_LINK_TO_DELETE)
           continue;
+
+      //inspection alredy managed;
+      if (is_marked_as_relocate(cell))
+          return irRELOCATE;
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
       //only TX links can mix in one slot
       bool can_overlap = (cell->link_options == LINK_OPTION_TX)
-                      && (x->link_options == LINK_OPTION_TX);
+                      && (x.field.link_options == LINK_OPTION_TX);
 
       //try to eval that have any slot to relocate conflicting link
       long new_slot = msf_find_unused_slot_offset(slotframe);
@@ -876,32 +888,29 @@ void msf_negotiated_inspect_link(tsch_link_t* x){
           // have no unconflicting slots!
           if (!can_overlap){
               // nothing can do with it
-              LOG_ERR("!new link[");
-              LOG_ERR_LLADDR(&x->addr);
-              LOG_ERR_("] conflicts with ->");
+              LOG_ERR("!new link conflicts with ->");
               LOG_ERR_LLADDR(&cell->addr);
               LOG_ERR_("for slot %d\n", cell->timeslot);
-              return;
+              return irFAIL;
           }
           //check that have unconflict chanels
           if (cell->channel_offset != x->channel_offset)
-              return;
+              return irOK;
       }
       else {
           // since able allocate unconflicting slots, drop preserved.
           //    This prevents from alloc link that later reallocate
           if (cell->link_options & LINK_OPTION_RESERVED_LINK){
-              msf_negotiated_cell_delete(cell);
-              return;
+              msf_reserved_release_link(cell);
+              return irOK;
           }
       }
 
-      LOG_INFO("new link[");
-      LOG_INFO_LLADDR(&x->addr);
-      LOG_INFO_("] relocate slot %d ->", cell->timeslot);
+      LOG_INFO("new link relocate slot %d ->", cell->timeslot);
       LOG_INFO_LLADDR(&cell->addr);
       LOG_INFO_("\n");
       msf_housekeeping_request_cell_to_relocate(cell);
-      return;
+      return irRELOCATE;
     }
+    return irNOCELL;
 }
