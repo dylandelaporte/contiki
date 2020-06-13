@@ -68,14 +68,11 @@ enum SIXPError {
 };
 typedef enum SIXPError SIXPError;
 
-// like memcopy(dst, h->body+offset, len) with packet strick bounds
-SIXPError sixp_pkt_load(SIXPHandle* h, void* dst, unsigned offset, unsigned len);
-SIXPError sixp_pkt_save(SIXPHandle* h, void* dst, unsigned offset, unsigned len);
-
 
 
 //==============================================================================
 struct SIXPCellsHandle {
+    sixp_pkt_metadata_t     meta;
     sixp_pkt_cell_options_t cell_options;
     sixp_pkt_num_cells_t    num_cells;
     sixp_pkt_cell_t*        cell_list;
@@ -84,14 +81,16 @@ struct SIXPCellsHandle {
 typedef struct SIXPCellsHandle SIXPCellsHandle;
 
 SIXPError sixp_pkt_parse_cell_list(SIXPHandle* h, SIXPCellsHandle* dst);
-
-SIXPError sixp_pkt_parse_cell_options(SIXPHandle* h,
-                                    sixp_pkt_cell_options_t *cell_options);
-
-SIXPError sixp_pkt_parse_num_cells(SIXPHandle* h,
-                       sixp_pkt_num_cells_t *num_cells );
-
 SIXPError sixp_pkt_parse_cells(SIXPHandle* h, SIXPCellsHandle* dst);
+
+// steps h body to position after dst cells
+SIXPError sixp_pkt_after_cells(SIXPHandle* h, SIXPCellsHandle* dst);
+
+//< takes from h->body new cells sequence, after dst described
+//  so in pack may be placed a few cells sets:
+//         body>head       >cells0...n   > head      > cells0..m
+//             :meta,op,cnt:s0c0, s1c1 ..:meta,op,cnt:s0c0, s1c1 ..
+SIXPError sixp_pkt_parse_next_cells(SIXPHandle* h, SIXPCellsHandle* dst);
 
 
 // strage for generating new cells packet body
@@ -111,9 +110,21 @@ void sixp_pkt_cells_init(SIXPCellsPkt* pkt, unsigned size){
 }
 
 static inline
+void sixp_pkt_cells_reset(SIXPCellsPkt* pkt){
+    pkt->cells[-1].raw = 0;
+}
+
+static inline
 void sixp_pkt_cells_assign(SIXPHandle* h, SIXPCellsPkt* pkt){
     h->body             = (const uint8_t*)&pkt->head;
     h->body_len         = sizeof(pkt->head)+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
+}
+
+static inline
+void sixp_pkt_cells_append(SIXPHandle* h, SIXPCellsPkt* pkt){
+    const uint8_t* body =(const uint8_t*)pkt;
+    assert( (h->body + h->body_len) == body);
+    h->body_len         += sizeof(pkt->head)+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
 }
 
 static inline
