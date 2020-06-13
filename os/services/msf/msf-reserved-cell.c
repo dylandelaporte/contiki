@@ -74,14 +74,14 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
     if(sheduled_link != NULL)
         continue;
 
-    if (!msf_is_avoid_local_slot(slot_offset)){
+    if (msf_is_avoid_local_slot(slot_offset) < 0){
         // this slot is not alocated by own cells, so can share it with other
         //      neighbors by channel resolve
         if (ret < 0)
             ret = slot_offset;
     }
 
-    if (!msf_is_avoid_slot(slot_offset))
+    if (msf_is_avoid_slot(slot_offset) < 0)
     {
       /*
        * avoid using the slot offset of 0, which is used by the
@@ -212,7 +212,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   {
     /* this slot is used; we cannot reserve a cell */
     _slot_offset = -1;
-  } else if (msf_is_avoid_local_slot(slot_offset)) {
+  } else if ( msf_is_avoid_local_slot(slot_offset) >= 0) {
       /* this slot is used; we cannot reserve a cell */
       _slot_offset = -1;
   } else {
@@ -245,6 +245,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
                                       0 // WHAT to do here?
                                       );
     if (cell != NULL){
+        cell->data = NULL;
         LOG_DBG("reserved a cell at slot_offset:%u, channel_offset:%u\n",
                 (uint16_t)_slot_offset, (uint16_t)_channel_offset);
     } else  {
@@ -274,7 +275,17 @@ msf_reserved_cell_delete_all(const linkaddr_t *peer_addr)
     next_cell = (tsch_link_t *)list_item_next(cell);
     if(cell->link_options & LINK_OPTION_RESERVED_LINK) {
       if(peer_addr == NULL ||
-         linkaddr_cmp(&cell->addr, peer_addr)) {
+         linkaddr_cmp(&cell->addr, peer_addr))
+      {
+          msf_reserved_release_link(cell);
+      }
+    } else {
+      /* this is not a reserved cell; skip it */
+    }
+  }
+}
+
+void msf_reserved_release_link(tsch_link_t *cell){
         uint16_t slot_offset = cell->timeslot;
         uint16_t channel_offset = cell->channel_offset;
         msf_housekeeping_delete_cell_later(cell);
@@ -282,8 +293,3 @@ msf_reserved_cell_delete_all(const linkaddr_t *peer_addr)
                 "slot_offset:%u, channel_offset:%u\n",
                 slot_offset, channel_offset);
       }
-    } else {
-      /* this is not a reserved cell; skip it */
-    }
-  }
-}

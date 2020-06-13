@@ -75,6 +75,11 @@ static tsch_link_t *add_cell(msf_autonomous_cell_type_t type,
 static void delete_cell(tsch_link_t *autonomous_cell);
 
 /*---------------------------------------------------------------------------*/
+bool msf_is_autonomous_cell(tsch_link_t *cell){
+    return list_contains( slotframe->links_list, cell);
+}
+
+/*---------------------------------------------------------------------------*/
 static tsch_link_t *
 add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
 {

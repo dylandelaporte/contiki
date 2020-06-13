@@ -91,26 +91,23 @@ tsch_neighbor_t* get_addr_nbr(const linkaddr_t *addr){
 
 
 int msf_is_avoid_cell(msf_cell_t x){
-    return msf_avoids_cell_idx(x) >= 0;
+    return msf_avoids_cell_idx(x);
 }
 
 int  msf_is_avoid_local_cell(msf_cell_t x){
-    return msf_uses_cell_idx(x, aoUSE_LOCAL) >= 0;
+    return msf_uses_cell_idx(x, aoUSE_LOCAL);
 }
 
 int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return msf_is_avoid_cell( msf_cell_at(slot_offset, channel_offset) );
 }
 
-int msf_is_avoid_cell_from(msf_cell_t x, const linkaddr_t *peer_addr){
-    if (peer_addr == NULL)
-        return msf_is_avoid_cell(x);
-    else
-        return msf_is_avoid_nbr_cell(x, get_addr_nbr(peer_addr));
-}
-
-int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
-    return msf_avoids_nbr_cell_idx(x, n) >= 0;
+int  msf_is_avoid_nbr_cell(msf_cell_t cell, const tsch_neighbor_t *n){
+    int x = msf_avoids_nbr_cell_idx(cell, n);
+    if (x < 0)
+        return x;
+    x = avoids_ops[x];
+    return x;
 }
 
 static
@@ -172,7 +169,7 @@ int  msf_is_avoid_slot(uint16_t slot_offset){
         if (cell->field.slot == slot_offset)
             return 1;
     }
-    return 0;
+    return -1;
 }
 
 int msf_is_avoid_local_slot(uint16_t slot_offset){
@@ -180,10 +177,10 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
         if (cell->field.slot == slot_offset){
             if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
-                return 1;
+                return avoids_ops[idx];
         }
     }
-    return 0;
+    return -1;
 }
 
 
@@ -192,33 +189,70 @@ int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->field.slot == slot_offset){
             if (avoids_nbrs[idx] == n)
-                return 1;
+                return avoids_ops[idx];
         }
     }
-    return 0;
+    return -1;
 }
 
 
-
+/*
+ * @return > 0 - appends new cell
+ *         = 0 - change current
+ *         < 0 - nothing change for exist cell
+ */
 static
-bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
+AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
+    int idxnbr = msf_avoids_nbr_cell_idx(x, n);
+    if (idxnbr>=0){
+        AvoidOption was  = avoids_ops[idxnbr];
+
+        if ((was & aoUSE_LOCAL) > (ops & aoUSE_LOCAL)){
+            //do not trust far cells, since they maybe a echo returned in cycle
+            if (( ops & aoUSE_REMOTE) > aoUSE_REMOTE_1HOP)
+                return arEXIST_KEEP;
+
+            // do not override local cell by remote.
+            // try update remote status only
+            avoids_ops[idxnbr] = ops | (was & ~aoUSE_REMOTE);
+        }
+        else {
+            avoids_ops[idxnbr] = ops | (was & ~aoUSE);
+        }
+
+        LOG_DBG("avoid %u+%u/%x->%x "
+                , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
+                , was, avoids_ops[idxnbr]);
+        LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
+        LOG_DBG_("\n");
+        return (avoids_ops[idxnbr] != was)? arEXIST_CHANGE: arEXIST_KEEP;
+    }
+
+    //local and close cells are sure valid, and so it ready for concurent
+    //  allow enum them as concurent nbr for same cell
+    bool force_new = ((ops & aoUSE_REMOTE) <= aoUSE_REMOTE_1HOP);
+
+    if (!force_new) {
     int idx = msf_avoids_cell_idx(x);
     if (idx >= 0){
         AvoidOption was  = avoids_ops[idx];
         // check that not override by far cells
-        if ((was & aoUSE) <= ops)
-            return 0;
+        if ((was & aoUSE) > ops) {
+            //override current cell, by more close
+            avoids_nbrs[avoids_list_num] = n;
+            avoids_ops[idx]  = ops | (was & ~aoUSE);
 
-        LOG_DBG("avoid %u+%u/%x ->"
+        LOG_DBG("avoid %u+%u/%x->%x "
                 , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
-                , ops);
+                , was, avoids_ops[idx]);
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
 
-        avoids_nbrs[avoids_list_num] = n;
-        avoids_ops[idx]  = ops | (was & ~aoUSE);
-        return avoids_ops[idx] != was;
+        return (avoids_ops[idx] != was)? arEXIST_CHANGE: arEXIST_KEEP;
+        }
+        return arEXIST_KEEP;
     }
+    }// if (!force_new)
 
     if (avoids_list_num < MSF_USED_LIST_LIMIT){
         LOG_DBG("avoid+ %u+%u/%x ->"
@@ -234,15 +268,15 @@ bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned op
     else {
         LOG_WARN("rich limit reserve for cell %x\n", x.raw);
     }
-    return true;
+    return arNEW;
 }
 
-bool msf_avoid_link_cell(const tsch_link_t* x){
+AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
     return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
                                 , aoUSE_LOCAL);
 }
 
-bool msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
     return msf_avoid_mark_nbr_cell(x, n, userange);
 }
 
@@ -355,6 +389,12 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
         int save = avoids_ops[idx];
         // looks that this far echo, skip it
         if ((save&aoUSE_REMOTE) <= range) {
+
+            // close cells should validates for exact nbrs, since thay can concurent
+            if ((save&aoUSE_REMOTE) <= aoUSE_REMOTE_1HOP)
+            if ( avoids_nbrs[idx] != n )
+                continue;
+
             avoids_ops[idx]  &= ~aoUSE_REMOTE;
             //assign nbr of clearer
             nbrs[idx]           = n;
@@ -514,7 +554,7 @@ int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
         msf_cell_t x;
         x.field.slot    = cell->field.slot;
         x.field.chanel  = cell->field.chanel;
-        if (!msf_is_avoid_nbr_cell(x, n)){
+        if (msf_is_avoid_nbr_cell(x, n) < 0 ){
             pkt->cells[res] = *cell;
             ++res;
         }
