@@ -101,12 +101,12 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     int rel = 0;
     for (unsigned i = 0; i < hcells->num_cells; ++i){
         sixp_cell_t c = sixp_pkt_get_cell(hcells->cell_list, i);
-        bool should_relay = false;
+        AvoidResult should_relay;
         should_relay = msf_avoid_nbr_use_cell(c, n, avoiduse);
 
         if (avoiduse <= NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP )
         //if (avoiduse < aoUSE_REMOTE_3HOP)
-        if (should_relay)
+        if (should_relay >= 0)
             ++rel;
     }
 
@@ -150,7 +150,7 @@ void nrsf_check_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     unsigned j = 0;
     for (unsigned i = 0; i < hcells->num_cells; ++i){
         sixp_cell_t x = sixp_pkt_get_cell(hcells->cell_list, i);
-        if (!msf_is_avoid_cell(x))
+        if (msf_is_avoid_cell(x) < 0)
             continue;
         hcells->cell_list[j].raw = x.raw;
         ++j;
@@ -704,7 +704,7 @@ void nrsf_on_msf_use_link_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
 void nrsf_on_msf_use_cell(tsch_neighbor_t *nbr, sixp_cell_t cell)
 {
     //assert(nbr != NULL);
-    if ( msf_is_avoid_local_cell(cell) )
+    if ( msf_is_avoid_local_cell(cell) >= 0 )
             return;
 
     LOG_DBG("nrsf_on_msf_use_link_cell %u.%u\n", cell.field.slot, cell.field.chanel);
@@ -722,7 +722,7 @@ void nrsf_on_msf_release_link_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
 
 void nrsf_on_msf_release_cell(tsch_neighbor_t *nbr, sixp_cell_t cell)
 {
-    if (msf_is_avoid_local_cell(cell) ){
+    if (msf_is_avoid_local_cell(cell) >= 0 ){
         // autonomous cells may are not release imidiate
         return;
     }
