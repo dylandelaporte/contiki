@@ -381,7 +381,7 @@ void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, const linkaddr_t* peer_addr
     }
 }
 
-typedef enum DeleteOption{ doCAREFUL, doBAREDROP } DeleteOption;
+typedef enum DeleteOption{ doCAREFUL, doBAREDROP, doRESERVED } DeleteOption;
 static
 void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 {
@@ -397,8 +397,11 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
   assert(cell != NULL);
   linkaddr_copy(&peer_addr, &cell->addr);
 
+  if (cell->link_options & LINK_OPTION_RESERVED_LINK)
+      how = doRESERVED;
+
   tsch_neighbor_t *nbr = NULL;
-  if(cell->link_options == LINK_OPTION_TX) {
+  if(cell->link_options & LINK_OPTION_TX) {
     cell_type_str = "TX";
 
     if (how == doCAREFUL) {
@@ -410,7 +413,6 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
     }
 
   } else {
-    assert(cell->link_options == LINK_OPTION_RX);
     cell_type_str = "RX";
   }
 
@@ -421,6 +423,10 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);
+
+  // reserved links are not avoids, not active. So drop it bare and silent
+  if (how >= doRESERVED)
+      return;
 
   msf_unvoid_link_cell(cell);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
