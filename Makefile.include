@@ -67,6 +67,15 @@ CFLAGS += -fdata-sections
 LDFLAGS+= --gc-sections,--cref
 endif
 
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+# turn off asserts
+CFLAGS += -DNDEBUG
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
 ifeq ($(WERROR),1)
