@@ -677,38 +677,39 @@ tsch_disassociate(void)
 }
 /*---------------------------------------------------------------------------*/
 // Parse EB and extract ASN and join priority, and validate EB
-int tsch_packet_parse_my_eb(const struct input_packet *eb,
+int tsch_packet_parse_my_eb(const struct input_packet *input_eb,
     frame802154_t *frame, struct ieee802154_ies *ies
     )
 {
   uint8_t hdrlen;
 
-    if(tsch_packet_parse_eb(eb->payload, eb->len
+    if(tsch_packet_parse_eb(input_eb->payload, input_eb->len
                             ,frame, ies, &hdrlen, 0) == 0)
     {
-      TSCH_PRINTF("TSCH:! failed to parse EB (len %u)\n", eb->len);
+    LOG_DBG("! failed to parse packet as EB while scanning (len %u)\n",
+        input_eb->len);
       return 0;
     }
 
 #if TSCH_JOIN_SECURED_ONLY
   if(frame->fcf.security_enabled == 0) {
-    LOG_ERR("TSCH:! parse_eb: EB is not secured\n");
+    LOG_ERR("! parse_eb: EB is not secured\n");
     return 0;
   }
 #endif /* TSCH_JOIN_SECURED_ONLY */
   
 #if LLSEC802154_ENABLED
-  if(!tsch_security_parse_frame(eb->payload, hdrlen,
-      eb->len - hdrlen - tsch_security_mic_len(frame),
+  if(!tsch_security_parse_frame(input_eb->payload, hdrlen,
+      input_eb->len - hdrlen - tsch_security_mic_len(frame),
       frame, (linkaddr_t*)frame->src_addr, &ies->ie_asn)) {
-      LOG_ERR("TSCH:! parse_eb: failed to authenticate\n");
+      LOG_ERR("! parse_eb: failed to authenticate\n");
     return 0;
   }
 #endif /* LLSEC802154_ENABLED */
 
 #if !LLSEC802154_ENABLED
   if(frame->fcf.security_enabled == 1) {
-    LOG_ERR("TSCH:! parse_eb: we do not support security, but EB is secured\n");
+    LOG_ERR("! parse_eb: we do not support security, but EB is secured\n");
     return 0;
   }
 #endif /* !LLSEC802154_ENABLED */
@@ -716,7 +717,7 @@ int tsch_packet_parse_my_eb(const struct input_packet *eb,
 #if TSCH_JOIN_MY_PANID_ONLY
   /* Check if the EB comes from the PAN ID we expect */
   if(frame->src_pid != IEEE802154_PANID) {
-    LOG_ERR("TSCH:! parse_eb: PAN ID %x != %x\n", frame->src_pid, IEEE802154_PANID);
+    LOG_ERR("! parse_eb: PAN ID %x != %x\n", frame->src_pid, IEEE802154_PANID);
     return 0;
   }
 #endif /* TSCH_JOIN_MY_PANID_ONLY */
@@ -1372,16 +1373,17 @@ send_packet(mac_callback_t sent, void *ptr)
     /* Enqueue packet */
     p = tsch_queue_add_packet(nbr_addr, max_transmissions, sent, ptr);
     if(p == NULL) {
-        TSCH_PRINTF("TSCH:! can't send packet to %x with seqno %u, queue[%u]\n",
+        TSCH_PRINTF("TSCH:! can't send packet to %x with seqno %u, queue[%u/%u] glob[%u/%u]\n",
           TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
-          tsch_queue_packet_count(nbr_addr) );
+          tsch_queue_packet_count(nbr_addr), TSCH_QUEUE_NUM_PER_NEIGHBOR, 
+          tsch_queue_global_packet_count(), QUEUEBUF_NUM);
       ret = MAC_TX_ERR;
     } else {
       p->header_len = hdr_len;
       TSCH_PRINTF8("TSCH: send packet to %x with seqno %u, queue[%u/%u], len %u %u\n",
              TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
              tsch_queue_packet_count(nbr_addr), tsch_queue_global_packet_count(),
-             p->header_len, queuebuf_datalen(p->qb));
+             QUEUEBUF_NUM, p->header_len, queuebuf_datalen(p->qb));
     }
   }
   if(ret != MAC_TX_DEFERRED) {

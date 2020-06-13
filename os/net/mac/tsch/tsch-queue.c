@@ -381,6 +381,7 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
                   , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
                   , n
                   , TSCH_LOG_ID_FROM_LINKADDR(&link->addr)
+              );
     }
     /* Update CSMA state in the unicast case */
     if(is_unicast) {
