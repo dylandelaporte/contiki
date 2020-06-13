@@ -111,7 +111,10 @@ void sixp_pkt_cells_init(SIXPCellsPkt* pkt, unsigned size){
 
 static inline
 void sixp_pkt_cells_reset(SIXPCellsPkt* pkt){
-    pkt->cells[-1].raw = 0;
+    //pkt->cells[-1].raw = 0;
+    pkt->head.meta          = 0;
+    pkt->head.cell_options  = 0;
+    pkt->head.num_cells     = 0;
 }
 
 static inline
@@ -119,6 +122,17 @@ void sixp_pkt_cells_assign(SIXPHandle* h, SIXPCellsPkt* pkt){
     h->body             = (const uint8_t*)&pkt->head;
     h->body_len         = sizeof(pkt->head)+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
 }
+
+static inline
+bool sixp_pkt_is_single_cell(SIXPHandle* h, SIXPCellsPkt* pkt){
+    if ( (pkt->head.num_cells == 1)
+        &&(h->body_len == (sizeof(sixp_pkt_cell_t)+sizeof(pkt->head)) )
+        )
+        return true;
+    else
+        return false;
+}
+
 
 static inline
 void sixp_pkt_cells_append(SIXPHandle* h, SIXPCellsPkt* pkt){
