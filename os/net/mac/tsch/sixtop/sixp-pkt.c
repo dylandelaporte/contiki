@@ -1169,6 +1169,7 @@ void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t cod
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 // like memcopy(dst, h->body+offset, len) with packet strick bounds
+static
 SIXPError sixp_pkt_load(SIXPHandle* h, void* dst, unsigned offset, unsigned len){
     assert(h != NULL && dst != NULL);
     assert(h->body != NULL);
@@ -1185,6 +1186,7 @@ SIXPError sixp_pkt_load(SIXPHandle* h, void* dst, unsigned offset, unsigned len)
     return sixpOK;
 }
 
+static
 SIXPError sixp_pkt_parse_cell_options(SIXPHandle* h,
                                     sixp_pkt_cell_options_t *cell_options)
 {
@@ -1198,6 +1200,7 @@ SIXPError sixp_pkt_parse_cell_options(SIXPHandle* h,
     return sixp_pkt_load(h, cell_options, offset, sizeof(*cell_options));
 }
 
+static
 SIXPError sixp_pkt_parse_num_cells(SIXPHandle* h,
                        sixp_pkt_num_cells_t *num_cells )
 {
@@ -1221,11 +1224,16 @@ SIXPError sixp_pkt_parse_cell_list(SIXPHandle* h, SIXPCellsHandle* dst){
       return sixpFAIL;
     }
 
-    unsigned len = (h->body_len - offset);
+    if (sixp_pkt_parse_num_cells(h, &dst->num_cells) < 0)
+        return sixpFAIL;
+
+    unsigned len = dst->num_cells * sizeof(sixp_pkt_cell_t);
+    unsigned lim = (h->body_len - offset);
+
     if(h->body_len < offset) {
       LOG_ERR("cannot parse cell_list; body is too short\n");
       return sixpFAIL;
-    } else if((len % sizeof(sixp_pkt_cell_t)) != 0) {
+    } else if ( len > lim) {
       LOG_ERR("cannot parse cell_list; invalid {body, cell_list}_len=%u\n", len);
       return sixpFAIL;
     }
@@ -1236,13 +1244,35 @@ SIXPError sixp_pkt_parse_cell_list(SIXPHandle* h, SIXPCellsHandle* dst){
 }
 
 SIXPError sixp_pkt_parse_cells(SIXPHandle* h, SIXPCellsHandle* dst){
-    if(sixp_pkt_parse_cell_options(h, &(dst->cell_options)) < 0)
-        return sixpFAIL;
-    if (sixp_pkt_parse_num_cells(h, &dst->num_cells) < 0)
-        return sixpFAIL;
     if (sixp_pkt_parse_cell_list(h, dst) < 0)
         return sixpFAIL;
+    if(sixp_pkt_parse_cell_options(h, &(dst->cell_options)) < 0)
+        return sixpFAIL;
+    memcpy(&dst->meta, h->body, sizeof(dst->meta) );
     return sixpOK;
+}
+
+// steps h body to position after dst cells
+SIXPError sixp_pkt_after_cells(SIXPHandle* h, SIXPCellsHandle* dst){
+    assert(dst->cell_list != NULL);
+    const uint8_t* next = (const uint8_t*)dst->cell_list;
+    next += dst->num_cells*sizeof(dst->cell_list[0]);
+    if ((next - h->body) >= h->body_len){
+        return sixpFAIL;
+    }
+
+    h->body_len -=(next - h->body);
+    h->body     = next;
+    return sixpOK;
+}
+
+SIXPError sixp_pkt_parse_next_cells(SIXPHandle* h, SIXPCellsHandle* dst){
+    SIXPError ok;
+    ok = sixp_pkt_after_cells(h, dst);
+    if (ok == sixpOK){
+        return sixp_pkt_parse_cells(h, dst);
+    }
+    return ok;
 }
 
 
