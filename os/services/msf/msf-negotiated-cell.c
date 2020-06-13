@@ -370,14 +370,14 @@ void msf_negotiated_drop_all_tx(tsch_neighbor_t *nbr){
 
 // if nbr need send, provide it with autonomous cell, if no negotiated have
 static
-void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, tsch_link_t *cell){
+void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, const linkaddr_t* peer_addr){
     assert(nbr != NULL);
     //check that nbr need tx cell
     if ( !msf_negotiated_nbr_is_scheduled_tx(nbr) )
     if ( tsch_queue_nbr_packet_count(nbr) > 0){
-        if ( !msf_autonomous_cell_is_scheduled_tx(&cell->addr) )
+        if ( !msf_autonomous_cell_is_scheduled_tx(peer_addr) )
             // here leave sending nbr without cells, so provide autonomous for it
-            msf_autonomous_cell_add_tx(&cell->addr);
+            msf_autonomous_cell_add_tx(peer_addr);
     }
 }
 
@@ -406,7 +406,7 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
     nbr = tsch_queue_get_nbr(&cell->addr);
     assert(nbr != NULL);
     msf_negotiated_drop_tx_cell(nbr, cell);
-        msf_sending_nbr_ensure_tx(nbr, cell);
+        msf_sending_nbr_ensure_tx(nbr, &cell->addr);
     }
 
   } else {
@@ -484,7 +484,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
         }
       }
 
-      msf_sending_nbr_ensure_tx(nbr, cell);
+      msf_sending_nbr_ensure_tx(nbr, peer_addr);
       MSF_AFTER_CELL_CLEAN(nbr);
     }
   }
