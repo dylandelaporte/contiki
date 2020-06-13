@@ -62,12 +62,12 @@ void msf_num_cells_update(void);
  * \brief Update NumUsed for the negotiated TX cells
  * \param count A value to add to NumUsed for negotiated TX cells
  */
-void msf_num_cells_update_tx_used(uint16_t count);
+void msf_num_cells_update_parent_tx_used(uint16_t count);
 
 /**
  * \brief Increment NumUsed for negotiated/autonomous RX cells
  */
-void msf_num_cells_increment_rx_used(void);
+void msf_num_cells_increment_parent_rx_used(void);
 
 /**
  * \brief Trigger a 6P transaction if necessary, based on NumCells*

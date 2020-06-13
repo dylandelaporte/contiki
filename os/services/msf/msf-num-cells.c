@@ -195,13 +195,13 @@ msf_num_cells_update(void)
 }
 /*---------------------------------------------------------------------------*/
 void
-msf_num_cells_update_tx_used(uint16_t count)
+msf_num_cells_update_parent_tx_used(uint16_t count)
 {
   tx_num_cells.used += count;
 }
 /*---------------------------------------------------------------------------*/
 void
-msf_num_cells_increment_rx_used(void)
+msf_num_cells_increment_parent_rx_used(void)
 {
   rx_num_cells.used += 1;
 }
