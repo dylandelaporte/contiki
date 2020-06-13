@@ -55,6 +55,8 @@ enum link_type { LINK_TYPE_NORMAL, LINK_TYPE_ADVERTISING, LINK_TYPE_ADVERTISING_
 
 // TSCH slot frame handle id type
 typedef uint8_t tsch_sf_h;
+// TSCH time slot idx offset
+typedef uint16_t tsch_slot_t;
 // TSCH chanel offset
 typedef uint16_t tsch_ch_offset_t;
 
@@ -62,10 +64,10 @@ typedef uint16_t tsch_ch_offset_t;
 typedef struct tsch_link {
   /* Links are stored as a list: "next" must be the first field */
   struct tsch_link *next;
-  /* Unique identifier */
-  uint16_t handle;
   /* MAC address of neighbor */
   linkaddr_t addr;
+  /* Unique identifier */
+  uint16_t handle;
   /* Slotframe identifier */
   uint16_t slotframe_handle;
   /* Identifier of Slotframe to which this link belongs

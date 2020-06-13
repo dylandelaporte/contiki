@@ -53,6 +53,7 @@
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
 #include "msf-avoid-cell.h"
+#include "msf-sixp-relocate.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
@@ -75,6 +76,8 @@ tsch_slotframe_t * msf_negotiate_slotframe;
 static const bool is_used = true;
 static const bool is_unused = true;
 static const bool is_kept = true;
+static const bool is_used_relocate = true;
+static const bool is_unused_relocate = true;
 
 MEMB(msf_negotiated_cell_data_memb,
      msf_negotiated_cell_data_t,
@@ -110,7 +113,7 @@ keep_rx_cells(const linkaddr_t *peer_addr)
 static void
 mark_rx_cell(tsch_link_t *cell, const bool *flag)
 {
-  if(cell == NULL || cell->link_options != LINK_OPTION_RX) {
+  if(cell == NULL) { //|| cell->link_options != LINK_OPTION_RX
     /* do nothing */
   } else {
     cell->data = (void *)flag;
@@ -138,13 +141,25 @@ mark_as_kept(tsch_link_t *cell)
 static bool
 is_marked_as_used(const tsch_link_t *cell)
 {
-  return cell != NULL && cell->data == (void *)&is_used;
+    if (cell != NULL){
+        if (cell->data == (void *)&is_used)
+            return true;
+        if (cell->data == (void *)&is_used_relocate)
+            return true;
+    }
+    return false;
 }
 /*---------------------------------------------------------------------------*/
 static bool
 is_marked_as_unused(const tsch_link_t *cell)
 {
-  return cell != NULL && cell->data == (void *)&is_unused;
+    if (cell != NULL){
+        if (cell->data == (void *)&is_unused)
+            return true;
+        if (cell->data == (void *)&is_unused_relocate)
+            return true;
+    }
+    return false;
 }
 /*---------------------------------------------------------------------------*/
 static bool
@@ -152,6 +167,38 @@ is_marked_as_kept(const tsch_link_t *cell)
 {
   return cell != NULL && cell->data == (void *)&is_kept;
 }
+
+void mark_as_relocate(tsch_link_t *cell){
+    mark_rx_cell(cell, is_marked_as_used(cell)? &is_used_relocate : &is_unused_relocate);
+}
+
+bool is_marked_as_relocate(const tsch_link_t *cell){
+    if (cell != NULL){
+        if (cell->data == (void *)&is_used_relocate)
+            return true;
+        if (cell->data == (void *)&is_unused_relocate)
+            return true;
+    }
+    return false;
+}
+
+tsch_link_t *msf_negotiated_get_cell_to_relocate(void){
+    tsch_link_t *cell;
+    for(cell = list_head(slotframe->links_list);
+        cell != NULL;
+        cell = list_item_next(cell))
+    {
+        if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
+            continue;
+        if (is_marked_as_relocate(cell) ){
+            LOG_DBG("found relocate cell [%u+%u]\n"
+                            , cell->timeslot, cell->channel_offset);
+            return cell;
+        }
+    }
+    return NULL;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_negotiated_cell_activate(void)
@@ -160,7 +207,6 @@ msf_negotiated_cell_activate(void)
   slotframe = tsch_schedule_get_slotframe_by_handle(
     MSF_SLOTFRAME_HANDLE_NEGOTIATED_CELLS);
   assert(slotframe != NULL);
-  msf_unvoid_all_cells();
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -170,6 +216,12 @@ msf_negotiated_cell_deactivate(void)
   msf_reserved_cell_delete_all(NULL);
   slotframe = NULL;
 }
+
+/*---------------------------------------------------------------------------*/
+bool msf_is_negotiated_cell(tsch_link_t *cell){
+    return list_contains( slotframe->links_list, cell);
+}
+
 /*---------------------------------------------------------------------------*/
 int
 msf_negotiated_cell_add(const linkaddr_t *peer_addr,
@@ -265,6 +317,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
       }
     }
     MSF_AFTER_CELL_USE(nbr, new_cell);
+    msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
   }
 
   return new_cell == NULL ? -1 : 0;
@@ -315,11 +368,29 @@ void msf_negotiated_drop_all_tx(tsch_neighbor_t *nbr){
     nbr->negotiated_tx_cell = NULL;
 }
 
-void
-msf_negotiated_cell_delete(tsch_link_t *cell)
+// if nbr need send, provide it with autonomous cell, if no negotiated have
+static
+void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, tsch_link_t *cell){
+    assert(nbr != NULL);
+    //check that nbr need tx cell
+    if ( !msf_negotiated_nbr_is_scheduled_tx(nbr) )
+    if ( tsch_queue_nbr_packet_count(nbr) > 0){
+        if ( !msf_autonomous_cell_is_scheduled_tx(&cell->addr) )
+            // here leave sending nbr without cells, so provide autonomous for it
+            msf_autonomous_cell_add_tx(&cell->addr);
+    }
+}
+
+typedef enum DeleteOption{ doCAREFUL, doBAREDROP } DeleteOption;
+static
+void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 {
+  // this is for LOG_
   linkaddr_t peer_addr;
   const char *cell_type_str;
+  (void)peer_addr;
+  (void)cell_type_str;
+
   uint16_t slot_offset, channel_offset;
 
   assert(slotframe != NULL);
@@ -330,10 +401,14 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
   if(cell->link_options == LINK_OPTION_TX) {
     cell_type_str = "TX";
 
+    if (how == doCAREFUL) {
+        // manage links and  send queues
     nbr = tsch_queue_get_nbr(&cell->addr);
     assert(nbr != NULL);
-    assert(nbr->negotiated_tx_cell != NULL);
     msf_negotiated_drop_tx_cell(nbr, cell);
+        msf_sending_nbr_ensure_tx(nbr, cell);
+    }
+
   } else {
     assert(cell->link_options == LINK_OPTION_RX);
     cell_type_str = "RX";
@@ -346,8 +421,15 @@ msf_negotiated_cell_delete(tsch_link_t *cell)
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);
+
+  msf_unvoid_link_cell(cell);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
 }
+
+void msf_negotiated_cell_delete(tsch_link_t *cell){
+    msf_negotiated_cell_delete_as(cell, doCAREFUL);
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
@@ -364,12 +446,20 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
             cell = next_cell)
         {
           next_cell = list_item_next(cell);
+
+          if ((cell->link_options & LINK_OPTION_LINK_TO_DELETE) != 0)
+              continue;
+
           nbr = tsch_queue_get_nbr(&cell->addr);
           assert(nbr != NULL);
+          if (nbr->negotiated_tx_cell == NULL){
+              // looks that nbr witout tx_links alredy managed for sending
+              msf_negotiated_cell_delete_as(cell, doBAREDROP);
+          }
+          else {
           msf_negotiated_drop_all_tx(nbr);
-          cell->link_options = LINK_OPTION_RESERVED_LINK;
-          msf_negotiated_cell_delete(cell);
-          //msf_housekeeping_delete_cell_later(cell);
+              msf_negotiated_cell_delete_as(cell, doCAREFUL);
+          }
         }
         LOG_INFO("removed all negotiated cells\n");
         MSF_AFTER_CELL_CLEAN(NULL);
@@ -379,6 +469,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
       if (nbr == NULL)
             //strange this
             return;
+      msf_negotiated_drop_all_tx(nbr);
 
       for(cell = list_head(slotframe->links_list);
           cell != NULL;
@@ -386,27 +477,28 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
         next_cell = list_item_next(cell);
         if(linkaddr_cmp(&cell->addr, peer_addr) &&
            (cell->link_options & LINK_OPTION_LINK_TO_DELETE) == 0) {
-          msf_negotiated_cell_delete(cell);
+            msf_negotiated_cell_delete_as(cell, doBAREDROP);
         } else {
           /* this cell is not scheduled with peer_addr; ignore it */
           continue;
         }
       }
-      nbr->negotiated_tx_cell = NULL;
+
+      msf_sending_nbr_ensure_tx(nbr, cell);
       MSF_AFTER_CELL_CLEAN(nbr);
     }
   }
 }
 /*---------------------------------------------------------------------------*/
 bool
-msf_negotiated_cell_is_scheduled_tx(tsch_neighbor_t *nbr)
+msf_negotiated_nbr_is_scheduled_tx(tsch_neighbor_t *nbr)
 {
   assert(nbr != NULL);
   return nbr->negotiated_tx_cell != NULL;
 }
 /*---------------------------------------------------------------------------*/
 bool msf_negotiated_is_scheduled_nbr(tsch_neighbor_t *nbr){
-    if (msf_negotiated_cell_is_scheduled_tx(nbr))
+    if (msf_negotiated_nbr_is_scheduled_tx(nbr))
         return true;
 
     tsch_link_t *cell;
@@ -584,7 +676,7 @@ msf_negotiated_cell_update_num_tx(uint16_t slot_offset,
 }
 /*---------------------------------------------------------------------------*/
 tsch_link_t *
-msf_negotiated_cell_get_cell_to_relocate(void)
+msf_negotiated_propose_cell_to_relocate(void)
 {
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
   tsch_neighbor_t *nbr;
@@ -677,7 +769,7 @@ msf_negotiated_cell_get_num_tx_ack(tsch_link_t *cell)
 }
 /*---------------------------------------------------------------------------*/
 void
-msf_negotiated_cell_rx_is_used(const linkaddr_t *src_addr,
+msf_negotiated_cell_rx_mark_used(const linkaddr_t *src_addr,
                                uint16_t slot_offset)
 {
   if(slotframe == NULL || src_addr == NULL || slot_offset == 0) {
@@ -763,3 +855,56 @@ msf_negotiated_cell_delete_unused_cells(void)
   }
 }
 /*---------------------------------------------------------------------------*/
+void msf_negotiated_inspect_link(tsch_link_t* x){
+    /* mark cells to keep with "is_kept" */
+    tsch_link_t *cell;
+    for(cell = list_head(slotframe->links_list);
+        cell != NULL;
+        cell = list_item_next(cell))
+    {
+      if (cell->timeslot != x->timeslot) continue;
+      if (cell->link_options & LINK_OPTION_LINK_TO_DELETE)
+          continue;
+
+      //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
+      //only TX links can mix in one slot
+      bool can_overlap = (cell->link_options == LINK_OPTION_TX)
+                      && (x->link_options == LINK_OPTION_TX);
+
+      //try to eval that have any slot to relocate conflicting link
+      long new_slot = msf_find_unused_slot_offset(slotframe);
+      msf_chanel_mask_t busych =  msf_avoided_slot_chanels(new_slot);
+
+      if (busych != 0){
+          // have no unconflicting slots!
+          if (!can_overlap){
+              // nothing can do with it
+              LOG_ERR("!new link[");
+              LOG_ERR_LLADDR(&x->addr);
+              LOG_ERR_("] conflicts with ->");
+              LOG_ERR_LLADDR(&cell->addr);
+              LOG_ERR_("for slot %d\n", cell->timeslot);
+              return;
+          }
+          //check that have unconflict chanels
+          if (cell->channel_offset != x->channel_offset)
+              return;
+      }
+      else {
+          // since able allocate unconflicting slots, drop preserved.
+          //    This prevents from alloc link that later reallocate
+          if (cell->link_options & LINK_OPTION_RESERVED_LINK){
+              msf_negotiated_cell_delete(cell);
+              return;
+          }
+      }
+
+      LOG_INFO("new link[");
+      LOG_INFO_LLADDR(&x->addr);
+      LOG_INFO_("] relocate slot %d ->", cell->timeslot);
+      LOG_INFO_LLADDR(&cell->addr);
+      LOG_INFO_("\n");
+      msf_housekeeping_request_cell_to_relocate(cell);
+      return;
+    }
+}

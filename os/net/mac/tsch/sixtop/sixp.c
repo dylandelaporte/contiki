@@ -269,10 +269,10 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
 
   if(pkt.type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
-      if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
-         (  (pkt.seqno == 0 && (seqno >0) )
-         || (pkt.seqno != 0 && (seqno == 0) )
-         ))
+      // CLEAR command MUST NOT rejects on seq mismutch
+      if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR) {
+      if (  (pkt.seqno == 0 && (seqno >0) )
+         || (pkt.seqno != 0 && (seqno == 0)) )
       {
         /*
          * seems the peer had power-cycle; we're going to send back
@@ -301,6 +301,15 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
           LOG_ERR("6P: sixp_input() fails to return an error response");
         }
         return;
+      }// seq check
+      }//if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR)
+      else {
+          /* looks that transaction have aborted, and CLEAR sent after that.
+           * so abort transaction too.
+           * */
+          LOG_INFO("sixp_input() abort trans(%p) by CLEAR Request\n", trans);
+          sixp_trans_abort(trans);
+          trans = NULL;
       }
     }//if(trans != NULL)
 
@@ -321,11 +330,11 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
     }
 
     /* Inconsistency Management */
-    if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
-       ( ( (pkt.seqno != 0) && (nbr == NULL) )
+    // CLEAR command MUST NOT rejects on seq mismutch
+    if (pkt.code.cmd != SIXP_PKT_CMD_CLEAR)
+    if ( ( (pkt.seqno != 0) && (nbr == NULL) )
        ||( (pkt.seqno == 0) && (nbr != NULL) && (sixp_nbr_get_next_seqno(nbr) > 0))
        )
-      )
     {
       LOG_DBG("seq break: %u vs expected %d\n", pkt.seqno, sixp_nbr_get_next_seqno(nbr) );
       if(trans != NULL) {
@@ -356,6 +365,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
        */
       return;
     }
+    nbr = sixp_nbr_find(src_addr);
   }
 
   if (nbr == NULL)

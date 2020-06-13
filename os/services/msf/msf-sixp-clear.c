@@ -129,6 +129,8 @@ msf_sixp_clear_send_request(const linkaddr_t *peer_addr)
     LOG_INFO("sent a CLEAR request to ");
     LOG_INFO_LLADDR(peer_addr);
     LOG_INFO_("\n");
+    //TODO: should it be here or at response?
+    msf_negotiated_cell_delete_all(peer_addr);
   }
 }
 /*---------------------------------------------------------------------------*/
