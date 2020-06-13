@@ -855,7 +855,7 @@ msf_negotiated_cell_delete_unused_cells(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-void msf_negotiated_inspect_link(tsch_link_t* x){
+void msf_negotiated_inspect_vs_link(tsch_link_t* x){
     /* mark cells to keep with "is_kept" */
     tsch_link_t *cell;
     for(cell = list_head(slotframe->links_list);

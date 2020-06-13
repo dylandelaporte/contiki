@@ -55,6 +55,10 @@ tsch_slotframe_t *msf_autonomous_cell_get_slotframe(void)
   return msf_autonomous_slotframe;
 }
 
+/* @brief - check, that link is valid in negotiated slotframe
+ * */
+bool msf_is_autonomous_cell(tsch_link_t *cell);
+
 /**
  * \brief Activate the autonomous cell scheduling
  * \details An autonomous RX cell will be installed.

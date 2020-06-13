@@ -196,7 +196,7 @@ void msf_negotiated_cell_delete_unused_cells(void);
  * \details It try to relocate negotiateg link, that conflicts with cell
  *          Also cleanup reserved links, that overlaps cell
  */
-void msf_negotiated_inspect_link(tsch_link_t *cell);
+void msf_negotiated_inspect_vs_link(tsch_link_t *cell);
 
 
 

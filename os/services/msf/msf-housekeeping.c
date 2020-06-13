@@ -130,8 +130,12 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
         LOG_DBG("housekeep: on relocate\n");
     } else if(ev == PROCESS_EVENT_MSF_RESOLVE){
         LOG_DBG("housekeep: inspects\n");
-        if (msf_is_negotiated_cell((tsch_link_t *)data))
-            msf_negotiated_inspect_link((tsch_link_t *)data);
+        bool valid_link = msf_is_negotiated_cell((tsch_link_t *)data)
+                       || msf_is_autonomous_cell((tsch_link_t *)data)
+                        ;
+        if (valid_link){
+            msf_negotiated_inspect_vs_link((tsch_link_t *)data);
+        }
     } else {
       /* etimer_expired(&et); go through */
 
