@@ -35,8 +35,8 @@
  *         alexrayne <alexraynepe196@gmail.com>
  */
 
-#define MSF_AFTER_CELL_USE      nrsf_on_msf_use_cell
-#define MSF_AFTER_CELL_RELEASE  nrsf_on_msf_release_cell
+#define MSF_AFTER_CELL_USE      nrsf_on_msf_use_link_cell
+#define MSF_AFTER_CELL_RELEASE  nrsf_on_msf_release_link_cell
 #define MSF_AFTER_CELL_CLEAN    nrsf_on_msf_nbr_clean
 #define MSF_ON_NEW_NBR          nrsf_on_msf_new_nbr
 #define SIXP_AFTER_TRANS_FREE   nrsf_on_6ptrans_free

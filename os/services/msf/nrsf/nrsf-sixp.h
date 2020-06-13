@@ -55,6 +55,16 @@
 
 
 
+union NRSFMeta{
+    struct fields_t{
+        // nrsf_avoid_cells use it for append new avoids
+        //< @sa AvoidOption:aoUSE_xxx
+        uint8_t         avoid_use;
+    }                   field;
+    sixp_pkt_metadata_t raw;
+};
+typedef union NRSFMeta NRSFMeta;
+
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells);
 void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells);
 void nrsf_check_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells);

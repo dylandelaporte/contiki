@@ -57,6 +57,7 @@
 #include "net/nbr-table.h"
 #include <stdint.h>
 #include <string.h>
+#include "tsch-log.h"
 #if BUILD_WITH_MSF
 #include "services/msf/msf-callback.h"
 #endif
@@ -65,6 +66,11 @@
 #include "sys/log.h"
 #define LOG_MODULE "TSCH Queue"
 #define LOG_LEVEL LOG_LEVEL_MAC
+
+#ifndef trace_backoff_off
+#define trace_backoff_on()
+#define trace_backoff_off()
+#endif
 
 /* Check if TSCH_QUEUE_NUM_PER_NEIGHBOR is power of two */
 #if (TSCH_QUEUE_NUM_PER_NEIGHBOR & (TSCH_QUEUE_NUM_PER_NEIGHBOR - 1)) != 0
@@ -501,15 +507,37 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
       } else if((get_index = ringbufindex_peek_get(&n->tx_ringbuf)) != -1) {
         packet = n->tx_array[get_index];
       } else {
-        packet = NULL;
+        return NULL;
+      }
+
+      if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
+      {
+          TSCH_DBG("check packets[%d] ->:%x (!%d)\n"
+                                  , (int)get_index
+                                  , ringbufindex_elements(&n->tx_ringbuf)
+                                  , (int)link->addr.u16[0]
+                                  , tsch_queue_backoff_expired(n)
+                      );
+          if ((get_index > 0) && !tsch_queue_backoff_expired(n)){
+              trace_backoff_on();
+          }
       }
 
       if(packet != NULL &&
          !(is_shared_link && !tsch_queue_backoff_expired(n))) {    /* If this is a shared link,
                                                                       make sure the backoff has expired */
 #if TSCH_WITH_LINK_SELECTOR
-        int packet_attr_slotframe = queuebuf_attr(packet->qb, PACKETBUF_ATTR_TSCH_SLOTFRAME);
-        int packet_attr_timeslot = queuebuf_attr(packet->qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
+        struct queuebuf* qb = n->tx_array[get_index]->qb;
+        int packet_attr_slotframe = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_SLOTFRAME);
+        int packet_attr_timeslot = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
+
+        if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+            TSCH_DBG("check packet[%d] -> (sf%d:%d)\n"
+                                    , ringbufindex_elements(&n->tx_ringbuf)
+                                    , packet_attr_slotframe, packet_attr_timeslot
+                        );
+        }
+
         if(packet_attr_slotframe != 0xffff && packet_attr_slotframe != link->slotframe_handle) {
           return NULL;
         }
@@ -517,6 +545,10 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
           return NULL;
         }
 #endif
+        if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+            trace_backoff_off();
+        }
+
         return packet;
       }
     }
