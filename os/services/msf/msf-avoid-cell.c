@@ -201,15 +201,29 @@ int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
 
 
 static
-void msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
-    int idx = msf_avoids_nbr_cell_idx(x, n);
+bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
+    int idx = msf_avoids_cell_idx(x);
     if (idx >= 0){
-        avoids_ops[idx]  |= ops;
-        return;
+        AvoidOption was  = avoids_ops[idx];
+        // check that not override by far cells
+        if ((was & aoUSE) <= ops)
+            return 0;
+
+        LOG_DBG("avoid %u+%u/%x ->"
+                , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
+                , ops);
+        LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
+        LOG_DBG_("\n");
+
+        avoids_nbrs[avoids_list_num] = n;
+        avoids_ops[idx]  = ops | (was & ~aoUSE);
+        return avoids_ops[idx] != was;
     }
 
     if (avoids_list_num < MSF_USED_LIST_LIMIT){
-        LOG_DBG("avoid %u+%u ->", (unsigned)(x.field.slot), (unsigned)(x.field.chanel));
+        LOG_DBG("avoid+ %u+%u/%x ->"
+                , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
+                , ops);
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
         avoids_list[avoids_list_num] = x;
@@ -220,19 +234,16 @@ void msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned op
     else {
         LOG_WARN("rich limit reserve for cell %x\n", x.raw);
     }
+    return true;
 }
 
-void msf_avoid_link_cell(const tsch_link_t* x){
-    msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
-                                , aoUSE);
+bool msf_avoid_link_cell(const tsch_link_t* x){
+    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
+                                , aoUSE_LOCAL);
 }
 
-void msf_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
-    msf_avoid_mark_nbr_cell(x, n, aoUSE);
-}
-
-void msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n){
-    msf_avoid_mark_nbr_cell(x, n, (n == NULL)? aoUSE_LOCAL : aoUSE_REMOTE);
+bool msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
+    return msf_avoid_mark_nbr_cell(x, n, userange);
 }
 
 
@@ -323,6 +334,48 @@ void msf_unmark_nbr_cells(const tsch_neighbor_t* n, unsigned ops){
     }
 }
 
+//   mark cell as no aoUSE_REMOTE_xxx.
+//          if range < stored one, cell remark as aoDROPED, else unvoids
+//   @return <0 - no cells unused
+//           0  - cells unused
+//           >0 - cell is marked as aoDROPED, return last cell  AvoidOptions
+int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption range)
+{
+    LOG_DBG("unuse:%x ->/%x\n", x, range);
+
+    msf_cell_t*             cells= avoids_list;
+    const tsch_neighbor_t** nbrs = avoids_nbrs;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cells){
+        if (cells->raw != x.raw) continue;
+
+        //only remote cells drop
+        if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0)
+            continue;
+
+        int save = avoids_ops[idx];
+        // looks that this far echo, skip it
+        if ((save&aoUSE_REMOTE) <= range) {
+            avoids_ops[idx]  &= ~aoUSE_REMOTE;
+            //assign nbr of clearer
+            nbrs[idx]           = n;
+
+            LOG_DBG("unuse %u+%u = %x\n"
+                        , (unsigned)cells->field.slot
+                        , (unsigned)cells->field.chanel
+                        , avoids_ops[idx]);
+        }
+        else {
+            ++nouse_free_count;
+            LOG_DBG("free %u+%u\n", (unsigned)cells->field.slot, (unsigned)cells->field.chanel);
+            cells->raw = cellFREE;
+            save = 0;
+        }
+
+        return save;
+    }
+    return -1;
+}
+
 void msf_unvoid_nbr_cells(const tsch_neighbor_t* n){
     msf_unmark_nbr_cells(n, aoUSE);
 }
@@ -379,14 +432,36 @@ void msf_avoid_link_cell_default(const tsch_link_t* x){
 
 //@return - amount of avoid cells
 int msf_avoid_num_local_cells(){
+    return msf_avoid_num_cells_at_range(aoUSE_LOCAL|aoMARK);
+}
+
+int msf_avoid_num_cells_at_range(unsigned range)
+{
     int res = 0;
     msf_cell_t* cell = avoids_list;
+    unsigned skip_mark    = aoDEFAULT | (aoMARK & ~range);
+    unsigned range_for    = range & aoUSE;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
-        if ( (avoids_ops[idx] & aoUSE_LOCAL) == 0 )
+        if (cell->raw == cellFREE) continue;
+        if ( (avoids_ops[idx] & skip_mark) != 0 ) continue;
+        if ( (avoids_ops[idx] & aoUSE) != range_for )
             continue;
-        if ( (avoids_ops[idx] & aoDEFAULT) != 0 ) continue;
-        if (cell->raw != cellFREE)
-            ++res;
+        ++res;
+    }
+    return res;
+}
+
+int msf_avoid_num_cells_in_range(unsigned range){
+    int res = 0;
+    msf_cell_t* cell = avoids_list;
+    unsigned skip_mark    = aoDEFAULT | (aoMARK & ~range);
+    unsigned range_for    = range & aoUSE;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
+        if (cell->raw == cellFREE) continue;
+        if ( (avoids_ops[idx] & skip_mark) != 0 ) continue;
+        if ( (avoids_ops[idx] & aoUSE) > range_for )
+            continue;
+        ++res;
     }
     return res;
 }
@@ -395,24 +470,34 @@ int msf_avoid_num_local_cells(){
 // @return - >0 - amount of cells append
 // @return - =0 - no cells to enumerate
 // @return - <0 - no cells append, not room to <cells>
-int msf_avoid_enum_local_cells(SIXPCellsPkt* pkt, unsigned limit){
+int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
+                        , unsigned range_ops
+                        , tsch_neighbor_t* nbr_skip)
+{
+    if (pkt)
     if ( pkt->head.num_cells >= limit)
         return -1;
 
     int res = 0;
     msf_cell_t* cell = avoids_list;
 
+    unsigned skip_mark    = aoDEFAULT | (aoMARK & ~range_ops);
+    unsigned range = range_ops & aoUSE;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->raw == cellFREE) continue;
-        if ( (avoids_ops[idx] & aoUSE_LOCAL) == 0 )
-            continue;
-        if ( (avoids_ops[idx] & aoDEFAULT) != 0 ) continue;
+        if ( avoids_nbrs[idx] == nbr_skip) continue;
+        if ( (avoids_ops[idx] & skip_mark) != 0 ) continue;
 
-        if ( pkt->head.num_cells < limit){
+        if ( (avoids_ops[idx] & aoUSE)  != range )
+            continue;
+
+        ++res;
+        if (pkt)
+        //if ( pkt->head.num_cells < limit)
+        {
             msf_cell_t* x = pkt->cells + pkt->head.num_cells;
             x->field.slot   = cell->field.slot;
             x->field.chanel = cell->field.chanel;
-            ++res;
             ++pkt->head.num_cells;
             if (pkt->head.num_cells >= limit)
                 return res;
@@ -437,3 +522,27 @@ int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
     pkt->head.num_cells = res;
     return res;
 }
+
+// NRSF use it to notify cells exposed to nbrs
+void msf_avoid_mark_all(){
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx){
+        avoids_ops[idx]  |= aoMARK;
+    }
+}
+
+// this unvoids all cells that are no any aoUSE
+//      such cells registred NRSF for deleted cells
+void msf_release_unused(){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->raw == cellFREE) continue;
+        if (( avoids_ops[idx] & aoUSE) != 0 ) continue;
+
+        ++nouse_free_count;
+        avoids_list[idx].raw = cellFREE;
+    }
+    if (nouse_free_count >= cellFREE_COUNT_TRIGGER){
+        msf_unuse_cleanup();
+    }
+}
+
