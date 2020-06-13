@@ -199,15 +199,26 @@ int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
 }
 
 
-
+// @return > 0 - appends new cell, or change current
 static
 bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
+    int idxnbr = msf_avoids_nbr_cell_idx(x, n);
+    if (idxnbr>=0){
+        avoids_ops[idxnbr] = ops | (avoids_ops[idxnbr] & ~aoUSE);
+        return 1;
+    }
+
+    //local and close cells are sure valid, and so it ready for concurent
+    //  allow enum them as concurent nbr for same cell
+    bool force_new = ((ops & aoUSE_REMOTE) <= aoUSE_REMOTE_1HOP);
+
+    if (!force_new) {
     int idx = msf_avoids_cell_idx(x);
     if (idx >= 0){
         AvoidOption was  = avoids_ops[idx];
         // check that not override by far cells
-        if ((was & aoUSE) <= ops)
-            return 0;
+        if ((was & aoUSE) > ops) {
+            //override current cell, by more close
 
         LOG_DBG("avoid %u+%u/%x ->"
                 , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
@@ -218,7 +229,10 @@ bool msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned op
         avoids_nbrs[avoids_list_num] = n;
         avoids_ops[idx]  = ops | (was & ~aoUSE);
         return avoids_ops[idx] != was;
+        }
+        return false;
     }
+    }// if (!force_new)
 
     if (avoids_list_num < MSF_USED_LIST_LIMIT){
         LOG_DBG("avoid+ %u+%u/%x ->"
@@ -355,6 +369,12 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
         int save = avoids_ops[idx];
         // looks that this far echo, skip it
         if ((save&aoUSE_REMOTE) <= range) {
+
+            // close cells should validates for exact nbrs, since thay can concurent
+            if ((save&aoUSE_REMOTE) <= aoUSE_REMOTE_1HOP)
+            if ( avoids_nbrs[idx] != n )
+                continue;
+
             avoids_ops[idx]  &= ~aoUSE_REMOTE;
             //assign nbr of clearer
             nbrs[idx]           = n;
