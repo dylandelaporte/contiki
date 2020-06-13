@@ -77,6 +77,14 @@ static void nrsf_tasks_poll_use();
 static void nrsf_tasks_poll_del();
 
 // @return - amount of modify/new cells
+// TODO: (ru) проблема возникает когда несколько нодов используют одну €чейку -
+//          текущее решение - хранитс€ использование локальное + ближайший сосед.
+// TODO:    Ќеобходимо детектирование конкуренции за одну €чейку, и политика
+//              релокации €чеек, если обнаруживаетс€ конкуренци€.
+//     ¬озможные решени€:
+//      - согласовывать новую €чейку, если идет конкуренци€ за автономную TX €чейку
+//        должен ли так разруливатьс€ конфликт за RX€чейку?
+//        кто должен инициировать согласование?
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
 
@@ -110,6 +118,14 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
 // here reaction on external request for unused cells.
 //  we unuse remote cell too, and if it is not far - relay it
 //
+// TODO: (ru) проблема возникает когда несколько нодов используют одну €чейку -
+//         «апрос может удалить не свою €чейку. надо вы€вл€ть этот конфликт.
+//         —уществующее решение - более дальн€€ команда игнорируетс€,
+//                  а при удалении ближней €чейки, система остаетс€ без информации
+//                    о дальней.
+//          ¬озможный выход - при приходе запроса удалени€ на локальную €чейку,
+//              форсировать отправку команды еЄ зан€тости - это обновит у соседей
+//              актуальную зан€тость €чейки.
 void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     int avoiduse;
     int rel = 0;
@@ -543,24 +559,11 @@ SIXPError nrsf_sixp_clear_recv_request(SIXPeerHandle* hpeer){
 #include "sys/ctimer.h"
 
 enum { nrsfTASK_PEERS_LIMIT = 4,
-       nrsfTASK_LEN_LIMIT   = MSF_6P_CELL_LIST_MAX_LEN+1,
-       nrsfOPS_LIMIT        = nrsfTASK_PEERS_LIMIT*nrsfTASK_LEN_LIMIT,
        //< limit of nrsf packet size
        nrsfREQ_OPS_LIMIT    = 100/sizeof(sixp_cell_t) ,
        nrsfOPS_CLEAN        = ~0ul, //< clean op item
 
 };
-
-//< index in nrsf_ops_list;
-typedef signed char nrsf_ops_idx;
-static sixp_cell_t ops_list[nrsfOPS_LIMIT];
-
-static inline
-SIXPCellsPkt*      nrsf_op_at(nrsf_ops_idx idx){
-    assert(idx >= 0);
-    assert(idx < nrsfOPS_LIMIT);
-    return (SIXPCellsPkt*)(ops_list+idx);
-}
 
 struct nrsfTask{
     tsch_neighbor_t* nbr;
@@ -577,7 +580,6 @@ nrsfTask        nrsf_task_use;
 nrsfTask        nrsf_task_del;
 
 static void nrsf_tasks_clear();
-static void nrsf_ops_clear();
 static nrsf_task_idx nrsf_task_alloc(tsch_neighbor_t* nbr);
 
 
@@ -618,8 +620,6 @@ void nrsf_init_tasks(){
     LOG_DBG("nrsf init\n");
     memset(&op_timer, 0, sizeof(op_timer) );
     nrsf_tasks_clear();
-    nrsf_task_clear = false;
-    nrsf_ops_clear();
 }
 
 static
@@ -635,6 +635,7 @@ void nrsf_tasks_clear(){
     }
     nrsf_task_free(&nrsf_task_use);
     nrsf_task_free(&nrsf_task_del);
+    nrsf_task_clear = false;
 }
 
 static
@@ -676,113 +677,9 @@ nrsf_task_idx nrsf_task_select(tsch_neighbor_t* nbr){
     return -1;
 }
 
-static
-void nrsf_ops_clear(){
-    for (int i = 0; i < nrsfOPS_LIMIT; ++i)
-        ops_list[i].raw = nrsfOPS_CLEAN;
-}
-
-static
-void nrsf_ops_free(nrsf_ops_idx x){
-    if (x < 0)
-        return;
-    if (ops_list[(int)x].raw == nrsfOPS_CLEAN)
-        return;
-
-    SIXPCellsPkt* op = nrsf_op_at(x);
-    unsigned len = op->head.num_cells;
-    assert(len < nrsfTASK_LEN_LIMIT);
-
-    for (int i = x; i <= x+len; ++i)
-        ops_list[i].raw = nrsfOPS_CLEAN;
-}
-
-static
-nrsf_ops_idx nrsf_ops_new(void){
-    //find ops nrsfTASK_LEN_LIMIT clean seq
-    nrsf_ops_idx res = 0;
-    for (int i = 0; i < nrsfOPS_LIMIT; ){
-        if (ops_list[i].raw != nrsfOPS_CLEAN){
-            LOG_DBG("alloc: op[%d]= %x\n", i, (ops_list[i].raw) );
-            // first element looks start of nrsfTASK_LEN_LIMIT bulk
-            i   = i + nrsfTASK_LEN_LIMIT;
-            res = i;
-            continue;
-        }
-        if ((res - i) >= nrsfTASK_LEN_LIMIT)
-            break;
-        ++i;
-    }
-    if (res >= nrsfOPS_LIMIT)
-        return -1;
-
-    SIXPCellsPkt* op = nrsf_op_at(res);
-    op->head.meta           = 0;
-    op->head.cell_options   = SIXP_PKT_CELL_OPTION_TX;//for valid request
-    op->head.num_cells      = 0;
-    //ops_list[res].raw = nrsfOPS_INIT;
-    return res;
-}
-
-static
-nrsf_ops_idx nrsf_ops_alloc(nrsf_ops_idx x, unsigned append_num){
-    if (x < 0){
-        x = nrsf_ops_new();
-        if (x < 0){
-            LOG_ERR("fail alloc op\n");
-            return -1;
-        }
-        LOG_DBG("alloc op[%d]\n", x);
-    }
-    return x;
-}
-
-static
-bool nrsf_ops_remove_cell(nrsf_ops_idx x, msf_cell_t cell, const char* name){
-    if(x < 0)
-        return false;
-
-    SIXPCellsPkt* op = nrsf_op_at(x);
-    sixp_cell_t* lastc = op->cells;
-    sixp_cell_t* lookc = op->cells;
-    sixp_cell_t  scanc = cell;
-
-    for (unsigned i = op->head.num_cells; i > 0; --i, ++lookc){
-        if (lookc->raw != scanc.raw){
-            lastc->raw = lookc->raw;
-            ++lastc;
-        }
-        else
-            LOG_DBG("drop %s[%d] op[%d]=%x \n", name, x
-                        , (lastc - (op->cells)), scanc.raw);
-    }
-    if (lastc != lookc) {
-        op->head.num_cells = lastc - op->cells;
-        return true;
-    }
-    return false;
-}
-
-static
-nrsf_ops_idx nrsf_ops_append(nrsf_ops_idx x, msf_cell_t cell, const char* name){
-    x = nrsf_ops_alloc(x, 1);
-    if(x < 0){
-        return x;
-    }
-    SIXPCellsPkt* op = nrsf_op_at(x);
-    if ( (op->head.num_cells + 1) >= (nrsfTASK_LEN_LIMIT-1) ) {
-        LOG_ERR("fail append %s op[%d+%d]\n", name, x, op->head.num_cells);
-        return -1;
-    }
-
-    op->cells[op->head.num_cells] = cell;
-    LOG_DBG("append %s[%d] op[%u]=%x\n", name, x
-                ,op->head.num_cells, op->cells[op->head.num_cells].raw);
-    ++(op->head.num_cells);
-    return x;
-}
 
 
+//------------------------------------------------------------------------------
 static
 tsch_neighbor_t* get_addr_nbr(const linkaddr_t *addr){
     if (addr == NULL)
@@ -892,7 +789,6 @@ static int nrsf_task_to_all_nbrs( task_op f, nrsfTask* t, int use, const char* i
 
 static int nrsf_task_notify_cells(nrsfTask* t, const char* info);
 static int nrsf_task_notify_dels(nrsfTask* t, const char* info);
-static int nrsf_task_used_cells(nrsfTask* t);
 
 void nrsf_tasks_exec(){
     if (sixp_trans_any()){
@@ -957,9 +853,10 @@ int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
     if (t->notify_use < aoUSE_REMOTE_1HOP) {
         // report about all local avoid and negotiated cells
         msf_avoid_enum_cells( op, limit, t->notify_use, t->nbr);
-        if (op->head.num_cells > 0)
+        if (op->head.num_cells > 0){
             total = op->head.num_cells + 1; // enum header space
-        LOG_DBG("notify avoid local %d cells\n", total);
+            LOG_DBG("notify avoid local %d cells\n", total);
+        }
         t->notify_use = (t->notify_use& ~aoUSE) | aoUSE_REMOTE_1HOP;
     }
 
@@ -973,9 +870,9 @@ int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
 
         // report about all remote hop cells
         int n = msf_avoid_enum_cells(NULL, lim-1, t->notify_use, t->nbr);
-        LOG_DBG("notify avoid remote[%x] %d cells\n", t->notify_use, n);
         if (n <= 0)
             continue;
+        LOG_DBG("notify avoid remote[%x] %d cells\n", t->notify_use, n);
         if (n >= lim)
             break;
 
@@ -1087,7 +984,8 @@ int nrsf_task_to_all_nbrs( task_op f, nrsfTask* t, int use, const char* info)
 }
 
 
-
+//------------------------------------------------------------------------------
+//                              LEGACY
 #include "net/ipv6/uip-ds6-route.h"
 #include "net/mac/tsch/sixtop/sixp-nbr.h"
 
