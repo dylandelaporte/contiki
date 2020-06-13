@@ -50,12 +50,14 @@
 #define LOG_MODULE "MSF"
 #define LOG_LEVEL LOG_LEVEL_MSF
 
-static struct {
-  uint16_t scheduled;
-  uint16_t required;
-  uint16_t elapsed;
-  uint16_t used;
+static struct CellsStats {
+  uint8_t scheduled;
+  uint8_t required;
+  uint8_t elapsed;
+  unsigned used;
 } tx_num_cells, rx_num_cells;
+typedef struct CellsStats CellsStats;
+
 static bool need_keep_alive = false;
 
 /*---------------------------------------------------------------------------*/
@@ -64,11 +66,12 @@ void update(msf_negotiated_cell_type_t cell_type)
 {
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
   uint16_t max_num_cells_scheduled;
-  uint16_t *num_cells_scheduled;
-  uint16_t *num_cells_used;
-  uint16_t *num_cells_required;
-  uint16_t *num_cells_elapsed;
+  CellsStats*   num_cells;
   uint16_t lim_num_cells_used_high;
+
+  // for log
+  const char* type_str;
+  (void)type_str;
 
   assert(parent_addr != NULL);
 
@@ -81,19 +84,15 @@ void update(msf_negotiated_cell_type_t cell_type)
    * autonomous TX cell.
    */
   if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+    num_cells = &tx_num_cells;
+    type_str = "TX";
     max_num_cells_scheduled = MSF_MAX_NUM_NEGOTIATED_TX_CELLS;
-    num_cells_scheduled = &tx_num_cells.scheduled;
-    num_cells_used = &tx_num_cells.used;
-    num_cells_elapsed = &tx_num_cells.elapsed;
-    num_cells_required = &tx_num_cells.required;
     lim_num_cells_used_high = MSF_LIM_NUM_CELLS_USED_HIGH;
   } else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) {
+    num_cells = &rx_num_cells;
+    type_str = "RX";
     max_num_cells_scheduled = MSF_MAX_NUM_NEGOTIATED_RX_CELLS;
-    num_cells_scheduled = &rx_num_cells.scheduled;
-    num_cells_used = &rx_num_cells.used;
-    num_cells_elapsed = &rx_num_cells.elapsed;
-    num_cells_required = &rx_num_cells.required;
-    if(num_cells_scheduled > 0) {
+    if(num_cells->scheduled > 0) {
       lim_num_cells_used_high = MSF_LIM_NUM_CELLS_USED_HIGH;
     } else {
       lim_num_cells_used_high = MSF_INITIAL_LIM_NUM_RX_CELLS_USED_HIGH;
@@ -103,50 +102,48 @@ void update(msf_negotiated_cell_type_t cell_type)
   }
 
   /* updating the counters */
-  *num_cells_scheduled = msf_negotiated_cell_get_num_cells(cell_type,
-                                                           parent_addr);
-  if(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX &&
-     *num_cells_scheduled == 0) {
+  num_cells->scheduled = msf_negotiated_cell_get_num_cells(cell_type, parent_addr);
+  if(num_cells->scheduled == 0 && (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) ) {
+    // take to account that have at least 1 autonomous RX link <- parent
     assert(msf_autonomous_cell_get_rx() != NULL);
-    *num_cells_elapsed += 1;
+    num_cells->elapsed += 1;
   } else {
-    *num_cells_elapsed += *num_cells_scheduled;
+    num_cells->elapsed += num_cells->scheduled;
   }
 
-  if(*num_cells_elapsed < MSF_MAX_NUM_CELLS) {
+  if(num_cells->elapsed < MSF_MAX_NUM_CELLS) {
     LOG_DBG("for upward %s - NumCellsElapsed: %u, NumCellsUsed: %u, "
             "NumCellsScheduled: %u, NumCellsRequired: %u\n",
-            cell_type == MSF_NEGOTIATED_CELL_TYPE_TX ? "TX" : "RX",
-            *num_cells_elapsed, *num_cells_used,
-            *num_cells_scheduled, *num_cells_required);
+            type_str,
+            num_cells->elapsed, num_cells->used,
+            num_cells->scheduled, num_cells->required);
   } else {
     LOG_INFO("for upward %s - NumCellsElapsed: %u, NumCellsUsed: %u, "
              "NumCellsScheduled: %u, NumCellsRequired: %u\n",
-             cell_type == MSF_NEGOTIATED_CELL_TYPE_TX ? "TX" : "RX",
-             *num_cells_elapsed, *num_cells_used,
-             *num_cells_scheduled, *num_cells_required);
+             type_str,
+             num_cells->elapsed, num_cells->used,
+             num_cells->scheduled, num_cells->required);
 
-    if(*num_cells_used > lim_num_cells_used_high &&
-       *num_cells_scheduled < max_num_cells_scheduled &&
-       *num_cells_required < (*num_cells_scheduled + 1)) {
-      *num_cells_required = *num_cells_scheduled + 1;
-      LOG_INFO("increment NumCellsRequired to %u; ", *num_cells_required);
-      LOG_INFO_("going to add another negotiated %s cell\n",
-                cell_type == MSF_NEGOTIATED_CELL_TYPE_TX ? "TX" : "RX");
-    } else if(*num_cells_used < MSF_LIM_NUM_CELLS_USED_LOW &&
-              ((cell_type == MSF_NEGOTIATED_CELL_TYPE_TX &&
-                *num_cells_scheduled > 1) ||
-               (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX &&
-                *num_cells_scheduled > 0)) &&
-              *num_cells_required > (*num_cells_scheduled - 1)) {
-      *num_cells_required = *num_cells_scheduled - 1;
-      LOG_INFO("decrement NumCellsRequred to %u; ",
-               *num_cells_required);
-      LOG_INFO_("going to delete a negotiated %s cell\n",
-                cell_type == MSF_NEGOTIATED_CELL_TYPE_TX ? "TX" : "RX");
+    if(num_cells->used > lim_num_cells_used_high &&
+       num_cells->scheduled < max_num_cells_scheduled &&
+       num_cells->required < (num_cells->scheduled + 1))
+    {
+      num_cells->required = num_cells->scheduled + 1;
+      LOG_INFO("increment NumCellsRequired to %u; "
+               "going to add another negotiated %s cell\n", num_cells->required, type_str);
+    } else if( num_cells->used < MSF_LIM_NUM_CELLS_USED_LOW &&
+              ((cell_type == MSF_NEGOTIATED_CELL_TYPE_TX && (num_cells->scheduled > 1))
+             ||(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX && (num_cells->scheduled > 0))
+              )
+              &&( num_cells->required > (num_cells->scheduled - 1) )
+              )
+    {
+      num_cells->required = num_cells->scheduled - 1;
+      LOG_INFO("decrement NumCellsRequred to %u; "
+               "going to delete a negotiated %s cell\n",  num_cells->required, type_str);
     } else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX &&
-              *num_cells_used == 0 &&
-              *num_cells_scheduled > 0){
+              num_cells->used == 0 &&
+              num_cells->scheduled > 0){
       /*
        * Send a keep-alive message, which is a COUNT request, to
        * prevent the parent from removing negotiated cells scheduled
@@ -160,8 +157,8 @@ void update(msf_negotiated_cell_type_t cell_type)
        */
     }
     /* reset NumCellsElapsed and NumCellsUsed */
-    *num_cells_elapsed = 0;
-    *num_cells_used = 0;
+    num_cells->elapsed = 0;
+    num_cells->used = 0;
   }
 }
 /*---------------------------------------------------------------------------*/
