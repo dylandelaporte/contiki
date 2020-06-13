@@ -894,7 +894,7 @@ void msf_negotiated_inspect_link(tsch_link_t* x){
           // since able allocate unconflicting slots, drop preserved.
           //    This prevents from alloc link that later reallocate
           if (cell->link_options & LINK_OPTION_RESERVED_LINK){
-              msf_negotiated_cell_delete(cell);
+              msf_reserved_release_link(cell);
               return;
           }
       }

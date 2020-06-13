@@ -83,6 +83,10 @@ tsch_link_t *msf_reserved_cell_add(const linkaddr_t *peer_addr,
  */
 void msf_reserved_cell_delete_all(const linkaddr_t *peer_addr);
 
+/**
+ * \brief Delete reserved link
+ */
+void msf_reserved_release_link(tsch_link_t *cell);
 
 
 //==============================================================================
