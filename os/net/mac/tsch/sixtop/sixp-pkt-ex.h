@@ -39,6 +39,7 @@
 #define CONTIKI_OS_NET_MAC_TSCH_SIXTOP_SIXP_PKT_EX_H_
 
 #include <stdint.h>
+#include "assert.h"
 #include "sixp.h"
 #include "sixp-pkt.h"
 
