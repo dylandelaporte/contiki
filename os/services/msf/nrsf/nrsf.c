@@ -68,6 +68,11 @@
 
 
 //=============================================================================
+static void nrsf_init_tasks();
+
+
+
+//=============================================================================
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     const tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
     for (unsigned i = 0; i < hcells->num_cells; ++i){
@@ -120,7 +125,6 @@ const sixtop_sf_t nrsf = {
 };
 
 /*---------------------------------------------------------------------------*/
-static void nrsf_init_tasks();
 void nrsf_init(void)
 {
     nrsf_init_tasks();
@@ -227,12 +231,10 @@ void nrsf_error_handler(sixp_error_t err, sixp_pkt_cmd_t cmd, uint8_t seqno,
 }
 /*---------------------------------------------------------------------------*/
 
-static
 void nrsf_sent_callback_responder(void *arg, uint16_t arg_len,
                               const linkaddr_t *dest_addr,
                               sixp_output_status_t status);
 
-static
 void nrsf_sent_complete_responder(void *arg, uint16_t arg_len,
                               const linkaddr_t *dest_addr,
                               sixp_output_status_t status);
@@ -435,8 +437,7 @@ SIXPError nrsf_sixp_check_recv_response(SIXPeerHandle* hpeer){
 }
 
 /*---------------------------------------------------------------------------*/
-static void
-nrsf_sent_callback_responder(void *arg, uint16_t arg_len,
+void nrsf_sent_callback_responder(void *arg, uint16_t arg_len,
                               const linkaddr_t *dest_addr,
                               sixp_output_status_t status)
 {
@@ -447,7 +448,6 @@ nrsf_sent_callback_responder(void *arg, uint16_t arg_len,
   }
 }
 
-static
 void nrsf_sent_complete_responder(void *arg, uint16_t arg_len,
                               const linkaddr_t *dest_addr,
                               sixp_output_status_t status)
