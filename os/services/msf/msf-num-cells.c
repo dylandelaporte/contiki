@@ -124,32 +124,43 @@ void update(msf_negotiated_cell_type_t cell_type)
              num_cells->elapsed, num_cells->used,
              num_cells->scheduled, num_cells->required);
 
-    if(num_cells->used > lim_num_cells_used_high &&
-       num_cells->scheduled < max_num_cells_scheduled &&
-       num_cells->required < (num_cells->scheduled + 1))
+    if(num_cells->used > lim_num_cells_used_high)
+    {
+      if ( num_cells->scheduled < max_num_cells_scheduled
+        && (num_cells->required < (num_cells->scheduled + 1)) )
     {
       num_cells->required = num_cells->scheduled + 1;
       LOG_INFO("increment NumCellsRequired to %u; "
                "going to add another negotiated %s cell\n", num_cells->required, type_str);
-    } else if( num_cells->used < MSF_LIM_NUM_CELLS_USED_LOW &&
-              ((cell_type == MSF_NEGOTIATED_CELL_TYPE_TX && (num_cells->scheduled > 1))
-             ||(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX && (num_cells->scheduled > 0))
-              )
+      }
+    }
+    else if( num_cells->used < MSF_LIM_NUM_CELLS_USED_LOW)
+    {
+      uint8_t require_least = 1;
+      // if rx no coflicts, do not requre negotiated rx link to parent, prefer use autonomous
+      if (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX)
+          require_least = 0;
+
+      if (   (num_cells->scheduled > require_least)
               &&( num_cells->required > (num_cells->scheduled - 1) )
               )
     {
       num_cells->required = num_cells->scheduled - 1;
       LOG_INFO("decrement NumCellsRequred to %u; "
                "going to delete a negotiated %s cell\n",  num_cells->required, type_str);
-    } else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX &&
+      }
+
+      if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX &&
               num_cells->used == 0 &&
-              num_cells->scheduled > 0){
+                    num_cells->scheduled > 0)
+      {
       /*
        * Send a keep-alive message, which is a COUNT request, to
        * prevent the parent from removing negotiated cells scheduled
        * with us.
        */
       need_keep_alive = true;
+      }
     } else {
       /*
        *  We have a right amount of negotiated cells for the latest
