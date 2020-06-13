@@ -73,18 +73,61 @@ static void nrsf_init_tasks();
 
 
 //=============================================================================
+static void nrsf_tasks_poll_use();
+static void nrsf_tasks_poll_del();
+
+// @return - amount of modify/new cells
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
-    const tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
-    for (unsigned i = 0; i < hcells->num_cells; ++i){
-        msf_avoid_nbr_use_cell(sixp_pkt_get_cell(hcells->cell_list, i), n);
+    tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
+
+    NRSFMeta meta;
+    meta.raw = hcells->meta;
+    unsigned avoiduse = meta.field.avoid_use & aoUSE_REMOTE;
+    if (avoiduse > NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP ){
+        LOG_DBG("ingnore hop%x cells\n", avoiduse);
+        return;
     }
+    LOG_DBG("avoid hop%x cells[%u]:\n", avoiduse, hcells->num_cells);
+
+    avoiduse += aoUSE_REMOTE_1HOP;
+    int rel = 0;
+    for (unsigned i = 0; i < hcells->num_cells; ++i){
+        sixp_cell_t c = sixp_pkt_get_cell(hcells->cell_list, i);
+        bool should_relay = false;
+        should_relay = msf_avoid_nbr_use_cell(c, n, avoiduse);
+
+        if (avoiduse <= NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP )
+        //if (avoiduse < aoUSE_REMOTE_3HOP)
+        if (should_relay)
+            ++rel;
+    }
+
+    // start DPC flush new avoids
+    if (rel > 0)
+        nrsf_tasks_poll_use();
 }
 
+// here reaction on external request for unused cells.
+//  we unuse remote cell too, and if it is not far - relay it
+//
 void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
-    const tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
+    int avoiduse;
+    int rel = 0;
+
+    tsch_neighbor_t *n = tsch_queue_get_nbr(hpeer->addr);
     for (unsigned i = 0; i < hcells->num_cells; ++i){
-        msf_release_nbr_cell(sixp_pkt_get_cell(hcells->cell_list, i), n);
+        sixp_cell_t c = sixp_pkt_get_cell(hcells->cell_list, i);
+
+        //drop remote cell in NRSF_RANGE_HOPS, and unuse if far cells
+        avoiduse = msf_unvoid_drop_nbr_cell(c, n, NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP );
+        if (avoiduse > 0)
+            ++rel;
     }
+
+    // start DPC flush new avoids
+    if (rel > 0)
+        nrsf_tasks_poll_del();
+
 }
 
 void nrsf_check_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
@@ -344,19 +387,30 @@ bool is_valid_add_request(SIXPCellsHandle*  h)
 static
 SIXPError nrsf_sixp_add_request(SIXPeerHandle* hpeer)
 {
-    SIXPCellsHandle  hcells;
-    SIXPError ok = sixp_pkt_parse_cells(&hpeer->h, &hcells);
-    if (ok < 0)
-        return ok;
-
     assert(hpeer->addr != NULL);
 
-    if(is_valid_add_request(&hcells)) {
-      nrsf_avoid_cells(hpeer, &hcells);
+    SIXPCellsHandle  hcells;
+    SIXPError ok1 = sixp_pkt_parse_cells(&hpeer->h, &hcells);
+    if (ok1 != sixpOK)
+        return ok1;
+
+    //bool is_single_cell = sixp_pkt_is_single_cell(&hpeer->h, hcells);
+    for (SIXPError ok = ok1; ok == sixpOK
+        ; ok = sixp_pkt_parse_next_cells(&hpeer->h, &hcells))
+    {
+        if(is_valid_add_request(&hcells)) {
+          nrsf_avoid_cells(hpeer, &hcells);
+        }
+        else{
+            LOG_DBG("pkt:%x*%d > %x,%x\n"
+                    , hcells.meta, hcells.num_cells
+                    , hcells.cell_list[-1], hcells.cell_list[0]);
+            return sixpFAIL;
+        }
     }
 
-    // no response for NRSF commands.
-    return sixpOK;
+    // no response for NRSF commands here.
+    return ok1;
 }
 
 SIXPError nrsf_sixp_add_recv_request(SIXPeerHandle* hpeer)
@@ -421,7 +475,7 @@ SIXPError nrsf_sixp_check_recv_request(SIXPeerHandle* hpeer){
     hpeer->h.type = SIXP_PKT_TYPE_RESPONSE;
 
     ok = sixp_pkt_output(hpeer, NRSF_SFID, nrsf_sent_callback_responder, NULL, 0);
-    nrsf_report_sent(hpeer, "ADD response", ok);
+    nrsf_report_sent(hpeer, "CHECK response", ok);
     return sixpOK;
 }
 
@@ -431,9 +485,12 @@ SIXPError nrsf_sixp_check_recv_response(SIXPeerHandle* hpeer){
     hcells.cell_list_len    = hpeer->h.body_len;
     hcells.num_cells        = hcells.cell_list_len/sizeof(*hcells.cell_list);
 
-    nrsf_avoid_cells(hpeer, &hcells);
+    SIXPError ok = sixp_pkt_parse_cells(&hpeer->h, &hcells);
+    if (ok == sixpOK)
+    if(is_valid_add_request(&hcells))
+        nrsf_avoid_cells(hpeer, &hcells);
 
-    return sixpOK;
+    return ok;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -485,19 +542,13 @@ SIXPError nrsf_sixp_clear_recv_request(SIXPeerHandle* hpeer){
 //==============================================================================
 #include "sys/ctimer.h"
 
-static struct ctimer op_timer;
-static void nrsf_tasks_exec();
-static
-
-void nrsf_tasks_poll(){
-    ctimer_stop(&op_timer);
-    ctimer_set(&op_timer, 0, nrsf_tasks_exec, NULL); /* expires immediately */
-}
-
 enum { nrsfTASK_PEERS_LIMIT = 4,
        nrsfTASK_LEN_LIMIT   = MSF_6P_CELL_LIST_MAX_LEN+1,
        nrsfOPS_LIMIT        = nrsfTASK_PEERS_LIMIT*nrsfTASK_LEN_LIMIT,
+       //< limit of nrsf packet size
+       nrsfREQ_OPS_LIMIT    = 100/sizeof(sixp_cell_t) ,
        nrsfOPS_CLEAN        = ~0ul, //< clean op item
+
 };
 
 //< index in nrsf_ops_list;
@@ -513,12 +564,8 @@ SIXPCellsPkt*      nrsf_op_at(nrsf_ops_idx idx){
 
 struct nrsfTask{
     tsch_neighbor_t* nbr;
-    // notify nbrs, except nbr, for added cells connect ->nbr
-    nrsf_ops_idx     adds;
-    // notify nbrs, except nbr, for released cells connect ->nbr
-    nrsf_ops_idx     dels;
     // notify nbr for used cells
-    nrsf_ops_idx     notify_use;
+    int             notify_use;
 };
 typedef struct nrsfTask nrsfTask;
 
@@ -526,10 +573,45 @@ typedef int nrsf_task_idx;
 struct nrsfTask nrsf_tasks[nrsfTASK_PEERS_LIMIT];
 //< this task is outstands from add/release
 bool            nrsf_task_clear = false;
+nrsfTask        nrsf_task_use;
+nrsfTask        nrsf_task_del;
 
 static void nrsf_tasks_clear();
 static void nrsf_ops_clear();
 static nrsf_task_idx nrsf_task_alloc(tsch_neighbor_t* nbr);
+
+
+
+static struct ctimer op_timer;
+static void nrsf_tasks_exec();
+static void nrsf_tasks_poll();
+
+static
+void nrsf_tasks_poll(){
+    ctimer_stop(&op_timer);
+    ctimer_set(&op_timer, 0, nrsf_tasks_exec, NULL); /* expires immediately */
+}
+
+static
+void nrsf_tasks_poll_use()
+{
+    if (nrsf_task_use.notify_use < 0){
+        nrsf_task_use.notify_use = aoUSE_LOCAL;//REMOTE_1HOP;
+        LOG_DBG("use task %p:%x\n", nrsf_task_use.nbr, nrsf_task_use.notify_use);
+    }
+    nrsf_tasks_poll();
+}
+
+static
+void nrsf_tasks_poll_del()
+{
+    if (nrsf_task_del.notify_use < 0){
+        nrsf_task_del.notify_use = aoDROPED|aoMARK;
+        LOG_DBG("del task %p-%x\n", nrsf_task_del.nbr, nrsf_task_del.notify_use);
+    }
+    nrsf_tasks_poll();
+}
+
 
 static
 void nrsf_init_tasks(){
@@ -541,15 +623,18 @@ void nrsf_init_tasks(){
 }
 
 static
+void nrsf_task_free(nrsfTask* t){
+    t->nbr = NULL;
+    t->notify_use   = -1;
+}
+
+static
 void nrsf_tasks_clear(){
     for (int i = 0; i < nrsfTASK_PEERS_LIMIT; ++i){
         nrsf_tasks[i].nbr = NULL;
     }
-}
-
-static
-void nrsf_task_free(nrsfTask* t){
-    t->nbr = NULL;
+    nrsf_task_free(&nrsf_task_use);
+    nrsf_task_free(&nrsf_task_del);
 }
 
 static
@@ -559,8 +644,6 @@ void nrsf_task_setup(nrsf_task_idx x, tsch_neighbor_t* nbr){
     nrsfTask* t = nrsf_tasks+x;
 
     t->nbr = nbr;
-    t->adds         = -1;
-    t->dels         = -1;
     t->notify_use   = -1;
 }
 
@@ -655,14 +738,14 @@ nrsf_ops_idx nrsf_ops_alloc(nrsf_ops_idx x, unsigned append_num){
 }
 
 static
-bool nrsf_ops_remove_cell(nrsf_ops_idx x, tsch_link_t *cell, const char* name){
+bool nrsf_ops_remove_cell(nrsf_ops_idx x, msf_cell_t cell, const char* name){
     if(x < 0)
         return false;
 
     SIXPCellsPkt* op = nrsf_op_at(x);
     sixp_cell_t* lastc = op->cells;
     sixp_cell_t* lookc = op->cells;
-    sixp_cell_t  scanc = msf_cell_of_link(cell);
+    sixp_cell_t  scanc = cell;
 
     for (unsigned i = op->head.num_cells; i > 0; --i, ++lookc){
         if (lookc->raw != scanc.raw){
@@ -681,7 +764,7 @@ bool nrsf_ops_remove_cell(nrsf_ops_idx x, tsch_link_t *cell, const char* name){
 }
 
 static
-nrsf_ops_idx nrsf_ops_append(nrsf_ops_idx x, tsch_link_t *cell, const char* name){
+nrsf_ops_idx nrsf_ops_append(nrsf_ops_idx x, msf_cell_t cell, const char* name){
     x = nrsf_ops_alloc(x, 1);
     if(x < 0){
         return x;
@@ -692,7 +775,7 @@ nrsf_ops_idx nrsf_ops_append(nrsf_ops_idx x, tsch_link_t *cell, const char* name
         return -1;
     }
 
-    op->cells[op->head.num_cells] = msf_cell_of_link(cell);
+    op->cells[op->head.num_cells] = cell;
     LOG_DBG("append %s[%d] op[%u]=%x\n", name, x
                 ,op->head.num_cells, op->cells[op->head.num_cells].raw);
     ++(op->head.num_cells);
@@ -711,70 +794,45 @@ tsch_neighbor_t* get_addr_nbr(const linkaddr_t *addr){
     return tsch_queue_get_nbr(addr);
 }
 
-void nrsf_on_msf_use_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
-    if (nbr == NULL) {
+
+void nrsf_on_msf_use_link_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
+    /*if (nbr == NULL) {
         nbr = get_addr_nbr(&cell->addr);
         if (nbr == NULL)
             return;
-    }
-
-    if ( msf_is_avoid_local_cell(msf_cell_of_link(cell)) )
-            return;
-
-    LOG_DBG("nrsf_on_msf_use_cell %u.%u\n", cell->timeslot, cell->channel_offset);
-    nrsf_task_idx ti = nrsf_task_alloc(nbr);
-    if (ti < 0){
-        LOG_ERR("fail alloc ADD task\n");
-        return;
-    }
-    nrsfTask* t = nrsf_tasks + ti;
-
-    // compensate oposite op, if it exists
-    if ( nrsf_ops_remove_cell(t->dels, cell, "REL") )
-        return;
-
-    // append new cell to task ops
-    nrsf_ops_idx tmp = nrsf_ops_append(t->adds, cell, "ADD");
-    if (tmp >= 0){
-        t->adds = tmp;
-        nrsf_tasks_poll();
-    }
+    }*/
+    nrsf_on_msf_use_cell( NULL, msf_cell_of_link(cell));
 }
 
-void nrsf_on_msf_release_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
+void nrsf_on_msf_use_cell(tsch_neighbor_t *nbr, sixp_cell_t cell)
+{
+    //assert(nbr != NULL);
+    if ( msf_is_avoid_local_cell(cell) )
+            return;
+
+    LOG_DBG("nrsf_on_msf_use_link_cell %u.%u\n", cell.field.slot, cell.field.chanel);
+    nrsf_tasks_poll_use();
+}
+
+void nrsf_on_msf_release_link_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
     if (nbr == NULL) {
         nbr = get_addr_nbr(&cell->addr);
         if (nbr == NULL)
             return;
     }
+    nrsf_on_msf_release_cell(nbr, msf_cell_of_link(cell));
+}
 
-    if ( msf_is_avoid_local_cell(msf_cell_of_link(cell)) )
-            return;
-
-    LOG_DBG("nrsf_on_msf_release_cell %u.%u\n", cell->timeslot, cell->channel_offset);
-
-    nrsf_task_idx ti = nrsf_task_alloc(nbr);
-    if (ti < 0){
-        LOG_ERR("fail alloc RELEASE task\n");
+void nrsf_on_msf_release_cell(tsch_neighbor_t *nbr, sixp_cell_t cell)
+{
+    if (msf_is_avoid_local_cell(cell) ){
+        // autonomous cells may are not release imidiate
         return;
     }
-    nrsfTask* t = nrsf_tasks + ti;
 
-    // compensate oposite op, if it exists
-    if ( nrsf_ops_remove_cell(t->adds, cell, "ADD") )
-        return;
-
-    if (t->notify_use >= 0){
-        // released cells now not need notify nbr
-        nrsf_ops_remove_cell(t->notify_use, cell, "USE");
-    }
-
-    // append new cell to task ops
-    nrsf_ops_idx tmp = nrsf_ops_append(t->dels, cell, "REL");
-    if (tmp >= 0){
-        t->dels = tmp;
-        nrsf_tasks_poll();
-    }
+    LOG_DBG("nrsf_on_msf_release_cell %u.%u\n", cell.field.slot, cell.field.chanel);
+    msf_avoid_nbr_use_cell(cell, nbr, aoDROPED);
+    nrsf_tasks_poll_del();
 }
 
 void nrsf_on_msf_nbr_clean(tsch_neighbor_t *nbr){
@@ -798,7 +856,8 @@ void nrsf_on_msf_new_nbr(tsch_neighbor_t *nbr){
     LOG_INFO_LLADDR(tsch_queue_get_nbr_address(nbr));
     LOG_DBG_("\n");
 
-    int num_voids = msf_avoid_num_local_cells();
+    const unsigned enum_range = (NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP) | aoMARK;
+    int num_voids = msf_avoid_num_cells_in_range( enum_range );
     if (num_voids <= 0)
         return;
 
@@ -813,22 +872,9 @@ void nrsf_on_msf_new_nbr(tsch_neighbor_t *nbr){
         LOG_WARN("task alredy have USES!\n");
         return;
     }
-    t->notify_use = nrsf_ops_alloc(t->notify_use, nrsfTASK_LEN_LIMIT-1);
-    if(t->notify_use < 0){
-        return;
-    }
-
-    SIXPCellsPkt* op = nrsf_op_at(t->notify_use);
-
-    // report about all avoid and negotiated cells
-    int ok = msf_avoid_enum_local_cells( op, nrsfTASK_LEN_LIMIT-1);
-    if (ok > 0)
-        ok = msf_avoid_clean_cells_for_nbr(op, nbr);
-
-        ok+= msf_negotiated_enum_cells_besides_nbr(nbr, op, nrsfTASK_LEN_LIMIT-1);
-    if (ok > 0){
-        nrsf_tasks_poll();
-    }
+    //< start enuerate from
+    t->notify_use = aoUSE_LOCAL | aoMARK;
+    nrsf_tasks_poll();
 }
 
 void nrsf_on_6ptrans_free(void){
@@ -836,6 +882,17 @@ void nrsf_on_6ptrans_free(void){
     if (!sixp_trans_any())
         nrsf_tasks_poll();
 }
+
+
+
+//------------------------------------------------------------------------------
+// @return amount of nrsf requests sended
+typedef int (*task_op)(nrsfTask* t, const char* info);
+static int nrsf_task_to_all_nbrs( task_op f, nrsfTask* t, int use, const char* info);
+
+static int nrsf_task_notify_cells(nrsfTask* t, const char* info);
+static int nrsf_task_notify_dels(nrsfTask* t, const char* info);
+static int nrsf_task_used_cells(nrsfTask* t);
 
 void nrsf_tasks_exec(){
     if (sixp_trans_any()){
@@ -856,44 +913,182 @@ void nrsf_tasks_exec(){
     //      maybe more efficient to traverse over nbrs whole tasks - composing
     //      multiple commands for nbr
 
+    int ok = 0;
     for (int i = 0; i < nrsfTASK_PEERS_LIMIT; ++i)
     if (nrsf_tasks[i].nbr != NULL) {
         nrsfTask* t = nrsf_tasks + i;
-        int ok = 0;
 
         if (t->notify_use >= 0) {
-            ok = nrsf_notify_cells_2nbr(t->nbr, nrsf_op_at(t->notify_use));
-            nrsf_ops_free(t->notify_use);
-            t->notify_use = -1;
-        }
-
-        if (ok <= 0)
-        if (t->dels >= 0) {
-            ok = nrsf_release_cells_by_nbr(t->nbr, nrsf_op_at(t->dels));
-            nrsf_ops_free(t->dels);
-            t->dels = -1;
-        }
-
-        if (ok <= 0)
-        if (t->adds >= 0){
-            ok = nrsf_used_cells_by_nbr(t->nbr, nrsf_op_at(t->adds));
-            nrsf_ops_free(t->adds);
-            t->adds = -1;
+            ok = nrsf_task_notify_cells(t, "NOTIFY");
         }
 
         if (ok <= 0) {
-            nrsf_task_free(t);
             continue;
         }
 
         nrsf_tasks_poll();
         return;
     }
+
+    if (ok <= 0)
+    if (nrsf_task_del.notify_use >= 0){
+        ok = nrsf_task_to_all_nbrs( nrsf_task_notify_dels
+                                , &nrsf_task_del, aoDROPED|aoMARK
+                                , "DEL"
+                                );
+        msf_release_unused();
+    }
+
+    if (ok <= 0)
+    if (nrsf_task_use.notify_use >= 0){
+        ok = nrsf_task_to_all_nbrs( nrsf_task_notify_cells
+                                , &nrsf_task_use, aoUSE_LOCAL
+                                , "USE"
+                                );
+        msf_avoid_mark_all();
+    }
+
+    if (ok > 0)
+        nrsf_tasks_poll();
+}
+
+int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
+    int total = 0;
+    if (t->notify_use < aoUSE_REMOTE_1HOP) {
+        // report about all local avoid and negotiated cells
+        msf_avoid_enum_cells( op, limit, t->notify_use, t->nbr);
+        if (op->head.num_cells > 0)
+            total = op->head.num_cells + 1; // enum header space
+        LOG_DBG("notify avoid local %d cells\n", total);
+        t->notify_use = (t->notify_use& ~aoUSE) | aoUSE_REMOTE_1HOP;
+    }
+
+    const unsigned limit_range = (NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP);
+    for (; (t->notify_use & aoUSE) <= limit_range //aoUSE_REMOTE_3HOP
+         ; t->notify_use += aoUSE_REMOTE_1HOP )
+    {
+        int lim = limit-total;
+        if (lim <= 0)
+            break;
+
+        // report about all remote hop cells
+        int n = msf_avoid_enum_cells(NULL, lim-1, t->notify_use, t->nbr);
+        LOG_DBG("notify avoid remote[%x] %d cells\n", t->notify_use, n);
+        if (n <= 0)
+            continue;
+        if (n >= lim)
+            break;
+
+        SIXPCellsPkt* hop = (SIXPCellsPkt*)(op+total);
+        sixp_pkt_cells_reset(hop);
+        hop->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
+        n = msf_avoid_enum_cells( hop, lim-1, t->notify_use, t->nbr);
+        if (n <=0)
+            continue;
+
+        NRSFMeta meta;
+        meta.raw = 0;
+        meta.field.avoid_use = t->notify_use;
+        hop->head.meta = meta.raw;
+
+        if(hop->head.num_cells > 0)
+            total += hop->head.num_cells + 1;//append cells with header
+    }
+    if ((t->notify_use & aoUSE) >= limit_range)
+        t->notify_use = -1;
+
+    return total;
+}
+
+int nrsf_task_notify_cells(nrsfTask* t, const char* info){
+    SIXPeerHandle hpeer;
+    sixp_cell_t ops[nrsfREQ_OPS_LIMIT];
+    SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
+    sixp_pkt_cells_reset(op);
+    op->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
+
+    LOG_DBG("%s task from %x\n", info, t->notify_use);
+
+    int ok;
+    ok = nrsf_build_task_cells(t, op, nrsfREQ_OPS_LIMIT-1);
+    if (ok <= 1)
+        return 0;
+
+    sixp_pkt_cells_assign(&hpeer.h, op);
+    hpeer.h.body_len  = sizeof(sixp_cell_t)*ok;
+    hpeer.h.code.cmd  = SIXP_PKT_CMD_ADD;
+    hpeer.addr        = tsch_queue_get_nbr_address(t->nbr);
+    nrsf_sixp_single_send_request(&hpeer, info);
+    return 1;
+}
+
+int nrsf_task_notify_dels(nrsfTask* t, const char* info){
+    SIXPeerHandle hpeer;
+    sixp_cell_t ops[nrsfREQ_OPS_LIMIT];
+    SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
+    sixp_pkt_cells_reset(op);
+    op->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
+
+    int ok;
+    ok = msf_avoid_enum_cells(op, nrsfREQ_OPS_LIMIT-1, aoDROPED|aoMARK, t->nbr);
+    LOG_DBG("%s task from %x =%d\n", info, t->notify_use, ok);
+
+    t->notify_use = -1;
+    if (ok <= 0)
+        return 0;
+
+    sixp_pkt_cells_assign(&hpeer.h, op);
+    hpeer.h.body_len  = sizeof(sixp_cell_t)*(ok+1);
+    hpeer.h.code.cmd  = SIXP_PKT_CMD_DELETE;
+    hpeer.addr        = tsch_queue_get_nbr_address(t->nbr);
+    nrsf_sixp_single_send_request(&hpeer, info);
+    return 1;
 }
 
 
-#include "net/ipv6/uip-ds6-route.h"
+
 #include "net/mac/tsch/tsch-queue.h"
+
+static
+int nrsf_task_to_all_nbrs( task_op f, nrsfTask* t, int use, const char* info)
+{
+    int cnt = 0;
+
+    if (t->nbr == NULL)
+        t->nbr = tsch_neighbors_head();
+
+    struct tsch_neighbor* item = t->nbr;
+    for (; item != NULL
+         ; item = tsch_neighbors_next(item), t->nbr = item )
+    {
+      if (item == n_eb)         continue;
+      if (item == n_broadcast)  continue;
+
+      LOG_DBG("%s hops /# [", info);
+      LOG_INFO_LLADDR( tsch_queue_get_nbr_address(item) );
+      LOG_DBG_("]\n");
+
+      //if (ok)
+      {
+          t->nbr        = item;
+          if (t->notify_use < 0)
+              t->notify_use = use;
+          cnt += f(t, info);
+          if (t->notify_use >= 0){
+              LOG_DBG("task next exec for %x\n", t->notify_use);
+              //task not finished, continue it next exec
+              return cnt;
+          }
+      }
+    }
+    t->nbr = NULL;
+
+    return cnt;
+}
+
+
+
+#include "net/ipv6/uip-ds6-route.h"
 #include "net/mac/tsch/sixtop/sixp-nbr.h"
 
 typedef void (*nbr_op)(const linkaddr_t *peer_addr, SIXPCellsPkt* hcells);

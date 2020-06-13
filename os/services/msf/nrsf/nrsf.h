@@ -56,6 +56,15 @@
  */
 #define NRSF_SFID 2
 
+#ifndef NRSF_CONF_RANGE_HOPS
+#define NRSF_RANGE_HOPS 0
+#else
+#if NRSF_CONF_RANGE_HOPS > 2
+#error "NRSF supports distance <= 2"
+#endif
+#define NRSF_RANGE_HOPS NRSF_CONF_RANGE_HOPS
+#endif
+
 /* Variables */
 /**
  * \brief sixtop_sf_t of nrsf
@@ -65,8 +74,12 @@ extern const sixtop_sf_t nrsf;
 
 
 // calbacks from MSF
-void nrsf_on_msf_use_cell(tsch_neighbor_t *nbr, tsch_link_t *cell);
-void nrsf_on_msf_release_cell(tsch_neighbor_t *nbr, tsch_link_t *cell);
+void nrsf_on_msf_use_cell(tsch_neighbor_t *nbr, sixp_cell_t cell);
+void nrsf_on_msf_use_link_cell(tsch_neighbor_t *nbr, tsch_link_t *cell);
+
+void nrsf_on_msf_release_cell(tsch_neighbor_t *nbr, sixp_cell_t cell);
+void nrsf_on_msf_release_link_cell(tsch_neighbor_t *nbr, tsch_link_t *cell);
+
 void nrsf_on_msf_nbr_clean(tsch_neighbor_t *nbr);
 void nrsf_on_msf_new_nbr(tsch_neighbor_t *nbr);
 
