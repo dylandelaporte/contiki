@@ -61,7 +61,7 @@ typedef uint16_t tsch_slot_t;
 typedef uint16_t tsch_ch_offset_t;
 
 /** \brief An IEEE 802.15.4-2015 TSCH link (also called cell or slot) */
-struct tsch_link {
+typedef struct tsch_link {
   /* Links are stored as a list: "next" must be the first field */
   struct tsch_link *next;
   /* MAC address of neighbor */
@@ -85,10 +85,10 @@ struct tsch_link {
   enum link_type link_type;
   /* Any other data for upper layers */
   void *data;
-};
+} tsch_link_t;
 
 /** \brief 802.15.4e slotframe (contains links) */
-struct tsch_slotframe {
+typedef struct tsch_slotframe {
   /* Slotframes are stored as a list: "next" must be the first field */
   struct tsch_slotframe *next;
   /* Unique identifier */
@@ -98,7 +98,7 @@ struct tsch_slotframe {
   struct tsch_asn_divisor_t size;
   /* List of links belonging to this slotframe */
   LIST_STRUCT(links_list);
-};
+} tsch_slotframe_t;
 
 /** \brief TSCH packet information */
 struct tsch_packet {
@@ -113,7 +113,7 @@ struct tsch_packet {
 };
 
 /** \brief TSCH neighbor information */
-struct tsch_neighbor {
+typedef struct tsch_neighbor {
   uint8_t is_broadcast; /* is this neighbor a virtual neighbor used for broadcast (of data packets or EBs) */
   uint8_t is_time_source; /* is this neighbor a time source? */
   uint8_t backoff_exponent; /* CSMA backoff exponent */
@@ -126,7 +126,7 @@ struct tsch_neighbor {
   struct tsch_packet *tx_array[TSCH_QUEUE_NUM_PER_NEIGHBOR];
   /* Circular buffer of pointers to packet. */
   struct ringbufindex tx_ringbuf;
-};
+} tsch_neighbor_t;
 
 /** \brief TSCH timeslot timing elements. Used to index timeslot timing
  * of different units, such as rtimer tick or micro-second */
