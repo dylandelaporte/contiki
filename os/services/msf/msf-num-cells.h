@@ -70,6 +70,13 @@ void msf_num_cells_update_parent_tx_used(uint16_t count);
 void msf_num_cells_increment_parent_rx_used(void);
 
 /**
+ * \brief ensures that use at least 1 parent RX cells.
+ *          Need when autonomous RX conflicts with nbrs
+ * \return true - more requests add
+ */
+bool msf_num_cells_request_rx_link(void);
+
+/**
  * \brief Trigger a 6P transaction if necessary, based on NumCells*
  * counters
  */

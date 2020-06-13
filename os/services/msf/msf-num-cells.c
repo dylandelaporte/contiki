@@ -47,7 +47,7 @@
 #include "msf-sixp.h"
 
 #include "sys/log.h"
-#define LOG_MODULE "MSF"
+#define LOG_MODULE "MSF num"
 #define LOG_LEVEL LOG_LEVEL_MSF
 
 static struct CellsStats {
@@ -60,6 +60,15 @@ typedef struct CellsStats CellsStats;
 
 static bool need_keep_alive = false;
 
+/*---------------------------------------------------------------------------*/
+static
+int least_rx_requires(){
+    // if rx coflicts, requre negotiated rx link to parent
+    if (msf_autonomous_cell_is_conflicted_rx())
+        return 1;
+    else
+        return 0;
+}
 /*---------------------------------------------------------------------------*/
 static
 void update(msf_negotiated_cell_type_t cell_type)
@@ -106,6 +115,7 @@ void update(msf_negotiated_cell_type_t cell_type)
   if(num_cells->scheduled == 0 && (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) ) {
     // take to account that have at least 1 autonomous RX link <- parent
     assert(msf_autonomous_cell_get_rx() != NULL);
+    if (!msf_autonomous_cell_is_conflicted_rx())
     num_cells->elapsed += 1;
   } else {
     num_cells->elapsed += num_cells->scheduled;
@@ -139,7 +149,7 @@ void update(msf_negotiated_cell_type_t cell_type)
       uint8_t require_least = 1;
       // if rx no coflicts, do not requre negotiated rx link to parent, prefer use autonomous
       if (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX)
-          require_least = 0;
+          require_least = least_rx_requires();
 
       if (   (num_cells->scheduled > require_least)
               &&( num_cells->required > (num_cells->scheduled - 1) )
@@ -188,7 +198,7 @@ msf_num_cells_reset(bool clear_num_cells_required)
 
   if(clear_num_cells_required) {
     tx_num_cells.required = 1;
-    rx_num_cells.required = 0;
+    rx_num_cells.required = least_rx_requires();
   } else {
     /* keep them */
   }
@@ -216,10 +226,23 @@ msf_num_cells_increment_parent_rx_used(void)
 {
   rx_num_cells.used += 1;
 }
+
+bool msf_num_cells_request_rx_link(void){
+    if (rx_num_cells.required > 0)
+        return false;
+    LOG_DBG("negotiate at least RX cell\n");
+    rx_num_cells.required  += 1;
+    return true;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_num_cells_trigger_6p_transaction(void)
 {
+  if(rx_num_cells.scheduled < least_rx_requires() ) {
+    msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
+  }
+  else
   if(tx_num_cells.scheduled < tx_num_cells.required) {
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
   } else if(rx_num_cells.scheduled < rx_num_cells.required) {

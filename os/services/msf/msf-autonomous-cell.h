@@ -108,5 +108,21 @@ void msf_autonomous_cell_forget(const linkaddr_t *peer_addr);
  */
 bool msf_autonomous_cell_is_scheduled_tx(const linkaddr_t *peer_addr);
 
+
+/**
+ * \brief Return whether an autonomous RX cell is conflicts with other nbrs
+ * \return true if other nbrs open same cells at RX one
+ */
+static inline
+bool msf_autonomous_cell_is_conflicted_rx( void){
+    extern bool msf_autonomous_rx_cell_is_conflicts;
+    return msf_autonomous_rx_cell_is_conflicts;
+}
+
+#include "msf-avoid-cell.h"
+/*
+ * */
+int msf_autonomous_inspect_vs_cell(msf_cell_t cell);
+
 #endif /* !_MSF_AUTONOMOUS_CELL_H */
 /** @} */
