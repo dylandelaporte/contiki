@@ -205,8 +205,27 @@ static
 AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
     int idxnbr = msf_avoids_nbr_cell_idx(x, n);
     if (idxnbr>=0){
-        avoids_ops[idxnbr] = ops | (avoids_ops[idxnbr] & ~aoUSE);
-        return arEXIST_CHANGE;
+        AvoidOption was  = avoids_ops[idxnbr];
+
+        if ((was & aoUSE_LOCAL) > (ops & aoUSE_LOCAL)){
+            //do not trust far cells, since they maybe a echo returned in cycle
+            if (( ops & aoUSE_REMOTE) > aoUSE_REMOTE_1HOP)
+                return arEXIST_KEEP;
+
+            // do not override local cell by remote.
+            // try update remote status only
+            avoids_ops[idxnbr] = ops | (was & ~aoUSE_REMOTE);
+        }
+        else {
+            avoids_ops[idxnbr] = ops | (was & ~aoUSE);
+        }
+
+        LOG_DBG("avoid %u+%u/%x->%x "
+                , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
+                , was, avoids_ops[idxnbr]);
+        LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
+        LOG_DBG_("\n");
+        return (avoids_ops[idxnbr] != was)? arEXIST_CHANGE: arEXIST_KEEP;
     }
 
     //local and close cells are sure valid, and so it ready for concurent
@@ -220,15 +239,15 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
         // check that not override by far cells
         if ((was & aoUSE) > ops) {
             //override current cell, by more close
+            avoids_nbrs[avoids_list_num] = n;
+            avoids_ops[idx]  = ops | (was & ~aoUSE);
 
-        LOG_DBG("avoid %u+%u/%x ->"
+        LOG_DBG("avoid %u+%u/%x->%x "
                 , (unsigned)(x.field.slot), (unsigned)(x.field.chanel)
-                , ops);
+                , was, avoids_ops[idx]);
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
 
-        avoids_nbrs[avoids_list_num] = n;
-        avoids_ops[idx]  = ops | (was & ~aoUSE);
         return (avoids_ops[idx] != was)? arEXIST_CHANGE: arEXIST_KEEP;
         }
         return arEXIST_KEEP;
