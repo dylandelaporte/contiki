@@ -453,8 +453,11 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
         msf_sending_nbr_ensure_tx(nbr, &cell->addr);
     }
 
-  } else {
+  } else if(cell->link_options & LINK_OPTION_RX){
     cell_type_str = "RX";
+  }
+  else {
+      cell_type_str = "?X";
   }
 
   slot_offset = cell->timeslot;
@@ -935,6 +938,7 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
         cell = list_item_next(cell))
     {
       if (cell->timeslot != x.field.slot) continue;
+
       if (cell->link_options & LINK_OPTION_LINK_TO_DELETE)
           continue;
 
@@ -943,9 +947,14 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
           return irRELOCATE;
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
-      //only TX links can mix in one slot
-      bool can_overlap = is_link_tx(cell->link_options)
-                      && is_link_tx(x.field.link_options);
+      //local links links can mix in one slot only TX
+      //bool can_overlap = true;
+      bool can_overlap = msf_cellid_is_remote(x)
+                      || ( is_link_tx(cell->link_options) && msf_cellid_is_tx(x) )
+                      ;
+
+      if (can_overlap)
+      if (cell->channel_offset != x.field.chanel) continue;
 
       //try to eval that have any slot to relocate conflicting link
       long new_slot = msf_find_unused_slot_offset(slotframe);

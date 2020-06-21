@@ -85,12 +85,16 @@ void msf_housekeeping_delete_cell_to_relocate(void);
 
 /**
  * \brief ckecks that cell not conflicts with any, and rquest relocations if need
+ *        this used by local, auto-cells
  */
 void msf_housekeeping_inspect_link_consintensy(tsch_link_t *cell);
 
+/**
+ * \brief ckecks that remote cell not conflicts with any, and rquest relocations if need
+ */
 void msf_housekeeping_inspect_cell_consintensy(
                     msf_cell_t cell,  tsch_neighbor_t *n,
-                    sixp_pkt_cell_options_t cell_opts
+                    uint8_t cell_avoid_opts //sixp_pkt_cell_options_t
                 );
 
 void msf_housekeeping_negotiate_for_parent_rx(void);

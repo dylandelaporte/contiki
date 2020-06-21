@@ -70,16 +70,17 @@ msf_cell_t msf_cell_at(uint16_t slot_offset, uint16_t channel_offset){
 
 
 enum AvoidOption{
-    //aoRX    = LINK_OPTION_RX,
-    //aoTX    = LINK_OPTION_TX,
+    aoTX    = LINK_OPTION_TX,
 
+    //aoRX    = LINK_OPTION_RX,
     // cell can't be relocated
-    aoFIXED         = 0x1,
-    // cell awaits relocation
-    aoRELOCATE      = 0x2,
+    aoFIXED         = 0x2,
 
     //cell is known by remotes, no need to anounce it
-    aoDEFAULT       = 0x8,
+    aoDEFAULT       = 0x4,
+
+    // cell awaits relocation
+    aoRELOCATE      = 0x8,
     //mark used by NRSF to ident calls that are exposed to nbrs
     aoMARK          = 0x10,
 
@@ -111,6 +112,9 @@ enum AvoidOption{
     aoRELOCATING    = aoRELOCATE | aoMARK,
 };
 typedef enum AvoidOption AvoidOption;
+
+// a set of AvoidOption
+typedef int              AvoidOptions;
 
 /* @return < 0 - no cell found
  *         >= 0 - AvoidOptions for cell

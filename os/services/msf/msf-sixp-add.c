@@ -125,6 +125,8 @@ sent_callback_responder(void *arg, uint16_t arg_len,
   assert(dest_addr != NULL);
   assert(arg == NULL || arg_len == sizeof(tsch_link_t));
 
+  bool is_new_nbr = !msf_negotiated_is_scheduled_peer(dest_addr);
+
   if(status == SIXP_OUTPUT_STATUS_SUCCESS) {
     LOG_INFO("ADD transaction completes successfully\n");
     if(reserved_cell == NULL) {
@@ -140,16 +142,6 @@ sent_callback_responder(void *arg, uint16_t arg_len,
 
       msf_reserved_cell_delete_all(dest_addr);
 
-      //nbr have no negotiations, so inform about new nbr
-      if ( !msf_negotiated_is_scheduled_peer(dest_addr) ){
-          tsch_neighbor_t *nbr;
-          nbr = tsch_queue_get_nbr(dest_addr);
-          assert(nbr != NULL);
-          if ( nbr != NULL ){
-              MSF_ON_NEW_NBR(nbr);
-          }
-      }
-
       if(msf_negotiated_cell_add(dest_addr, cell_type,
                                  slot_offset, channel_offset) < 0) {
         LOG_ERR("failed to add a negotiated cell\n");
@@ -161,6 +153,16 @@ sent_callback_responder(void *arg, uint16_t arg_len,
   } else {
     LOG_ERR("ADD transaction failed\n");
     msf_reserved_cell_delete_all(dest_addr);
+  }
+
+  //nbr have no negotiations, so inform about new nbr
+  if ( is_new_nbr ){
+      tsch_neighbor_t *nbr;
+      nbr = tsch_queue_get_nbr(dest_addr);
+      assert(nbr != NULL);
+      if ( nbr != NULL ){
+          MSF_ON_NEW_NBR(nbr);
+      }
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -203,7 +205,8 @@ send_response(const linkaddr_t *peer_addr,
                  reserved_cell == NULL ? NULL : (uint8_t *)&cell_to_return,
                  reserved_cell == NULL ? 0 : sizeof(sixp_pkt_cell_t),
                  peer_addr, sent_callback_responder, reserved_cell,
-                 reserved_cell == NULL ? 0 : sizeof(tsch_link_t)) < 0) {
+                 reserved_cell == NULL ? 0 : sizeof(tsch_link_t)) < 0)
+  {
     LOG_ERR("failed to send a response to ");
     LOG_ERR_LLADDR(peer_addr);
     LOG_ERR_("\n");
@@ -314,6 +317,8 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
   LOG_INFO_LLADDR(peer_addr);
   LOG_INFO_("\n");
 
+  bool is_new_nbr = !msf_negotiated_is_scheduled_peer(peer_addr);
+
   if(rc == SIXP_PKT_RC_SUCCESS) {
     LOG_INFO("ADD transaction completes successfully\n");
     if(sixp_pkt_get_cell_list(SIXP_PKT_TYPE_RESPONSE,
@@ -336,16 +341,6 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       reserved_cell = msf_reserved_cell_get(peer_addr,
                                       slot_offset, channel_offset);
       if(reserved_cell != NULL) {
-
-          //nbr have no negotiations, so inform about new nbr
-          if ( !msf_negotiated_is_scheduled_peer(peer_addr) ){
-              tsch_neighbor_t *nbr;
-              nbr = tsch_queue_get_nbr(peer_addr);
-              assert(nbr != NULL);
-              if ( nbr != NULL ){
-                  MSF_ON_NEW_NBR(nbr);
-              }
-          }
 
         /* this is a cell which we proposed in the request */
         msf_negotiated_cell_type_t cell_type;
@@ -378,6 +373,16 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
     } else {
       /* do nothing */
     }
+  }
+
+  //nbr have no negotiations, so inform about new nbr
+  if ( is_new_nbr ){
+      tsch_neighbor_t *nbr;
+      nbr = tsch_queue_get_nbr(peer_addr);
+      assert(nbr != NULL);
+      if ( nbr != NULL ){
+          MSF_ON_NEW_NBR(nbr);
+      }
   }
 }
 /*---------------------------------------------------------------------------*/
