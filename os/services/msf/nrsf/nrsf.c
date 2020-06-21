@@ -808,19 +808,7 @@ static int nrsf_task_notify_cells(nrsfTask* t, const char* info);
 static int nrsf_task_notify_dels(nrsfTask* t, const char* info);
 
 void nrsf_tasks_exec(){
-    if (sixp_trans_any()){
-        // exec only when no active transactions
-        return;
-    }
-
     LOG_DBG("nrsf_tasks_exec\n");
-    if(0)// clearing for self alredy done by MSF, NRSF no need any job here
-    if (nrsf_task_clear){
-        nrsf_clean_cells_by_nbr(NULL);
-        nrsf_task_clear = false;
-        nrsf_tasks_poll();
-        return;
-    }
 
     // TODO: if have ability to pack multiple 6P commands/packet
     //      maybe more efficient to traverse over nbrs whole tasks - composing
@@ -840,6 +828,12 @@ void nrsf_tasks_exec(){
         }
 
         nrsf_tasks_poll();
+        return;
+    }
+
+    // USE/DEL action can only inform all nbr together, so start them when 6P is clear.
+    if (sixp_trans_any()){
+        // exec only when no active transactions
         return;
     }
 
