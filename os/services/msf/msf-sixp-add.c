@@ -223,6 +223,12 @@ void
 msf_sixp_add_send_request(msf_negotiated_cell_type_t cell_type)
 {
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  msf_sixp_add_send_request_to(cell_type, parent_addr);
+}
+
+void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
+                              , const linkaddr_t *parent_addr)
+{
   const sixp_pkt_type_t type = SIXP_PKT_TYPE_REQUEST;
   const sixp_pkt_code_t code = (sixp_pkt_code_t)(uint8_t)SIXP_PKT_CMD_ADD;
   uint8_t cell_list[MSF_6P_CELL_LIST_MAX_LEN * sizeof(sixp_pkt_cell_t)];
