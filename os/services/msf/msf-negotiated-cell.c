@@ -79,7 +79,22 @@ static const bool is_kept = true;
 static const bool is_used_relocate = true;
 static const bool is_unused_relocate = true;
 
+MEMB(msf_negotiated_cell_data_memb,
+     msf_negotiated_cell_data_t,
+     MSF_MAX_NUM_NEGOTIATED_TX_CELLS);
 
+/* static functions */
+static void keep_rx_cells(const linkaddr_t *peer_addr);
+static void mark_as_used(tsch_link_t *cell);
+static void mark_as_unused(tsch_link_t *cell);
+static void mark_as_kept(tsch_link_t *cell);
+static bool is_marked_as_used(const tsch_link_t *cell);
+static bool is_marked_as_unused(const tsch_link_t *cell);
+static bool is_marked_as_kept(const tsch_link_t *cell);
+
+
+
+//==============================================================================
 enum {
     LINK_OPTION_XX = (LINK_OPTION_TX|LINK_OPTION_RX) ,
 };
@@ -100,21 +115,6 @@ static inline
 msf_negotiated_cell_data_t * neglink_data(tsch_link_t *cell){
     return ((neg_data_t*)cell->data);
 }
-
-
-
-MEMB(msf_negotiated_cell_data_memb,
-     msf_negotiated_cell_data_t,
-     MSF_MAX_NUM_NEGOTIATED_TX_CELLS);
-
-/* static functions */
-static void keep_rx_cells(const linkaddr_t *peer_addr);
-static void mark_as_used(tsch_link_t *cell);
-static void mark_as_unused(tsch_link_t *cell);
-static void mark_as_kept(tsch_link_t *cell);
-static bool is_marked_as_used(const tsch_link_t *cell);
-static bool is_marked_as_unused(const tsch_link_t *cell);
-static bool is_marked_as_kept(const tsch_link_t *cell);
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -194,35 +194,35 @@ is_marked_as_kept(const tsch_link_t *cell)
   return cell != NULL && cell->data == (void *)&is_kept;
 }
 
-void mark_as_relocate(tsch_link_t *cell){
-    assert( is_link_rx(cell->link_options) );
-    mark_rx_cell(cell, is_marked_as_used(cell)? &is_used_relocate : &is_unused_relocate);
-}
-
-bool is_marked_as_relocate(const tsch_link_t *cell){
+bool msf_is_marked_as_relocate(const tsch_link_t *cell){
     if (cell != NULL){
-        if (cell->data == (void *)&is_used_relocate)
-            return true;
-        if (cell->data == (void *)&is_unused_relocate)
-            return true;
+        AvoidOptionsResult ops = msf_is_avoid_link_cell(cell);
+        if (ops >= 0){
+            return (ops & aoRELOCATE) != 0;
+        }
     }
     return false;
 }
 
-tsch_link_t *msf_negotiated_get_cell_to_relocate(void){
+tsch_link_t* msf_negotiated_get_cell_to_relocate(void){
+    sixp_cell_t ops[2];
+    SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
+
+    tsch_neighbor_t *n = tsch_queue_get_nbr( msf_housekeeping_get_parent_addr() );
+
+    int ok= msf_avoid_append_nbr_cell_to_relocate(op, n);
+    if ( ok <= 0)
+        return NULL;
+
     tsch_link_t *cell;
-    for(cell = list_head(slotframe->links_list);
-        cell != NULL;
-        cell = list_item_next(cell))
-    {
-        if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
-            continue;
-        if (is_marked_as_relocate(cell) ){
-            LOG_DBG("found relocate cell [%u+%u]\n"
-                            , cell->timeslot, cell->channel_offset);
-            return cell;
-        }
+    cell = tsch_schedule_get_link_by_timeslot(slotframe, ops[1].field.slot, ops[1].field.chanel);
+    if (cell != NULL){
+        LOG_DBG("found relocate cell [%u+%u]\n"
+                        , cell->timeslot, cell->channel_offset);
+        return cell;
     }
+    //mark it to set it processed
+    msf_avoid_expose_nbr_cell(ops[1], n);
     return NULL;
 }
 
@@ -939,7 +939,7 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
           continue;
 
       //inspection alredy managed;
-      if (is_marked_as_relocate(cell))
+      if (msf_is_marked_as_relocate(cell))
           return irRELOCATE;
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))

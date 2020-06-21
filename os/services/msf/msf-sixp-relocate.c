@@ -297,6 +297,8 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
     msf_reserved_cell_delete_all(parent_addr);
     msf_sixp_start_request_wait_timer();
   }
+  //this will mark taht relocate starts, so not take it for relocation
+  msf_avoid_expose_link_cell(cell_to_relocate);
 }
 /*---------------------------------------------------------------------------*/
 void

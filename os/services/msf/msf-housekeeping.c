@@ -60,6 +60,7 @@
 /* variables */
 static linkaddr_t parent_addr_storage;
 const linkaddr_t* msf_housekeeping_parent_addr;
+tsch_neighbor_t * msf_housekeeping_parent_nbr;
 #define parent_addr msf_housekeeping_parent_addr
 
 static tsch_link_t *cell_to_relocate;
@@ -173,9 +174,9 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
     if(timer_expired(&t_col)) {
       /* decide to relocate a cell or not */
       if(cell_to_relocate == NULL && parent_addr) {
-        cell_to_relocate = msf_negotiated_propose_cell_to_relocate();
+        cell_to_relocate = msf_negotiated_get_cell_to_relocate();
         if (cell_to_relocate == NULL)
-            cell_to_relocate = msf_negotiated_get_cell_to_relocate();
+            cell_to_relocate = msf_negotiated_propose_cell_to_relocate();
       }
       timer_restart(&t_col);
     }
@@ -283,9 +284,13 @@ void
 msf_housekeeping_delete_cell_to_relocate(void)
 {
   if(cell_to_relocate != NULL) {
+    //this will mark taht relocate starts, so not take it for relocation
+    //msf_avoid_mark_link_cell(cell_to_relocate);
+
     msf_negotiated_cell_delete(cell_to_relocate);
     cell_to_relocate = NULL;
   }
+  // process next requested relocation
   msf_housekeeping_request_cell_to_relocate( msf_negotiated_get_cell_to_relocate() );
 }
 
@@ -293,7 +298,7 @@ void msf_housekeeping_request_cell_to_relocate(tsch_link_t *cell){
     if (cell == NULL)
         return;
     LOG_DBG("housekeep: relocate cell %u+%u\n", cell->timeslot, cell->channel_offset);
-    mark_as_relocate(cell);
+    msf_avoid_relocate_link_cell(cell);
     if (cell_to_relocate == NULL){
         cell_to_relocate = cell;
         process_post(&msf_housekeeping_process, PROCESS_EVENT_MSF_RELOCATE, cell);

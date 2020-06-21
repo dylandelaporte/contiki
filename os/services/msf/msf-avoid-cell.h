@@ -68,10 +68,15 @@ msf_cell_t msf_cell_at(uint16_t slot_offset, uint16_t channel_offset){
 }
 
 enum AvoidOption{
-    aoRX    = LINK_OPTION_RX,
-    aoTX    = LINK_OPTION_TX,
+    //aoRX    = LINK_OPTION_RX,
+    //aoTX    = LINK_OPTION_TX,
 
-    //cell is known by remotes
+    // cell can't be relocated
+    aoFIXED         = 0x1,
+    // cell awaits relocation
+    aoRELOCATE      = 0x2,
+
+    //cell is known by remotes, no need to anounce it
     aoDEFAULT       = 0x8,
     //mark used by NRSF to ident calls that are exposed to nbrs
     aoMARK          = 0x10,
@@ -79,7 +84,6 @@ enum AvoidOption{
     //cell is local used, and should be shared to nbrs
     aoUSE_LOCAL     = 0x20,
     aoUSE_REMOTE    = 0xC0,
-
 
 
     //cell is remote used
@@ -91,22 +95,44 @@ enum AvoidOption{
 
     // this cell is should be removed. NRSF use it for enum cells to expose deleted
     aoDROPED        = 0,
+
+    //mark field mask for cell states
+    aoMARK_FIELD    = aoRELOCATE | aoMARK,
+    //< this is state for a new cell, that yet not known to nbrs
+    aoFRESH         = 0,
+    //< cell is exposed by NRSF ro nbrs
+    aoEXPOSED       = aoMARK,
+    //< cell is marked to relocate
+    aoWAIT_RELOC    = aoRELOCATE,
+    //< cell have initiated relocation. after RELOC complete it must be avoid or unvoid
+    //  for fixed cell relocation means that, negotiation for RX cell started/done
+    aoRELOCATING    = aoRELOCATE | aoMARK,
 };
 typedef enum AvoidOption AvoidOption;
+typedef int             AvoidOptionsResult;
 
 enum AvoidResult{
     arNEW = 1 ,             //< for new cell appends
     arEXIST_CHANGE = 0,     //< for updates present cell
-    arEXIST_KEEP = -1       //< for keep unchanged present cell
+    arEXIST_KEEP = -1,      //< for keep unchanged present cell
+    arNO         = -2,
 };
 typedef enum AvoidResult AvoidResult;
 
 // same as reset all
 void msf_unvoid_all_cells();
 
+
+
 // locals avoid
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x);
+
+// avoids cell, that can't move - autonomous calls are.
+AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x);
+
 void msf_unvoid_link_cell(const tsch_link_t* x);
+
+
 
 /* check that cell have used local or nbr
  * @return < 0 - no cell found
@@ -172,13 +198,8 @@ int msf_avoid_enum_cells(SIXPCellsPkt* cells, unsigned limit
 // clenup cells, that are known by n
 int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* cells, const tsch_neighbor_t *n);
 
-// NRSF use it to notify cells exposed to nbrs
-void msf_avoid_mark_all();
-
-//   mark cell as no aoUSE_REMOTE_xxx, if range < stored one.
-//   @return 0 - no cells used
-//           >0 - cell is used/updated
-int  msf_avoid_use_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption range);
+// Mark all aoFRESH cells to aoEXPOSED. NRSF use it to notify cells exposed to nbrs.
+void msf_avoid_mark_all_fresh();
 
 //   mark cell as no aoUSE_REMOTE_xxx.
 //          if range < stored one, cell remark as aoDROPED, else unvoids
@@ -190,6 +211,30 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
 // this unvoids all cells that are no any aoUSE
 //      such cells registred NRSF for deleted cells
 void msf_release_unused();
+
+// Mark local cell as aoRELOCATE
+
+AvoidOptionsResult msf_avoid_relocate_link_cell(const tsch_link_t* x);
+
+// @brief Mark cell to aoEXPOSED. use it to notify cells exposed to nbrs.
+//  for aoRELOCATE cells, this use to show that relocation started/done
+AvoidOptionsResult msf_avoid_expose_link_cell(const tsch_link_t* x);
+
+// @brief Mark cell to aoEXPOSED. use it to notify cells exposed to nbrs.
+AvoidOptionsResult msf_avoid_expose_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+
+/* @brief takes first avail cell marked as aoWAIT_RELOC
+ * @return - nbr for enumerated cells
+ *           cells->head.meta - AvoidOption of enumed cells
+ * */
+tsch_neighbor_t* msf_avoid_append_cell_to_relocate(SIXPCellsPkt* cells);
+
+/* @brief takes first avail cell marked as aoWAIT_RELOC
+// @result - cells->head.num_cells= amount of filled cells
+// @return - >0 - amount of cells append
+// @return - =0 - no cells to enumerate
+ * */
+int msf_avoid_append_nbr_cell_to_relocate(SIXPCellsPkt* cells, tsch_neighbor_t *n);
 
 
 #endif /* _MSF_RESERVED_CELL_H_ */

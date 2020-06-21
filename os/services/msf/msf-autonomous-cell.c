@@ -145,7 +145,7 @@ add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
     }
 
     MSF_AFTER_CELL_USE(NULL, cell);
-    msf_avoid_link_cell(cell);
+    msf_avoid_fixed_link_cell(cell);
   }
 
   return cell;
