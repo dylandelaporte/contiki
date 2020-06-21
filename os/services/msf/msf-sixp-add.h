@@ -56,6 +56,9 @@
  */
 void msf_sixp_add_send_request(msf_negotiated_cell_type_t cell_type);
 
+void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
+                            , const linkaddr_t *to_addr);
+
 /**
  * \brief Handler for reception of a ADD request
  * \param peer_addr The source MAC address of the request

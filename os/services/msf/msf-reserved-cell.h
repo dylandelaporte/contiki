@@ -65,6 +65,15 @@ tsch_link_t *msf_reserved_cell_get(const linkaddr_t *peer_addr,
                                    long slot_offset,
                                    long channel_offset);
 
+/* Modes for reservation selects new slots
+ * */
+enum ReserveMode {
+    RESERVE_NEW_CELL = -1 ,
+    //< search forslot, that have busy with close nbr
+    RESERVE_NBR_BUSY_CELL = -2 ,
+};
+typedef enum ReserveMode ReserveMode;
+
 /**
  * \brief Add (reserve) a cell in the slotframe for negotiated cells
  * \param peer_addr The MAC address of the peer
@@ -77,6 +86,20 @@ tsch_link_t *msf_reserved_cell_add(const linkaddr_t *peer_addr,
                                    int32_t slot_offset,
                                    int32_t channel_offset);
 
+/** This is less strictive msf_reserved_cell_add - it allow new cells in alredy ocupied slot.
+ *  RELOCATIE use it for allocate links that migrate chanel in slot
+ */
+tsch_link_t *msf_reserved_cell_over(const linkaddr_t *peer_addr,
+                                   msf_negotiated_cell_type_t cell_type,
+                                   msf_cell_t new_cell);
+
+/** This is less stricted msf_reserved_cell_add - it not check cell avoidance.
+ *  RELOCATIE use it for allocate links that migrate chanel in slot
+ */
+tsch_link_t * msf_reserved_cell_add_anyvoid(const linkaddr_t *peer_addr,
+                      msf_negotiated_cell_type_t cell_type,
+                      int32_t slot_offset, int32_t channel_offset);
+
 /**
  * \brief Delete all the cells reserved for a peer
  * \param peer_addr The MAC address of the peer
@@ -88,10 +111,21 @@ void msf_reserved_cell_delete_all(const linkaddr_t *peer_addr);
  */
 void msf_reserved_release_link(tsch_link_t *cell);
 
+/**
+ * \brief Check that peer have reserved cells. Need to avoid concurent operations
+ *          on same peer, that can leed to SHEDULE INCONSISTENT
+ * \param peer_addr The MAC address of the peer
+ *       = NULL - checks that any link eserved
+ */
+bool msf_is_reserved_for_peer(const linkaddr_t *peer_addr);
 
 //==============================================================================
-long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe);
-uint16_t  msf_find_unused_slot_chanel(uint16_t slot);
+long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe
+                                    , ReserveMode mode
+                                    //< used for mode RESERVE_NBR_BUSY_CELL
+                                    , const linkaddr_t *peer_addr
+                                    );
+int  msf_find_unused_slot_chanel(uint16_t slot, msf_chanel_mask_t skip );
 
 
 

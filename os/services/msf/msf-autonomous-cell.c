@@ -117,9 +117,14 @@ add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
   channel_offset = sax(num_channels, mac_addr->u8, sizeof(linkaddr_t),
                        MSF_SAX_H0, MSF_SAX_L_BIT, MSF_SAX_R_BIT);
 
+#if 0
   cell = tsch_schedule_get_link_by_timeslot(slotframe, slot_offset, channel_offset);
   // overlap existing link
-  bool is_conflict = (cell != NULL);
+  bool is_conflict = cell == msf_our_autonomous_rx_cell;
+  // TX links can share same slot concurently with no degrade
+  if (cell != NULL)
+      is_conflict = ((link_options | cell->link_options) & LINK_OPTION_RX) != 0;
+#endif
 
   cell = tsch_schedule_add_link(slotframe,
                                       link_options, LINK_TYPE_NORMAL, mac_addr,
@@ -136,12 +141,19 @@ add_cell(msf_autonomous_cell_type_t type, const linkaddr_t *mac_addr)
     LOG_DBG_(" at slot_offset:%u, channel_offset:%u\n",
              slot_offset, channel_offset);
 
+    bool is_conflict = false;
+    if (msf_our_autonomous_rx_cell != NULL)
+        is_conflict = (msf_our_autonomous_rx_cell->timeslot == cell->timeslot)
+                    &&(msf_our_autonomous_rx_cell->channel_offset == cell->channel_offset)
+                    ;
+
     //inspect link in housekeep process
     if (!is_conflict)
         msf_housekeeping_inspect_link_consintensy(cell);
     else{
         //less job on such direct conflict
         msf_autonomous_inspect_vs_cell( msf_cell_of_link(cell) );
+        msf_housekeeping_negotiate_for_nbr_tx(&cell->addr);
     }
 
     MSF_AFTER_CELL_USE(NULL, cell);
@@ -276,16 +288,19 @@ msf_autonomous_cell_is_scheduled_tx(const linkaddr_t *peer_addr)
 }
 /*---------------------------------------------------------------------------*/
 int msf_autonomous_inspect_vs_cell(msf_cell_t cell){
+
+    if (our_autonomous_rx_cell == NULL)
+        return 0;
+
+    if (cell.raw != msf_cell_of_link(our_autonomous_rx_cell).raw )
+        return 0;
+
     if (msf_autonomous_rx_cell_is_conflicts)
         return 0;
 
-    if (our_autonomous_rx_cell != NULL)
-    if (cell.raw == msf_cell_of_link(our_autonomous_rx_cell).raw ){
         msf_autonomous_rx_cell_is_conflicts = true;
         msf_housekeeping_negotiate_for_parent_rx();
         LOG_DBG("autoRX conflicts!\n");
         return 1;
     }
-    return 0;
-}
 /*---------------------------------------------------------------------------*/

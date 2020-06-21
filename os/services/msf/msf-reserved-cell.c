@@ -49,6 +49,9 @@
 #include "msf-reserved-cell.h"
 #include "msf-avoid-cell.h"
 
+// provide: ffz
+#include "msf-bittwiddings.h"
+
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
 #define LOG_LEVEL LOG_LEVEL_MSF
@@ -57,13 +60,18 @@
 extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
 
 /*---------------------------------------------------------------------------*/
-long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
+long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe
+                                , ReserveMode mode
+                                , const linkaddr_t *peer_addr)
 {
   long ret;
   uint16_t slot_offset;
   const tsch_link_t *autonomous_rx_cell = msf_autonomous_cell_get_rx();
+  tsch_neighbor_t* nbr = NULL;
 
   assert(autonomous_rx_cell != NULL);
+  if (mode == RESERVE_NBR_BUSY_CELL)
+      nbr = tsch_queue_get_nbr(peer_addr);
 
   slot_offset = random_rand() % slotframe->size.val;
   ret = -1;
@@ -72,6 +80,11 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
         slot_offset = 0;
     tsch_link_t* sheduled_link = tsch_schedule_get_any_link_by_timeslot(slotframe, slot_offset);
     if(sheduled_link != NULL)
+        continue;
+
+    if (mode == RESERVE_NBR_BUSY_CELL)
+    // search only slots that have busy at other nbrs
+    if ( msf_is_avoid_close_slot_outnbr(slot_offset, nbr ) < 0 )
         continue;
 
     if (msf_is_avoid_local_slot(slot_offset) < 0){
@@ -97,29 +110,37 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
   return ret;
 }
 
-#if defined( __GNUC__ )
-static inline
-int ffz( unsigned int x ){  return __builtin_ctz(~x); }
-#elif  _XOPEN_SOURCE >= 700 \
-        || ! (_POSIX_C_SOURCE >= 200809L) \
-        || /* Glibc since 2.19: */ _DEFAULT_SOURCE \
-        || /* Glibc versions <= 2.19: */ _BSD_SOURCE \
-        || _SVID_SOURCE
-static inline
-int ffz( unsigned int x ){  return ffs(~x); }
-#elif defined(__CTZ)
-static inline
-int ffz( unsigned int x ){  return __CTZ(~x); }
-#endif
+int  msf_find_unused_slot_chanel(uint16_t slot, msf_chanel_mask_t skip){
+    msf_chanel_mask_t busych = skip | msf_avoided_slot_chanels(slot);
 
-uint16_t  msf_find_unused_slot_chanel(uint16_t slot){
-    msf_chanel_mask_t busych =  msf_avoided_slot_chanels(slot);
-    if (busych != ~0ul) {
-        return ffz(busych);
-    }
-    // all chanels are busy, select any random for hope
+    // random ch better avoids conflicts with other nbrs
     uint16_t ch = random_rand();
-    return ch % tsch_hopping_sequence_length.val;
+    ch %= tsch_hopping_sequence_length.val;
+
+    // there is free chanels, select random one
+    if ( ((busych >> ch)& 1)==0 )
+        return ch;
+
+    int res = ffz(busych);
+    if ( res >= TSCH_JOIN_HOPPING_SEQUENCE_SIZE() ){
+        // all chanels are busy, select any random for hope
+        return -1;
+    }
+
+    //search ch-n free chanel in set of busych, wraped around it's free cells
+    for (unsigned cset = busych>>res ; ch > 0
+        ; cset = cset >> 1, ++res )
+    {
+        if (res >= tsch_hopping_sequence_length.val){
+            res = ffz(busych);
+            cset = busych>>res;
+        }
+        if ((cset&1)==0){
+            --ch;
+        }
+    }
+
+    return res;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -177,9 +198,95 @@ msf_reserved_cell_get(const linkaddr_t *peer_addr,
 
   return cell;
 }
+
+/*---------------------------------------------------------------------------*/
+static
+bool is_valid_new_link(const linkaddr_t *peer_addr,
+                      msf_negotiated_cell_type_t cell_type,
+                      int32_t slot_offset, int32_t channel )
+{
+    tsch_slotframe_t *slotframe = msf_negotiated_cell_get_slotframe();
+    tsch_link_t *cell;
+
+    for(cell = list_head(slotframe->links_list)
+        ; cell != NULL
+        ; cell = (tsch_link_t *)list_item_next(cell) )
+    {
+        if (cell->timeslot != slot_offset) continue;
+
+        // RELOCATION may requre chanel migration in one slot.
+        // so allow to insert TX-TX/RX-RX to peer on different chanels.
+        if (linkaddr_cmp(&cell->addr, peer_addr)){
+            if ( ((cell->link_options & LINK_OPTION_RX) != 0)
+                 != (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX)
+                )
+                return false;
+
+            if (cell->channel_offset == channel)
+                return false;
+
+            continue;
+        }
+
+        // don't allow RX at one slot, only TX can mix concurently
+        if ( (cell->link_options & LINK_OPTION_RX) != 0
+            || (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX)
+            )
+            return false;
+
+        if (cell->channel_offset != channel)
+            continue;
+
+        return false;
+    }
+    return true;
+}
 /*---------------------------------------------------------------------------*/
 tsch_link_t *
 msf_reserved_cell_add(const linkaddr_t *peer_addr,
+                      msf_negotiated_cell_type_t cell_type,
+                      int32_t slot_offset, int32_t channel_offset)
+{
+
+    if(slot_offset > 0)
+    if ( msf_is_avoid_local_slot(slot_offset) >= 0) {
+        /* this slot is used; we cannot reserve a cell */
+        LOG_DBG("reserve %s miss at slot_offset:%d, channel_offset:%d\n",
+                msf_negotiated_cell_type_str(cell_type),
+                slot_offset, channel_offset);
+        return NULL;
+    }
+
+    return msf_reserved_cell_add_anyvoid(peer_addr, cell_type,
+                                            slot_offset, channel_offset
+                                           );
+}
+
+/** This is less strictive msf_reserved_cell_add - it allow new cells in alredy ocupied slot.
+ *  RELOCATIE use it for allocate links that migrate chanel in slot
+ */
+tsch_link_t *msf_reserved_cell_over(const linkaddr_t *peer_addr,
+                                   msf_negotiated_cell_type_t cell_type,
+                                   msf_cell_t new_cell)
+{
+
+    if ( msf_is_avoid_local_cell(new_cell) >= 0) {
+        /* this slot is used; we cannot reserve a cell */
+        LOG_DBG("reserve %s miss at slot_offset:%d, channel_offset:%d\n",
+                msf_negotiated_cell_type_str(cell_type),
+                new_cell.field.slot, new_cell.field.chanel);
+        return NULL;
+    }
+
+    return msf_reserved_cell_add_anyvoid(peer_addr, cell_type,
+                    new_cell.field.slot, new_cell.field.chanel
+                                           );
+}
+
+/** This is less stricted msf_reserved_cell_add - it not check cell avoidance.
+ *  RELOCATIE use it for allocate links that migrate chanel in slot
+ */
+tsch_link_t * msf_reserved_cell_add_anyvoid(const linkaddr_t *peer_addr,
                       msf_negotiated_cell_type_t cell_type,
                       int32_t slot_offset, int32_t channel_offset)
 {
@@ -206,13 +313,8 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   }
 
   if(slot_offset < 0) {
-    _slot_offset = msf_find_unused_slot_offset(slotframe);
-  } else if(tsch_schedule_get_link_by_timeslot(slotframe
-              , slot_offset, channel_offset) != NULL )
-  {
-    /* this slot is used; we cannot reserve a cell */
-    _slot_offset = -1;
-  } else if ( msf_is_avoid_local_slot(slot_offset) >= 0) {
+    _slot_offset = msf_find_unused_slot_offset(slotframe, (ReserveMode)slot_offset, peer_addr);
+  } else if ( !is_valid_new_link(peer_addr, cell_type, slot_offset, channel_offset) ){
       /* this slot is used; we cannot reserve a cell */
       _slot_offset = -1;
   } else {
@@ -223,7 +325,7 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
   if(_slot_offset >= 0) {
     if(channel_offset < 0) {
       /* pick a channel offset */
-      _channel_offset = msf_find_unused_slot_chanel(_slot_offset);
+      _channel_offset = msf_find_unused_slot_chanel(_slot_offset, 0);
     } else if (channel_offset > (tsch_hopping_sequence_length.val - 1)) {
       /* invalid channel offset */
       _channel_offset = -1;
@@ -242,21 +344,24 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
                                       LINK_TYPE_NORMAL, peer_addr,
                                       (uint16_t)_slot_offset,
                                       (uint16_t)_channel_offset ,
-                                      0 // WHAT to do here?
+                                      0 // do not create multiple reserved links?
                                       );
     if (cell != NULL){
         cell->data = NULL;
-        LOG_DBG("reserved a cell at slot_offset:%u, channel_offset:%u\n",
-                (uint16_t)_slot_offset, (uint16_t)_channel_offset);
+        LOG_DBG("reserved a %s cell at slot_offset:%d, channel_offset:%d\n",
+                msf_negotiated_cell_type_str(cell_type),
+                _slot_offset, _channel_offset);
     } else  {
-      LOG_ERR("failed to reserve a cell at "
-              "slot_offset:%ld, channel_offset:%ld\n",
+      LOG_ERR("failed to reserve a %s cell at "
+              "slot_offset:%d, channel_offset:%d\n",
+              msf_negotiated_cell_type_str(cell_type),
               _slot_offset, _channel_offset);
     }
   }
   else{
-      LOG_DBG("reserve miss at slot_offset:%u, channel_offset:%u\n",
-              (uint16_t)slot_offset, (uint16_t)channel_offset);
+      LOG_DBG("reserve %s miss at slot_offset:%d, channel_offset:%d\n",
+              msf_negotiated_cell_type_str(cell_type),
+              slot_offset, channel_offset);
   }
 
   return cell;
@@ -286,10 +391,32 @@ msf_reserved_cell_delete_all(const linkaddr_t *peer_addr)
 }
 
 void msf_reserved_release_link(tsch_link_t *cell){
-        uint16_t slot_offset = cell->timeslot;
-        uint16_t channel_offset = cell->channel_offset;
-        msf_housekeeping_delete_cell_later(cell);
-        LOG_DBG("released a reserved cell at "
-                "slot_offset:%u, channel_offset:%u\n",
-                slot_offset, channel_offset);
-      }
+    uint16_t slot_offset = cell->timeslot;
+    uint16_t channel_offset = cell->channel_offset;
+    msf_housekeeping_delete_cell_later(cell);
+    LOG_DBG("released a reserved cell at "
+            "slot_offset:%u, channel_offset:%u\n",
+            slot_offset, channel_offset);
+}
+
+
+bool msf_is_reserved_for_peer(const linkaddr_t *peer_addr){
+    tsch_slotframe_t *slotframe = msf_negotiated_cell_get_slotframe();
+    tsch_link_t *cell;
+    tsch_link_t *next_cell;
+
+    assert(slotframe != NULL);
+
+    for(cell = list_head(slotframe->links_list); cell != NULL; cell = next_cell) {
+      next_cell = (tsch_link_t *)list_item_next(cell);
+
+      if ((cell->link_options & LINK_OPTION_RESERVED_LINK) == 0) continue;
+
+      if(peer_addr == NULL)
+              return true;
+
+      if(linkaddr_cmp(&cell->addr, peer_addr))
+          return true;
+    }
+    return false;
+}

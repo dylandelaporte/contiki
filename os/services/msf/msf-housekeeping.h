@@ -97,7 +97,17 @@ void msf_housekeeping_inspect_cell_consintensy(
                     uint8_t cell_avoid_opts //sixp_pkt_cell_options_t
                 );
 
+/**
+ * \brief Establish negotiated cell for RX with parent.
+ *        Need when parent rx cell conflicts with some other cells
+ */
 void msf_housekeeping_negotiate_for_parent_rx(void);
+
+/**
+ * \brief Establish negotiated cell for TX with nbr. not parent.
+ *        Need when nbr rx cell conflicts with mine one.
+ */
+void msf_housekeeping_negotiate_for_nbr_tx(const linkaddr_t *peer_addr);
 
 /**
  * \brief Resolve schedule inconsistency

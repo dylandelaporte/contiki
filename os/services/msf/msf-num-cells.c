@@ -78,10 +78,6 @@ void update(msf_negotiated_cell_type_t cell_type)
   CellsStats*   num_cells;
   uint16_t lim_num_cells_used_high;
 
-  // for log
-  const char* type_str;
-  (void)type_str;
-
   assert(parent_addr != NULL);
 
   /*
@@ -94,12 +90,10 @@ void update(msf_negotiated_cell_type_t cell_type)
    */
   if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
     num_cells = &tx_num_cells;
-    type_str = "TX";
     max_num_cells_scheduled = MSF_MAX_NUM_NEGOTIATED_TX_CELLS;
     lim_num_cells_used_high = MSF_LIM_NUM_CELLS_USED_HIGH;
   } else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) {
     num_cells = &rx_num_cells;
-    type_str = "RX";
     max_num_cells_scheduled = MSF_MAX_NUM_NEGOTIATED_RX_CELLS;
     if(num_cells->scheduled > 0) {
       lim_num_cells_used_high = MSF_LIM_NUM_CELLS_USED_HIGH;
@@ -124,13 +118,13 @@ void update(msf_negotiated_cell_type_t cell_type)
   if(num_cells->elapsed < MSF_MAX_NUM_CELLS) {
     LOG_DBG("for upward %s - NumCellsElapsed: %u, NumCellsUsed: %u, "
             "NumCellsScheduled: %u, NumCellsRequired: %u\n",
-            type_str,
+            msf_negotiated_cell_type_str(cell_type),
             num_cells->elapsed, num_cells->used,
             num_cells->scheduled, num_cells->required);
   } else {
     LOG_INFO("for upward %s - NumCellsElapsed: %u, NumCellsUsed: %u, "
              "NumCellsScheduled: %u, NumCellsRequired: %u\n",
-             type_str,
+             msf_negotiated_cell_type_str(cell_type),
              num_cells->elapsed, num_cells->used,
              num_cells->scheduled, num_cells->required);
 
@@ -141,7 +135,8 @@ void update(msf_negotiated_cell_type_t cell_type)
     {
       num_cells->required = num_cells->scheduled + 1;
       LOG_INFO("increment NumCellsRequired to %u; "
-               "going to add another negotiated %s cell\n", num_cells->required, type_str);
+               "going to add another negotiated %s cell\n", num_cells->required
+                   , msf_negotiated_cell_type_str(cell_type) );
       }
     }
     else if( num_cells->used < MSF_LIM_NUM_CELLS_USED_LOW)
@@ -157,7 +152,8 @@ void update(msf_negotiated_cell_type_t cell_type)
     {
       num_cells->required = num_cells->scheduled - 1;
       LOG_INFO("decrement NumCellsRequred to %u; "
-               "going to delete a negotiated %s cell\n",  num_cells->required, type_str);
+               "going to delete a negotiated %s cell\n",  num_cells->required
+                   , msf_negotiated_cell_type_str(cell_type) );
       }
 
       if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX &&
@@ -214,6 +210,49 @@ msf_num_cells_update(void)
     update(MSF_NEGOTIATED_CELL_TYPE_RX);
   }
 }
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Update NumCells* counters, provided by specified peer
+ * \details This is event handler, to update NumCells* counters on add/delete
+ *          negotiated links.
+ *      It upadates Scheduled counters, to provide actual value at runtime.
+ *      This is requred to avoid 6p_transaction trigger caused by inadecvate
+ *          obsolete Scheduled value.
+ *      This rises when parent peer opens/delete cells concuretly, by conflicts
+ *          resolution involved
+ */
+void msf_num_cells_update_peers(int inc, msf_negotiated_cell_type_t cell_type
+                                , const linkaddr_t *peer_addr)
+{
+    if (inc == 0) return;
+
+    const linkaddr_t * parent_addr = msf_housekeeping_get_parent_addr();
+    if(parent_addr == NULL) return;
+
+    if ( !linkaddr_cmp(parent_addr, peer_addr)) return;
+
+    CellsStats*   num_cells;
+    if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+      num_cells = &tx_num_cells;
+    }
+    else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) {
+        num_cells = &rx_num_cells;
+    }
+    else {
+        // WT?
+        return;
+    }
+
+    assert( (num_cells->scheduled + inc) >= 0 );
+    if ( (num_cells->scheduled + inc) >= 0)
+        num_cells->scheduled += inc;
+
+    LOG_DBG("for upward %s NumCellsScheduled: %u\n", msf_negotiated_cell_type_str(cell_type)
+                , num_cells->scheduled
+            );
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_num_cells_update_parent_tx_used(uint16_t count)
@@ -237,7 +276,7 @@ bool msf_num_cells_request_rx_link(void){
 
 /*---------------------------------------------------------------------------*/
 void
-msf_num_cells_trigger_6p_transaction(void)
+msf_num_cells_trigger_6p_add_transaction(void)
 {
   if(rx_num_cells.scheduled < least_rx_requires() ) {
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
@@ -247,17 +286,22 @@ msf_num_cells_trigger_6p_transaction(void)
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
   } else if(rx_num_cells.scheduled < rx_num_cells.required) {
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
-  } else if(tx_num_cells.scheduled > tx_num_cells.required) {
-    msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
-  } else if(rx_num_cells.scheduled > rx_num_cells.required) {
-    msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
-  } else if(need_keep_alive) {
-    msf_sixp_count_send_request();
-    need_keep_alive = false;
-  } else {
-    /* nothing to do */
   }
 }
+
+void msf_num_cells_trigger_6p_del_transaction(void){
+    if(tx_num_cells.scheduled > tx_num_cells.required) {
+        msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
+    } else if(rx_num_cells.scheduled > rx_num_cells.required) {
+        msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
+    } else if(need_keep_alive) {
+        msf_sixp_count_send_request();
+        need_keep_alive = false;
+    } else {
+        /* nothing to do */
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_num_cells_show(shell_output_func output)

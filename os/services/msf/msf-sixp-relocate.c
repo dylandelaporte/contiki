@@ -85,10 +85,8 @@ is_valid_request(sixp_pkt_cell_options_t cell_options,
 {
   bool ret = false;
 
-  if(cell_options != SIXP_PKT_CELL_OPTION_TX) {
-    LOG_INFO("bad CellOptions - %02X (should be %02X)\n",
-             cell_options, SIXP_PKT_CELL_OPTION_TX);
-  } else if(num_cells != 1) {
+  if(!msf_sixp_is_valid_rxtx(cell_options)) {}
+  else if(num_cells != 1) {
     LOG_INFO("bad NumCells - %u (should be 1)\n", num_cells);
   } else if(relocation_cell_list == NULL) {
     LOG_INFO("no RelocationCellList\n");
@@ -158,9 +156,11 @@ void msf_rel_sent_callback_responder(void *arg, uint16_t arg_len,
       if(msf_negotiated_cell_add(dest_addr, MSF_NEGOTIATED_CELL_TYPE_RX,
                                  slot_offset, channel_offset) >= 0)
       {
-          if (msf_is_negotiated_cell(cell_to_relocate))
+          if (msf_is_negotiated_cell(cell_to_relocate)){
+              LOG_INFO("relocated cell well, drop original\n");
               /* all good */
               msf_negotiated_cell_delete(cell_to_relocate);
+          }
           else{
               LOG_ERR("relocated cell loosed!\n");
           }
@@ -193,25 +193,39 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
 
   assert(peer_addr != NULL);
 
-  if(is_valid_request(cell_options, num_cells,
+  msf_negotiated_cell_type_t cell_type;
+  if(cell_options == SIXP_PKT_CELL_OPTION_TX) {
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+  } else {
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+  }
+
+  if(! is_valid_request(cell_options, num_cells,
                       relocation_cell_list, relocation_cell_list_len,
-                      candidate_cell_list, candidate_cell_list_len) == false) {
+                      candidate_cell_list, candidate_cell_list_len) ) {
     rc = SIXP_PKT_RC_ERR;
     reserved_cell = NULL;
     cell_to_relocate = NULL;
-  } else if((cell_to_relocate =
+  }
+  else if ( msf_is_reserved_for_peer(peer_addr) ){
+      LOG_ERR("busy by concurent to send an RELOCATE %s ->", msf_negotiated_cell_type_str(cell_type));
+      LOG_ERR_LLADDR(peer_addr);
+      LOG_ERR_("\n");
+      msf_sixp_start_retry_wait_timer();
+      rc = SIXP_PKT_RC_ERR_BUSY;
+      reserved_cell = NULL;
+  }
+  else if((cell_to_relocate =
              msf_sixp_find_scheduled_cell(peer_addr,
-                                          LINK_OPTION_RX,
+                                          cell_type,
                                           relocation_cell_list,
                                           relocation_cell_list_len)) == NULL) {
     rc = SIXP_PKT_RC_ERR_CELLLIST;
     reserved_cell = NULL;
   } else {
     rc = SIXP_PKT_RC_SUCCESS;
-    /* RELOCATE can happen only with negotiated RX cells */
     if((reserved_cell =
-             msf_sixp_reserve_one_cell(peer_addr,
-                                       MSF_NEGOTIATED_CELL_TYPE_RX,
+             msf_sixp_reserve_cell_over(cell_to_relocate,
                                        candidate_cell_list,
                                        candidate_cell_list_len)) == NULL) {
       LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
@@ -240,68 +254,77 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
 void
 msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
 {
-  const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  //const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  const linkaddr_t *parent_addr = &cell_to_relocate->addr;
+
+  // TODO: need to improve reservation links so that allow concurent querys
+  //          operaqtes on same peer. this is reduce schedule time-to-converge,
+  //          and save transmitions, especialy when bootstrap on conflicted cell
+  if ( msf_is_reserved_for_peer(parent_addr) ){
+      LOG_ERR("busy by concurent to send an RELOCATE ->");
+      LOG_ERR_LLADDR(parent_addr);
+      LOG_ERR_("\n");
+      msf_sixp_start_retry_wait_timer();
+      return;
+  }
+
   const sixp_pkt_type_t type = SIXP_PKT_TYPE_REQUEST;
   const sixp_pkt_code_t code = (sixp_pkt_code_t)(uint8_t)SIXP_PKT_CMD_RELOCATE;
-  const size_t relocation_cell_list_len = sizeof(sixp_pkt_cell_t);
-  uint8_t relocation_cell_list[sizeof(sixp_pkt_cell_t)];
-  uint8_t candidate_cell_list[(MSF_6P_CELL_LIST_MAX_LEN *
-                               sizeof(sixp_pkt_cell_t))];
-  size_t candidate_cell_list_len;
-  uint8_t body[sizeof(sixp_pkt_metadata_t) +
-               sizeof(sixp_pkt_cell_options_t) +
-               sizeof(sixp_pkt_num_cells_t) +
-               relocation_cell_list_len +
-               sizeof(candidate_cell_list)];
   size_t body_len;
-  sixp_pkt_cell_options_t cell_options = SIXP_PKT_CELL_OPTION_TX;
+  sixp_pkt_cell_options_t cell_options;
+  // amount of cells to relocate
   const sixp_pkt_num_cells_t num_cells = 1;
 
   assert(parent_addr != NULL);
   assert(cell_to_relocate != NULL);
 
-  LOG_INFO("sent a RELOCATE [%u+%u] request to the parent: "
+  MSFCellsPkt  msg;
+  memset(&msg, 0, sizeof(msg));
+
+  if( cell_to_relocate->link_options & LINK_OPTION_TX ) {
+    cell_options= SIXP_PKT_CELL_OPTION_TX;
+  } else {
+    cell_options = SIXP_PKT_CELL_OPTION_RX;
+  }
+  sixp_pkt_cells_reset(&msg.as_pkt);
+  msg.as_pkt.head.cell_options  = cell_options;
+
+  LOG_INFO("send a RELOCATE [%u+%u] ->"
           , cell_to_relocate->timeslot, cell_to_relocate->channel_offset);
   LOG_INFO_LLADDR(parent_addr);
   LOG_INFO_("\n");
 
-  msf_sixp_set_cell_params(relocation_cell_list, cell_to_relocate);
-  /* RELOCATION can happen only with negotiated TX cells */
-  candidate_cell_list_len = msf_sixp_fill_cell_list(
-    parent_addr, MSF_NEGOTIATED_CELL_TYPE_TX,
-    candidate_cell_list, sizeof(candidate_cell_list));
+  msf_sixp_set_cell_params(msg.as_pkt.cells[0].bytes, cell_to_relocate);
+  msg.as_pkt.head.num_cells     = num_cells;
 
-  memset(body, 0, sizeof(body));
-  body_len = (sizeof(sixp_pkt_metadata_t) +
-              sizeof(sixp_pkt_cell_options_t) +
-              sizeof(sixp_pkt_num_cells_t) +
-              relocation_cell_list_len +
-              candidate_cell_list_len);
+  int candidate_cell_list_len =
+  msf_sixp_reserve_cells_pkt(parent_addr, &msg.as_pkt, 1+MSF_6P_CELL_LIST_MAX_LEN);
+  if (candidate_cell_list_len < MSF_6P_CELL_LIST_MAX_LEN){
+      // for last chance to migrate, provide cells at same slot, that will be ready
+      //    for replace original one at no-confilct chanel
+      candidate_cell_list_len +=  msf_sixp_reserve_migrate_chanels_pkt(
+                                      cell_to_relocate
+                                      , &msg.as_pkt, 1+MSF_6P_CELL_LIST_MAX_LEN );
+  }
+  body_len = sixp_pkt_cells_total(&msg.as_pkt);
+  //reset pkt.num to count of relocating cells
+  msg.as_pkt.head.num_cells     = num_cells;
 
-  if(candidate_cell_list_len == 0) {
+  if(candidate_cell_list_len <= 0) {
     LOG_ERR("relocate_send_request: no cell is available\n");
     msf_sixp_start_request_wait_timer();
-  } else if(
-    sixp_pkt_set_cell_options(type, code, cell_options, body, body_len) < 0 ||
-    sixp_pkt_set_num_cells(type, code, num_cells, body, body_len) < 0 ||
-    sixp_pkt_set_rel_cell_list(type, code,
-                               relocation_cell_list,
-                               relocation_cell_list_len, 0,
-                               body, body_len) < 0 ||
-    sixp_pkt_set_cand_cell_list(type, code,
-                                candidate_cell_list, candidate_cell_list_len,
-                                0, body, body_len) < 0) {
-    LOG_ERR("cannot build a RELOCATE request\n");
-    msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_request_wait_timer();
-  } else if(sixp_output(type, code, MSF_SFID, body, body_len, parent_addr,
+  } else if(sixp_output(type, code, MSF_SFID, msg.body, body_len, parent_addr,
                         msf_rel_sent_callback_initiator, NULL, 0) < 0) {
     LOG_ERR("failed to send a RELOCATE request \n");
     msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_retry_wait_timer();
+    //this will mark that relocate starts, so not take it for relocation
+    msf_avoid_expose_link_cell(cell_to_relocate);
   }
-  //this will mark taht relocate starts, so not take it for relocation
-  msf_avoid_expose_link_cell(cell_to_relocate);
+  else {
+      //this will mark that relocate starts, so not take it for relocation
+      msf_avoid_expose_link_cell(cell_to_relocate);
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -365,6 +388,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       LOG_INFO("received an empty CellList; "
                "try another RELOCATE request later\n");
       msf_reserved_cell_delete_all(peer_addr);
+      msf_sixp_start_request_wait_timer();
     } else if(cell_list_len != sizeof(sixp_pkt_cell_t)) {
       /* invalid length; MSF always requests one cell per RELOCATE request */
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);
@@ -375,7 +399,19 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       if(msf_reserved_cell_get(peer_addr, slot_offset, channel_offset)) {
         /* this is a cell which we proposed in the request */
         msf_reserved_cell_delete_all(peer_addr);
-        if(msf_negotiated_cell_add(peer_addr, MSF_NEGOTIATED_CELL_TYPE_TX,
+
+        sixp_pkt_cell_options_t cell_options;
+        sixp_pkt_get_cell_options(SIXP_PKT_TYPE_RESPONSE, (sixp_pkt_code_t)(uint8_t)SIXP_PKT_RC_SUCCESS
+                                , &cell_options, body, body_len);
+
+        msf_negotiated_cell_type_t cell_type;
+        if(cell_options == SIXP_PKT_CELL_OPTION_TX) {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+        } else {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+        }
+
+        if(msf_negotiated_cell_add(peer_addr, cell_type,
                                    slot_offset, channel_offset) < 0) {
           msf_housekeeping_resolve_inconsistency(peer_addr);
         } else {
