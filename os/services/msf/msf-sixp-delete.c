@@ -109,6 +109,7 @@ sent_callback_initiator(void *arg, uint16_t arg_len,
        * possible schedule inconsistency should be detected during a
        * following transaction if any.
        */
+      LOG_INFO("DELETE transaction initiated\n");
       msf_negotiated_cell_delete(cell_to_delete);
     } else {
       /* do nothing */
@@ -206,7 +207,7 @@ msf_sixp_delete_send_request(msf_negotiated_cell_type_t cell_type)
       msf_negotiated_cell_get_cell_to_delete(parent_addr, cell_type)) == NULL) {
     /* this shouldn't happen, by the way */
     LOG_ERR("delete_send_request: no negotiated %s cells scheduled with ",
-            cell_type == MSF_NEGOTIATED_CELL_TYPE_TX ? "TX" : "RX");
+             msf_negotiated_cell_type_str(cell_type) );
     LOG_ERR_LLADDR(parent_addr);
     LOG_ERR_("\n");
   } else {
@@ -234,7 +235,7 @@ msf_sixp_delete_send_request(msf_negotiated_cell_type_t cell_type)
       LOG_ERR_("\n");
       msf_sixp_start_request_wait_timer();
     } else {
-      LOG_INFO("sent a DELETE request to the parent: ");
+      LOG_INFO("sent a DELETE %s request to the parent: ", msf_negotiated_cell_type_str(cell_type) );
       LOG_INFO_LLADDR(parent_addr);
       LOG_INFO_("\n");
     }

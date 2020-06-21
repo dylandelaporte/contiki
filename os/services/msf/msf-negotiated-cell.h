@@ -51,10 +51,12 @@
  * \brief Types of negotiated cells
  */
 typedef enum {
-  MSF_NEGOTIATED_CELL_TYPE_TX,  /**< Negotiated TX cell */
-  MSF_NEGOTIATED_CELL_TYPE_RX   /**< Negotiated RX cell */
+  MSF_NEGOTIATED_CELL_TYPE_NO = 0,               /**< ??? */
+  MSF_NEGOTIATED_CELL_TYPE_TX = LINK_OPTION_TX,  /**< Negotiated TX cell */
+  MSF_NEGOTIATED_CELL_TYPE_RX = LINK_OPTION_RX,  /**< Negotiated RX cell */
 } msf_negotiated_cell_type_t;
 
+const char* msf_negotiated_cell_type_str(msf_negotiated_cell_type_t x);
 
 
 //----------------------------------------------------------------------------

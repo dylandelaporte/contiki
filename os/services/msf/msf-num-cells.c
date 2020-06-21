@@ -78,10 +78,6 @@ void update(msf_negotiated_cell_type_t cell_type)
   CellsStats*   num_cells;
   uint16_t lim_num_cells_used_high;
 
-  // for log
-  const char* type_str;
-  (void)type_str;
-
   assert(parent_addr != NULL);
 
   /*
@@ -94,12 +90,10 @@ void update(msf_negotiated_cell_type_t cell_type)
    */
   if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
     num_cells = &tx_num_cells;
-    type_str = "TX";
     max_num_cells_scheduled = MSF_MAX_NUM_NEGOTIATED_TX_CELLS;
     lim_num_cells_used_high = MSF_LIM_NUM_CELLS_USED_HIGH;
   } else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) {
     num_cells = &rx_num_cells;
-    type_str = "RX";
     max_num_cells_scheduled = MSF_MAX_NUM_NEGOTIATED_RX_CELLS;
     if(num_cells->scheduled > 0) {
       lim_num_cells_used_high = MSF_LIM_NUM_CELLS_USED_HIGH;
@@ -124,13 +118,13 @@ void update(msf_negotiated_cell_type_t cell_type)
   if(num_cells->elapsed < MSF_MAX_NUM_CELLS) {
     LOG_DBG("for upward %s - NumCellsElapsed: %u, NumCellsUsed: %u, "
             "NumCellsScheduled: %u, NumCellsRequired: %u\n",
-            type_str,
+            msf_negotiated_cell_type_str(cell_type),
             num_cells->elapsed, num_cells->used,
             num_cells->scheduled, num_cells->required);
   } else {
     LOG_INFO("for upward %s - NumCellsElapsed: %u, NumCellsUsed: %u, "
              "NumCellsScheduled: %u, NumCellsRequired: %u\n",
-             type_str,
+             msf_negotiated_cell_type_str(cell_type),
              num_cells->elapsed, num_cells->used,
              num_cells->scheduled, num_cells->required);
 
@@ -141,7 +135,8 @@ void update(msf_negotiated_cell_type_t cell_type)
     {
       num_cells->required = num_cells->scheduled + 1;
       LOG_INFO("increment NumCellsRequired to %u; "
-               "going to add another negotiated %s cell\n", num_cells->required, type_str);
+               "going to add another negotiated %s cell\n", num_cells->required
+                   , msf_negotiated_cell_type_str(cell_type) );
       }
     }
     else if( num_cells->used < MSF_LIM_NUM_CELLS_USED_LOW)
@@ -157,7 +152,8 @@ void update(msf_negotiated_cell_type_t cell_type)
     {
       num_cells->required = num_cells->scheduled - 1;
       LOG_INFO("decrement NumCellsRequred to %u; "
-               "going to delete a negotiated %s cell\n",  num_cells->required, type_str);
+               "going to delete a negotiated %s cell\n",  num_cells->required
+                   , msf_negotiated_cell_type_str(cell_type) );
       }
 
       if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX &&

@@ -250,6 +250,15 @@ bool msf_is_negotiated_cell(tsch_link_t *cell){
 }
 
 /*---------------------------------------------------------------------------*/
+const char* msf_negotiated_cell_type_str(msf_negotiated_cell_type_t type){
+    if(type == MSF_NEGOTIATED_CELL_TYPE_TX)
+        return "TX";
+    else if (type == MSF_NEGOTIATED_CELL_TYPE_RX)
+        return "RX";
+    else
+        return "?X";
+}
+
 int
 msf_negotiated_cell_add(const linkaddr_t *peer_addr,
                         msf_negotiated_cell_type_t type,
@@ -257,27 +266,23 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
 {
   tsch_neighbor_t *nbr;
   uint8_t cell_options;
-  const char* cell_type_str;
   tsch_link_t *new_cell;
 
   assert(slotframe != NULL);
   assert(peer_addr != NULL);
-  (void)cell_type_str;
 
   if(type == MSF_NEGOTIATED_CELL_TYPE_TX) {
     cell_options = LINK_OPTION_TX;
-    cell_type_str = "TX";
   } else {
     assert(type == MSF_NEGOTIATED_CELL_TYPE_RX);
     cell_options = LINK_OPTION_RX;
-    cell_type_str = "RX";
   }
 
   // WHAT IT? try add nbr twice?
   if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL)
   if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL) {
     LOG_ERR("failed to add a negotiated %s cell because nbr is not available\n",
-            cell_type_str);
+            msf_negotiated_cell_type_str(type) );
     return irNOCELL;
   }
 
@@ -301,12 +306,12 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
   }
 
   if(new_cell == NULL) {
-    LOG_ERR("failed to add a negotiated %s cell for ", cell_type_str);
+    LOG_ERR("failed to add a negotiated %s cell for ", msf_negotiated_cell_type_str(type) );
     LOG_ERR_LLADDR(peer_addr);
     LOG_ERR_(" at slot_offset:%u, channel_offset:%u\n",
              slot_offset, channel_offset);
   } else {
-    LOG_INFO("added a negotiated %s cell for ", cell_type_str);
+    LOG_INFO("added a negotiated %s cell for ", msf_negotiated_cell_type_str(type) );
     LOG_INFO_LLADDR(peer_addr);
     LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
               slot_offset, channel_offset);
@@ -428,9 +433,9 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 {
   // this is for LOG_
   linkaddr_t peer_addr;
-  const char *cell_type_str;
   (void)peer_addr;
-  (void)cell_type_str;
+
+  msf_negotiated_cell_type_t cell_type;
 
   uint16_t slot_offset, channel_offset;
 
@@ -443,7 +448,7 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 
   tsch_neighbor_t *nbr = NULL;
   if(cell->link_options & LINK_OPTION_TX) {
-    cell_type_str = "TX";
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
 
     if (how == doCAREFUL) {
         // manage links and  send queues
@@ -454,16 +459,18 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
     }
 
   } else if(cell->link_options & LINK_OPTION_RX){
-    cell_type_str = "RX";
+
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+
   }
   else {
-      cell_type_str = "?X";
+      cell_type = MSF_NEGOTIATED_CELL_TYPE_NO;
   }
 
   slot_offset = cell->timeslot;
   channel_offset = cell->channel_offset;
   msf_housekeeping_delete_cell_later(cell);
-  LOG_INFO("removed a negotiated %s cell for ", cell_type_str);
+  LOG_INFO("removed a negotiated %s cell for ", msf_negotiated_cell_type_str(cell_type));
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);

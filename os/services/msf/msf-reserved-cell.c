@@ -246,17 +246,20 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
                                       );
     if (cell != NULL){
         cell->data = NULL;
-        LOG_DBG("reserved a cell at slot_offset:%u, channel_offset:%u\n",
-                (uint16_t)_slot_offset, (uint16_t)_channel_offset);
+        LOG_DBG("reserved a %s cell at slot_offset:%d, channel_offset:%d\n",
+                msf_negotiated_cell_type_str(cell_type),
+                _slot_offset, _channel_offset);
     } else  {
-      LOG_ERR("failed to reserve a cell at "
-              "slot_offset:%ld, channel_offset:%ld\n",
+      LOG_ERR("failed to reserve a %s cell at "
+              "slot_offset:%d, channel_offset:%d\n",
+              msf_negotiated_cell_type_str(cell_type),
               _slot_offset, _channel_offset);
     }
   }
   else{
-      LOG_DBG("reserve miss at slot_offset:%u, channel_offset:%u\n",
-              (uint16_t)slot_offset, (uint16_t)channel_offset);
+      LOG_DBG("reserve %s miss at slot_offset:%d, channel_offset:%d\n",
+              msf_negotiated_cell_type_str(cell_type),
+              slot_offset, channel_offset);
   }
 
   return cell;
