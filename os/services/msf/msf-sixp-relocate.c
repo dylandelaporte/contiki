@@ -134,14 +134,17 @@ void msf_rel_sent_callback_responder(void *arg, uint16_t arg_len,
   assert(dest_addr != NULL);
   assert(arg == NULL || arg_len == sizeof(tsch_link_t));
 
+  int cells_num = 0;
   if(status == SIXP_OUTPUT_STATUS_SUCCESS) {
     LOG_INFO("RELOCATE transaction completes successfully\n");
     if(cell_to_relocate == NULL) {
       /* we've returned an empty CellList; do nothing */
       assert(arg_len == 0);
-    } else if(msf_reserved_cell_get_num_cells(dest_addr) != 1) {
+    } else if( (cells_num = msf_reserved_cell_get_num_cells(dest_addr)) > 1) {
       LOG_ERR("We have more than one reserved cell; this shouldn't happen\n");
       msf_reserved_cell_delete_all(dest_addr);
+    } else if( cells_num <= 0) {
+      LOG_ERR("We have no reserved cells; looks all slots are locked\n");
     } else {
       tsch_link_t *reserved_cell = msf_reserved_cell_get(dest_addr, -1, -1);
       uint16_t slot_offset, channel_offset;
