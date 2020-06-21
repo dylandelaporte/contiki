@@ -272,7 +272,7 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
                , timeslot, channel_offset
                , TSCH_LOG_ID_FROM_LINKADDR(address));
 
-        LOG_INFO("add_link sf=%u opt=%s type=%s ts=%u ch=%u addr=",
+        LOG_INFO("add_link sf=%u opt=%s type=%s [%u+%u] addr=",
                  slotframe->handle,
                  print_link_options(link_options),
                  print_link_type(link_type), timeslot, channel_offset);

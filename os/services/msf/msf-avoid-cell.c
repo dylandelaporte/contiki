@@ -102,7 +102,11 @@ int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return msf_is_avoid_cell( msf_cell_at(slot_offset, channel_offset) );
 }
 
-int  msf_is_avoid_nbr_cell(msf_cell_t cell, const tsch_neighbor_t *n){
+AvoidOptionsResult  msf_is_avoid_link_cell(const tsch_link_t* x){
+    return msf_is_avoid_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr));
+}
+
+AvoidOptionsResult  msf_is_avoid_nbr_cell(msf_cell_t cell, const tsch_neighbor_t *n){
     int x = msf_avoids_nbr_cell_idx(cell, n);
     if (x < 0)
         return x;
@@ -184,7 +188,7 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
 }
 
 
-int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
+AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->field.slot == slot_offset){
@@ -274,6 +278,12 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
     return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
                                 , aoUSE_LOCAL);
+}
+
+// avoids cell, that can't move - autonomous calls are.
+AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x){
+    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
+                                , aoUSE_LOCAL | aoFIXED);
 }
 
 AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
@@ -538,13 +548,14 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
             msf_cell_t* x = pkt->cells + pkt->head.num_cells;
             x->field.slot   = cell->field.slot;
             x->field.chanel = cell->field.chanel;
-            ++pkt->head.num_cells;
+            ++(pkt->head.num_cells);
             if (pkt->head.num_cells >= limit)
                 return res;
         }
     }
     return res;
 }
+
 
 int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
     int res = 0;
@@ -564,10 +575,38 @@ int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
 }
 
 // NRSF use it to notify cells exposed to nbrs
-void msf_avoid_mark_all(){
+void msf_avoid_mark_all_fresh(){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx){
         avoids_ops[idx]  |= aoMARK;
     }
+}
+
+// Mark local cell as aoRELOCATE
+AvoidOptionsResult msf_avoid_relocate_link_cell(const tsch_link_t* x){
+    int idxnbr = msf_avoids_nbr_cell_idx( msf_cell_of_link(x), get_addr_nbr(&x->addr) );
+    if (idxnbr >= 0){
+        avoids_ops[idxnbr]  |= aoRELOCATE;
+        return avoids_ops[idxnbr];
+    }
+    else
+        return arNO;
+}
+
+// @brief Mark cells to aoEXPOSED. use it to notify cells exposed to nbrs.
+//  for aoRELOCATE cells, this use to show that relocation started/done
+AvoidOptionsResult msf_avoid_expose_link_cell(const tsch_link_t* x){
+    return msf_avoid_expose_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr));
+}
+
+AvoidOptionsResult msf_avoid_expose_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
+    LOG_DBG("mark cell %u+%u ->\n", x.field.slot, x.field.chanel);
+    int idxnbr = msf_avoids_nbr_cell_idx( x, n );
+    if (idxnbr >= 0){
+        avoids_ops[idxnbr]  |= aoMARK;
+        return avoids_ops[idxnbr];
+    }
+    else
+        return arNO;
 }
 
 // this unvoids all cells that are no any aoUSE
@@ -586,3 +625,63 @@ void msf_release_unused(){
     }
 }
 
+
+/* @brief takes first avail cell marked as aoWAIT_RELOC
+ * @return - nbr for enumerated cells
+ *           cells->head.meta - AvoidOption of enumed cells
+ * */
+tsch_neighbor_t* msf_avoid_append_cell_to_relocate(SIXPCellsPkt* pkt){
+    assert(pkt != NULL);
+
+    msf_cell_t* cell = avoids_list;
+
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
+        if (cell->raw == cellFREE) continue;
+        if ( (avoids_ops[idx] & aoRELOCATE)  == 0 ) continue;
+        if ( (avoids_ops[idx] & aoMARK) != 0 ) continue;
+        // only local cells can relocate
+        if ( (avoids_ops[idx] & aoUSE_LOCAL)  == 0 ) continue;
+
+        //if ( pkt->head.num_cells < limit)
+        {
+            msf_cell_t* x = pkt->cells + pkt->head.num_cells;
+            x->field.slot   = cell->field.slot;
+            x->field.chanel = cell->field.chanel;
+            pkt->head.meta  = avoids_ops[idx];
+            ++(pkt->head.num_cells);
+            return (tsch_neighbor_t*) avoids_nbrs[idx];
+        }
+    }
+    return NULL;
+}
+
+/* @brief takes first avail cell marked as aoWAIT_RELOC
+// @result - cells->head.num_cells= amount of filled cells
+// @return - >0 - amount of cells append
+// @return - =0 - no cells to enumerate
+ * */
+int msf_avoid_append_nbr_cell_to_relocate(SIXPCellsPkt* pkt, tsch_neighbor_t *n){
+    assert(pkt != NULL);
+
+    msf_cell_t* cell = avoids_list;
+
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
+        if (cell->raw == cellFREE) continue;
+        if (avoids_nbrs[idx] != n) continue;
+        if ( (avoids_ops[idx] & aoRELOCATE)  == 0 ) continue;
+        // only local cells can relocate
+        if ( (avoids_ops[idx] & aoUSE_LOCAL)  == 0 ) continue;
+        if ( (avoids_ops[idx] & aoMARK) != 0 ) continue;
+
+        //if ( pkt->head.num_cells < limit)
+        {
+            msf_cell_t* x = pkt->cells + pkt->head.num_cells;
+            x->field.slot   = cell->field.slot;
+            x->field.chanel = cell->field.chanel;
+            pkt->head.meta  = avoids_ops[idx];
+            ++(pkt->head.num_cells);
+            return 1;
+        }
+    }
+    return 0;
+}

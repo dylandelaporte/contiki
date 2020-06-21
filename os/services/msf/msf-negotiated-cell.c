@@ -92,6 +92,30 @@ static bool is_marked_as_used(const tsch_link_t *cell);
 static bool is_marked_as_unused(const tsch_link_t *cell);
 static bool is_marked_as_kept(const tsch_link_t *cell);
 
+
+
+//==============================================================================
+enum {
+    LINK_OPTION_XX = (LINK_OPTION_TX|LINK_OPTION_RX) ,
+};
+
+static inline
+bool is_link_rx(unsigned opt){
+    return (opt & LINK_OPTION_XX) == LINK_OPTION_RX;
+}
+
+static inline
+bool is_link_tx(unsigned opt){
+    return (opt & LINK_OPTION_XX) == LINK_OPTION_TX;
+}
+
+// just short handy acronims here
+typedef msf_negotiated_cell_data_t neg_data_t;
+static inline
+msf_negotiated_cell_data_t * neglink_data(tsch_link_t *cell){
+    return ((neg_data_t*)cell->data);
+}
+
 /*---------------------------------------------------------------------------*/
 static void
 keep_rx_cells(const linkaddr_t *peer_addr)
@@ -101,9 +125,10 @@ keep_rx_cells(const linkaddr_t *peer_addr)
   } else {
     for(tsch_link_t *cell = list_head(slotframe->links_list);
         cell != NULL;
-        cell = list_item_next(cell)) {
-      if(cell->link_options == LINK_OPTION_RX &&
-        linkaddr_cmp(&cell->addr, peer_addr)) {
+        cell = list_item_next(cell))
+    {
+      if ( is_link_rx(cell->link_options) )
+      if ( linkaddr_cmp(&cell->addr, peer_addr) ) {
         mark_as_kept(cell);
       }
     }
@@ -113,9 +138,10 @@ keep_rx_cells(const linkaddr_t *peer_addr)
 static void
 mark_rx_cell(tsch_link_t *cell, const bool *flag)
 {
-  if(cell == NULL) { //|| cell->link_options != LINK_OPTION_RX
+  if(cell == NULL) {
     /* do nothing */
   } else {
+    assert( is_link_rx(cell->link_options) );
     cell->data = (void *)flag;
   }
 }
@@ -168,34 +194,35 @@ is_marked_as_kept(const tsch_link_t *cell)
   return cell != NULL && cell->data == (void *)&is_kept;
 }
 
-void mark_as_relocate(tsch_link_t *cell){
-    mark_rx_cell(cell, is_marked_as_used(cell)? &is_used_relocate : &is_unused_relocate);
-}
-
-bool is_marked_as_relocate(const tsch_link_t *cell){
+bool msf_is_marked_as_relocate(const tsch_link_t *cell){
     if (cell != NULL){
-        if (cell->data == (void *)&is_used_relocate)
-            return true;
-        if (cell->data == (void *)&is_unused_relocate)
-            return true;
+        AvoidOptionsResult ops = msf_is_avoid_link_cell(cell);
+        if (ops >= 0){
+            return (ops & aoRELOCATE) != 0;
+        }
     }
     return false;
 }
 
-tsch_link_t *msf_negotiated_get_cell_to_relocate(void){
+tsch_link_t* msf_negotiated_get_cell_to_relocate(void){
+    sixp_cell_t ops[2];
+    SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
+
+    tsch_neighbor_t *n = tsch_queue_get_nbr( msf_housekeeping_get_parent_addr() );
+
+    int ok= msf_avoid_append_nbr_cell_to_relocate(op, n);
+    if ( ok <= 0)
+        return NULL;
+
     tsch_link_t *cell;
-    for(cell = list_head(slotframe->links_list);
-        cell != NULL;
-        cell = list_item_next(cell))
-    {
-        if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
-            continue;
-        if (is_marked_as_relocate(cell) ){
-            LOG_DBG("found relocate cell [%u+%u]\n"
-                            , cell->timeslot, cell->channel_offset);
-            return cell;
-        }
+    cell = tsch_schedule_get_link_by_timeslot(slotframe, ops[1].field.slot, ops[1].field.chanel);
+    if (cell != NULL){
+        LOG_DBG("found relocate cell [%u+%u]\n"
+                        , cell->timeslot, cell->channel_offset);
+        return cell;
     }
+    //mark it to set it processed
+    msf_avoid_expose_nbr_cell(ops[1], n);
     return NULL;
 }
 
@@ -260,13 +287,16 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
                                     , 1 // WHAT to do here?
                                     );
 
-  if(new_cell != NULL && type == MSF_NEGOTIATED_CELL_TYPE_TX) {
-    if((new_cell->data = memb_alloc(&msf_negotiated_cell_data_memb)) == NULL) {
+  if (new_cell != NULL)
+  if (type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+    new_cell->data = memb_alloc(&msf_negotiated_cell_data_memb);
+    if(new_cell->data != NULL) {
+        memset(new_cell->data, 0, sizeof(msf_negotiated_cell_data_t));
+        LOG_DBG("add_tx: new data(%p)[%p]\n", new_cell, new_cell->data);
+    } else {
       LOG_ERR("memb_alloc failed for a new negotiated cell\n");
       (void)tsch_schedule_remove_link(slotframe, new_cell);
       new_cell = NULL;
-    } else {
-      memset(new_cell->data, 0, sizeof(msf_negotiated_cell_data_t));
     }
   }
 
@@ -290,17 +320,17 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
       tsch_link_t *prev = NULL;
       while(curr != NULL) {
         if(new_cell->timeslot > curr->timeslot) {
-          ((msf_negotiated_cell_data_t *)new_cell->data)->next = curr;
+          neglink_data(new_cell)->next = curr;
           if(prev == NULL) {
             /* new_cell has the largest slot_offset in the list */
             nbr->negotiated_tx_cell = new_cell;
           } else {
-            ((msf_negotiated_cell_data_t *)prev->data)->next = new_cell;
+            neglink_data(prev)->next = new_cell;
           }
           break;
         } else {
           prev = curr;
-          curr = ((msf_negotiated_cell_data_t *)curr->data)->next;
+          curr = neglink_data(curr)->next;
         }
       }
       if(curr == NULL) {
@@ -312,7 +342,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
           nbr->negotiated_tx_cell = new_cell;
         } else {
           /* put the new cell to the end */
-          ((msf_negotiated_cell_data_t *)prev->data)->next = new_cell;
+          neglink_data(prev)->next = new_cell;
         }
       }
     }
@@ -331,19 +361,28 @@ void msf_negotiated_drop_tx_cell(tsch_neighbor_t *nbr, tsch_link_t *cell){
     /* update the chain of the negotiated cells */
     tsch_link_t *curr_cell, *prev_cell;
     for(curr_cell = nbr->negotiated_tx_cell, prev_cell = NULL;
-        curr_cell != NULL;
-        curr_cell = ((msf_negotiated_cell_data_t *)curr_cell->data)->next) 
+        (curr_cell != NULL) && (curr_cell->data != NULL);
+        curr_cell = neglink_data(curr_cell)->next )
     {
+
+      // we can hook in infinite cycle, if access deleted call
+      assert(curr_cell != prev_cell);
+
+      neg_data_t* cell_data = neglink_data(curr_cell);
+      assert(cell_data != NULL);
+
       if(curr_cell == cell) {
+
         if(prev_cell == NULL) {
-          nbr->negotiated_tx_cell =
-            ((msf_negotiated_cell_data_t *)cell->data)->next;
+          nbr->negotiated_tx_cell = cell_data->next;
         } else {
-          ((msf_negotiated_cell_data_t *)prev_cell->data)->next =
-            ((msf_negotiated_cell_data_t *)cell->data)->next;
+            neglink_data(prev_cell)->next = cell_data->next;
         }
-        memb_free(&msf_negotiated_cell_data_memb, cell->data);
-        break;
+        // just for sure against lost pointer access, invalidate next
+        cell_data->next = NULL; //cell;//
+        memb_free(&msf_negotiated_cell_data_memb, cell_data);
+        cell->data = NULL;
+        return;
       } else {
         prev_cell = curr_cell;
       }
@@ -358,11 +397,13 @@ void msf_negotiated_drop_all_tx(tsch_neighbor_t *nbr){
     /* update the chain of the negotiated cells */
     tsch_link_t *curr_cell, *next_cell;
     for(curr_cell = nbr->negotiated_tx_cell;
-        curr_cell != NULL;
+        curr_cell != NULL && (curr_cell->data != NULL);
         curr_cell = next_cell)
     {
-        next_cell = ((msf_negotiated_cell_data_t *)curr_cell->data)->next;
-        memb_free(&msf_negotiated_cell_data_memb, curr_cell);
+        next_cell = neglink_data(curr_cell)->next;
+        neglink_data(curr_cell)->next = NULL;
+        memb_free(&msf_negotiated_cell_data_memb, curr_cell->data);
+        curr_cell->data = NULL;
     }
 
     nbr->negotiated_tx_cell = NULL;
@@ -381,7 +422,7 @@ void msf_sending_nbr_ensure_tx(tsch_neighbor_t *nbr, const linkaddr_t* peer_addr
     }
 }
 
-typedef enum DeleteOption{ doCAREFUL, doBAREDROP } DeleteOption;
+typedef enum DeleteOption{ doCAREFUL, doBAREDROP, doRESERVED } DeleteOption;
 static
 void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 {
@@ -397,8 +438,11 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
   assert(cell != NULL);
   linkaddr_copy(&peer_addr, &cell->addr);
 
+  if (cell->link_options & LINK_OPTION_RESERVED_LINK)
+      how = doRESERVED;
+
   tsch_neighbor_t *nbr = NULL;
-  if(cell->link_options == LINK_OPTION_TX) {
+  if(cell->link_options & LINK_OPTION_TX) {
     cell_type_str = "TX";
 
     if (how == doCAREFUL) {
@@ -410,7 +454,6 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
     }
 
   } else {
-    assert(cell->link_options == LINK_OPTION_RX);
     cell_type_str = "RX";
   }
 
@@ -421,6 +464,10 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);
+
+  // reserved links are not avoids, not active. So drop it bare and silent
+  if (how >= doRESERVED)
+      return;
 
   msf_unvoid_link_cell(cell);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
@@ -552,9 +599,9 @@ msf_negotiated_cell_get_cell_to_delete(const linkaddr_t *peer_addr,
       ret = NULL;
       for(tsch_link_t *cell = list_head(slotframe->links_list);
           cell != NULL;
-          cell = list_item_next(cell)) {
-        if(linkaddr_cmp(&cell->addr, peer_addr) &&
-           cell->link_options == LINK_OPTION_RX) {
+          cell = list_item_next(cell))
+      {
+        if(linkaddr_cmp(&cell->addr, peer_addr) && is_link_rx(cell->link_options) ) {
           ret = cell;
           break;
         }
@@ -584,7 +631,8 @@ msf_negotiated_cell_get_num_cells(msf_negotiated_cell_type_t cell_type,
         ret = 0;
         for(tsch_link_t *cell = nbr->negotiated_tx_cell;
             cell != NULL;
-            cell = ((msf_negotiated_cell_data_t *)cell->data)->next) {
+            cell = neglink_data(cell)->next)
+        {
           ret++;
         }
       }
@@ -596,9 +644,9 @@ msf_negotiated_cell_get_num_cells(msf_negotiated_cell_type_t cell_type,
         ret = 0;
         for(tsch_link_t *cell = (tsch_link_t *)list_head(slotframe->links_list);
             cell != NULL;
-            cell = list_item_next(cell)) {
-          if(linkaddr_cmp(&cell->addr, peer_addr) &&
-             cell->link_options == LINK_OPTION_RX) {
+            cell = list_item_next(cell))
+        {
+          if(linkaddr_cmp(&cell->addr, peer_addr) && is_link_rx(cell->link_options) ) {
             ret++;
           } else {
             /* skip TX or reserved cells */
@@ -630,33 +678,45 @@ msf_negotiated_cell_update_num_tx(uint16_t slot_offset,
     /* identify the cell that is used for the last transmission */
     for(cell = nbr->negotiated_tx_cell;
         cell != NULL;
-        cell = ((msf_negotiated_cell_data_t *)cell->data)->next) {
-      if(cell->timeslot == slot_offset) {
+        cell = neglink_data(cell)->next )
+    {
+      if(cell->timeslot <= slot_offset) {
         last_used = cell;
         break;
       }
     }
 
     if(last_used == NULL) {
+      if (num_tx<=1)
       /*
        * The last used cell is not scheduled as a negotiated cell for
        * the neighbor; give up updating NumTX/NumTxAck
        */
       return;
-    } else {
-      uint16_t i;
-      msf_negotiated_cell_data_t *cell_data;
+
+      // spread other TX attempts between other cells, since resoning link looks deleted
+      --num_tx;
+      last_used = nbr->negotiated_tx_cell;
+    }
+
+      cell = last_used;
+      assert(cell->data != NULL);
 
       /* update NumTxAck */
       if(mac_tx_status == MAC_TX_OK) {
-        ((msf_negotiated_cell_data_t *)last_used->data)->num_tx_ack++;
+          neglink_data(cell)->num_tx_ack++;
       }
 
-      /* update the counters */
-      cell = last_used;
+      /* update the counters.
+       * Assume that every tx attempt steps through all links assigned to nbr.
+       * So traverse through links sequently incrementing it's num_tx
+       *
+       * */
+
+      uint16_t i;
       for(i = 0; i < num_tx; i++) {
         assert(cell->data != NULL);
-        cell_data = (msf_negotiated_cell_data_t *)cell->data;
+        neg_data_t* cell_data = neglink_data(cell);
 
         if(cell_data->num_tx == 255) {
           cell_data->num_tx = 128;
@@ -665,14 +725,13 @@ msf_negotiated_cell_update_num_tx(uint16_t slot_offset,
           cell_data->num_tx++;
         }
 
-        if(((msf_negotiated_cell_data_t *)cell->data)->next == NULL) {
+        if( cell_data->next == NULL) {
           cell = nbr->negotiated_tx_cell;
         } else {
-          cell = ((msf_negotiated_cell_data_t *)cell->data)->next;
+          cell = cell_data->next;
         }
-      }
-    }
-  }
+      }//for(i = 0;
+  }//if( nbr->negotiated_tx_cell != NULL )
 }
 /*---------------------------------------------------------------------------*/
 tsch_link_t *
@@ -694,7 +753,7 @@ msf_negotiated_propose_cell_to_relocate(void)
   }
 
   for(cell = nbr->negotiated_tx_cell; cell != NULL; cell = cell_data->next) {
-    cell_data = (msf_negotiated_cell_data_t *)cell->data;
+    cell_data = neglink_data(cell);
     assert(cell_data != NULL);
     if(cell_data->num_tx < MSF_MIN_NUM_TX_FOR_RELOCATION) {
       /* we don't evaluate this cell since it's not used much enough yet */
@@ -747,24 +806,22 @@ msf_negotiated_propose_cell_to_relocate(void)
 uint16_t
 msf_negotiated_cell_get_num_tx(tsch_link_t *cell)
 {
-  if(cell == NULL ||
-     (cell->link_options & LINK_OPTION_TX) == 0 ||
-     cell->data == NULL) {
+  if(cell == NULL) return 0;
+  if ( (cell->link_options & LINK_OPTION_TX) == 0 || cell->data == NULL) {
     return 0;
   } else {
-    return ((msf_negotiated_cell_data_t *)cell->data)->num_tx;
+    return neglink_data(cell)->num_tx;
   }
 }
 /*---------------------------------------------------------------------------*/
 uint16_t
 msf_negotiated_cell_get_num_tx_ack(tsch_link_t *cell)
 {
-  if(cell == NULL ||
-     (cell->link_options & LINK_OPTION_TX) == 0 ||
-     cell->data == NULL) {
+  if(cell == NULL) return 0;
+  if ( (cell->link_options & LINK_OPTION_TX) == 0 || cell->data == NULL) {
     return 0;
   } else {
-    return ((msf_negotiated_cell_data_t *)cell->data)->num_tx_ack;
+    return neglink_data(cell)->num_tx_ack;
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -777,10 +834,10 @@ msf_negotiated_cell_rx_mark_used(const linkaddr_t *src_addr,
   } else {
     for(tsch_link_t *cell = list_head(slotframe->links_list);
         cell != NULL;
-        cell = list_item_next(cell)) {
-      if(cell->link_options == LINK_OPTION_RX &&
-         linkaddr_cmp(src_addr, &cell->addr) &&
-         cell->timeslot == slot_offset) {
+        cell = list_item_next(cell))
+    {
+      if( is_link_rx(cell->link_options) && (cell->timeslot == slot_offset) )
+      if ( linkaddr_cmp(src_addr, &cell->addr) ) {
         mark_as_used(cell);
         break;
       }
@@ -791,6 +848,11 @@ msf_negotiated_cell_rx_mark_used(const linkaddr_t *src_addr,
 void
 msf_negotiated_cell_delete_unused_cells(void)
 {
+  if(slotframe == NULL) {
+      /* nothing to do; shouldn't happen, though */
+      return;
+  }
+
   LOG_DBG("unused_cells GC\n");
   /*
    * MSF assumes there is constant upward traffic, which is handled by
@@ -807,24 +869,31 @@ msf_negotiated_cell_delete_unused_cells(void)
    */
   /* This function involves many loops, which could be improved */
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
-  if(slotframe == NULL) {
-    /* nothing to do; shouldn't happen, though */
-  } else {
+
     tsch_link_t *cell, *next_cell;
     /* mark cells to keep with "is_kept" */
     for(cell = list_head(slotframe->links_list);
         cell != NULL;
-        cell = list_item_next(cell)) {
-      if(cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell)) {
+        cell = list_item_next(cell))
+    {
+      if( is_link_rx(cell->link_options) && is_marked_as_used(cell)) {
         keep_rx_cells(&cell->addr);
       }
     }
     for(cell = list_head(slotframe->links_list), next_cell = NULL;
         cell != NULL;
-        cell = next_cell) {
+        cell = next_cell)
+    {
       next_cell = list_item_next(cell);
-      if(cell->link_options == LINK_OPTION_RX &&
-         (parent_addr == NULL || linkaddr_cmp(&cell->addr, parent_addr) == 0)) {
+
+      if ( !is_link_rx(cell->link_options) )
+          continue;
+
+      // do not garbage cells that are listen parent. why?
+      if (parent_addr != NULL)
+      if (linkaddr_cmp(&cell->addr, parent_addr))
+          continue;
+
         /*
          * reset the state of a cell if it has "is_kept", delete it
          * otherwise
@@ -850,9 +919,7 @@ msf_negotiated_cell_delete_unused_cells(void)
           LOG_WARN_LLADDR(&cell->addr);
           LOG_WARN_("\n");
         }
-      }
-    }
-  }
+    }//for(cell
 }
 /*---------------------------------------------------------------------------*/
 MSFInspectResult msf_negotiated_inspect_vs_link(tsch_link_t* x){
@@ -872,13 +939,13 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
           continue;
 
       //inspection alredy managed;
-      if (is_marked_as_relocate(cell))
+      if (msf_is_marked_as_relocate(cell))
           return irRELOCATE;
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
       //only TX links can mix in one slot
-      bool can_overlap = (cell->link_options == LINK_OPTION_TX)
-                      && (x.field.link_options == LINK_OPTION_TX);
+      bool can_overlap = is_link_tx(cell->link_options)
+                      && is_link_tx(x.field.link_options);
 
       //try to eval that have any slot to relocate conflicting link
       long new_slot = msf_find_unused_slot_offset(slotframe);
@@ -894,7 +961,7 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
               return irFAIL;
           }
           //check that have unconflict chanels
-          if (cell->channel_offset != x->channel_offset)
+          if (cell->channel_offset != x.field.chanel)
               return irOK;
       }
       else {

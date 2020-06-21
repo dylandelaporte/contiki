@@ -196,8 +196,7 @@ void msf_negotiated_cell_update_num_tx(uint16_t slot_offset,
 tsch_link_t *msf_negotiated_propose_cell_to_relocate(void);
 
 // markup cell for relocation
-void mark_as_relocate(tsch_link_t *cell);
-bool is_marked_as_relocate(const tsch_link_t *cell);
+bool msf_is_marked_as_relocate(const tsch_link_t *cell);
 
 // \brief get negotiated link marked for relocate
 tsch_link_t *msf_negotiated_get_cell_to_relocate(void);
