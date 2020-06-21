@@ -103,6 +103,12 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     LOG_DBG("avoid hop%x cells[%u]:\n", avoiduse, hcells->num_cells);
 
     avoiduse += aoUSE_REMOTE_1HOP;
+
+    //this set of options describe cell passes for conflict checks
+    unsigned cell_avoidopt = (meta.field.avoid_use & ~aoUSE)
+                            | (avoiduse & aoUSE_REMOTE)
+                            | (hcells->cell_options & aoTX);
+
     int rel = 0;
     for (unsigned i = 0; i < hcells->num_cells; ++i){
         sixp_cell_t c = sixp_pkt_get_cell(hcells->cell_list, i);
@@ -115,7 +121,7 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
             ++rel;
 
         if (should_relay >= arEXIST_CHANGE){
-            msf_housekeeping_inspect_cell_consintensy(c, n, hcells->cell_options);
+            msf_housekeeping_inspect_cell_consintensy(c, n, cell_avoidopt );
         }
     }
 
@@ -802,19 +808,7 @@ static int nrsf_task_notify_cells(nrsfTask* t, const char* info);
 static int nrsf_task_notify_dels(nrsfTask* t, const char* info);
 
 void nrsf_tasks_exec(){
-    if (sixp_trans_any()){
-        // exec only when no active transactions
-        return;
-    }
-
     LOG_DBG("nrsf_tasks_exec\n");
-    if(0)// clearing for self alredy done by MSF, NRSF no need any job here
-    if (nrsf_task_clear){
-        nrsf_clean_cells_by_nbr(NULL);
-        nrsf_task_clear = false;
-        nrsf_tasks_poll();
-        return;
-    }
 
     // TODO: if have ability to pack multiple 6P commands/packet
     //      maybe more efficient to traverse over nbrs whole tasks - composing
@@ -837,6 +831,12 @@ void nrsf_tasks_exec(){
         return;
     }
 
+    // USE/DEL action can only inform all nbr together, so start them when 6P is clear.
+    if (sixp_trans_any()){
+        // exec only when no active transactions
+        return;
+    }
+
     if (ok <= 0)
     if (nrsf_task_del.notify_use >= 0){
         ok = nrsf_task_to_all_nbrs( nrsf_task_notify_dels
@@ -852,13 +852,15 @@ void nrsf_tasks_exec(){
                                 , &nrsf_task_use, aoUSE_LOCAL
                                 , "USE"
                                 );
-        msf_avoid_mark_all();
+        msf_avoid_mark_all_fresh();
     }
 
     if (ok > 0)
         nrsf_tasks_poll();
 }
 
+// TODO: need provide support for aoFIXED option for exposed cells -
+//       need establish them to separate list with meta
 int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
     int total = 0;
     if (t->notify_use < aoUSE_REMOTE_1HOP) {
@@ -909,6 +911,12 @@ int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
 }
 
 int nrsf_task_notify_cells(nrsfTask* t, const char* info){
+
+    const linkaddr_t *peer_addr = tsch_queue_get_nbr_address(t->nbr);
+    if (sixp_trans_find(peer_addr) != NULL){
+        return 0;
+    }
+
     SIXPeerHandle hpeer;
     sixp_cell_t ops[nrsfREQ_OPS_LIMIT];
     SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
@@ -925,7 +933,7 @@ int nrsf_task_notify_cells(nrsfTask* t, const char* info){
     sixp_pkt_cells_assign(&hpeer.h, op);
     hpeer.h.body_len  = sizeof(sixp_cell_t)*ok;
     hpeer.h.code.cmd  = SIXP_PKT_CMD_ADD;
-    hpeer.addr        = tsch_queue_get_nbr_address(t->nbr);
+    hpeer.addr        = peer_addr;
     nrsf_sixp_single_send_request(&hpeer, info);
     return 1;
 }
