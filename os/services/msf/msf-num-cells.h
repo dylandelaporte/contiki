@@ -91,9 +91,12 @@ bool msf_num_cells_request_rx_link(void);
 
 /**
  * \brief Trigger a 6P transaction if necessary, based on NumCells*
- * counters
+ * counters.
+ *  ADD transactions are may fails with requested retry timeout
+ *  DEL transaction are suerly success, and can be executed as requests
  */
-void msf_num_cells_trigger_6p_transaction(void);
+void msf_num_cells_trigger_6p_add_transaction(void);
+void msf_num_cells_trigger_6p_del_transaction(void);
 
 /**
  * \brief Show NumCells* counters in the shell

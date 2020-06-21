@@ -283,7 +283,7 @@ void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
     LOG_ERR_LLADDR(parent_addr);
     LOG_ERR_("\n");
     msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_retry_wait_timer();
   } else {
     LOG_INFO("sent an ADD %s request to the parent: ", msf_negotiated_cell_type_str(cell_type) );
     LOG_INFO_LLADDR(parent_addr);

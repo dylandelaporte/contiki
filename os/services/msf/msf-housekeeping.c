@@ -187,14 +187,24 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
       timer_restart(&t_col);
     }
 
-    /* start an ADD or a DELETE transaction if necessary and possible */
-    bool need6p= (parent_addr != NULL) && msf_sixp_is_request_wait_timer_expired();
-    if (!need6p)
+    if (parent_addr == NULL)
+        continue;
+
+    if (! msf_sixp_is_retry_wait_timer_expired())
         continue;
 
     if( sixp_trans_find(parent_addr) == NULL ) { //sixp_trans_find_for_sfid(parent_addr, MSF_SFID)
-      msf_num_cells_trigger_6p_transaction();
+      msf_num_cells_trigger_6p_del_transaction();
     }
+
+    /* start an ADD or a DELETE transaction if necessary and possible */
+    if (! msf_sixp_is_request_wait_timer_expired())
+        continue;
+
+    if( sixp_trans_find(parent_addr) != NULL ) //sixp_trans_find_for_sfid(parent_addr, MSF_SFID)
+        continue;
+
+    msf_num_cells_trigger_6p_add_transaction();
 
     if(cell_to_relocate != NULL) {
       // check that cell still exists

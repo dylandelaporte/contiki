@@ -53,6 +53,7 @@
 
 /* variables */
 static struct timer request_wait_timer;
+static struct timer retry_wait_timer;
 
 /*---------------------------------------------------------------------------*/
 const char *
@@ -105,6 +106,7 @@ msf_sixp_get_cell_params(const uint8_t *buf,
     *slot_offset = buf[0] + (buf[1] << 8);
     *channel_offset = buf[2] + (buf[3] << 8);
 }
+//==============================================================================
 /*---------------------------------------------------------------------------*/
 bool
 msf_sixp_is_request_wait_timer_expired(void)
@@ -135,6 +137,33 @@ msf_sixp_start_request_wait_timer(void)
   timer_set(&request_wait_timer, wait_duration_seconds * CLOCK_SECOND);
   LOG_DBG("delay the next request for %lu seconds\n", wait_duration_seconds);
 }
+/*---------------------------------------------------------------------------*/
+bool msf_sixp_is_retry_wait_timer_expired(void)
+{
+  return timer_expired(&retry_wait_timer);
+}
+/*---------------------------------------------------------------------------*/
+void msf_sixp_stop_retry_wait_timer(void)
+{
+  timer_set(&retry_wait_timer, 0);
+}
+/*---------------------------------------------------------------------------*/
+void msf_sixp_start_retry_wait_timer(void)
+{
+  clock_time_t wait_duration_seconds;
+  unsigned short random_value = random_rand();
+
+  //retry about 1-2 frame slots
+  wait_duration_seconds = MSF_SLOTFRAME_LENGTH
+                        +(( MSF_SLOTFRAME_LENGTH * random_value) / RANDOM_RAND_MAX )
+                        ;
+  wait_duration_seconds = (wait_duration_seconds* CLOCK_SECOND) / TSCH_SLOTS_PER_SECOND;
+
+  assert(timer_expired(&retry_wait_timer) != 0);
+  timer_set(&retry_wait_timer, wait_duration_seconds );
+  LOG_DBG("delay the next retry for %lu [tick]\n", wait_duration_seconds);
+}
+//==============================================================================
 /*---------------------------------------------------------------------------*/
 static
 size_t msf_sixp_reserves_cell_list(const linkaddr_t *peer_addr,

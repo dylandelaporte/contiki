@@ -223,14 +223,14 @@ msf_sixp_delete_send_request(msf_negotiated_cell_type_t cell_type)
        sixp_pkt_set_cell_list(type, code, cell_list, cell_list_len,
                               0, body, body_len) < 0) {
       LOG_ERR("cannot build a DELETE request\n");
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_retry_wait_timer();
     } else if(sixp_output(type, code, MSF_SFID, body, body_len, parent_addr,
                           sent_callback_initiator,
                           cell_to_delete, sizeof(cell_to_delete)) < 0) {
       LOG_ERR("failed to send a DELETE request to \n");
       LOG_ERR_LLADDR(parent_addr);
       LOG_ERR_("\n");
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_retry_wait_timer();
     } else {
       LOG_INFO("sent a DELETE %s request to the parent: ", msf_negotiated_cell_type_str(cell_type) );
       LOG_INFO_LLADDR(parent_addr);

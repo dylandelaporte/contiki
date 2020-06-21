@@ -276,7 +276,7 @@ bool msf_num_cells_request_rx_link(void){
 
 /*---------------------------------------------------------------------------*/
 void
-msf_num_cells_trigger_6p_transaction(void)
+msf_num_cells_trigger_6p_add_transaction(void)
 {
   if(rx_num_cells.scheduled < least_rx_requires() ) {
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
@@ -286,17 +286,22 @@ msf_num_cells_trigger_6p_transaction(void)
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
   } else if(rx_num_cells.scheduled < rx_num_cells.required) {
     msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
-  } else if(tx_num_cells.scheduled > tx_num_cells.required) {
-    msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
-  } else if(rx_num_cells.scheduled > rx_num_cells.required) {
-    msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
-  } else if(need_keep_alive) {
-    msf_sixp_count_send_request();
-    need_keep_alive = false;
-  } else {
-    /* nothing to do */
   }
 }
+
+void msf_num_cells_trigger_6p_del_transaction(void){
+    if(tx_num_cells.scheduled > tx_num_cells.required) {
+        msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
+    } else if(rx_num_cells.scheduled > rx_num_cells.required) {
+        msf_sixp_delete_send_request(MSF_NEGOTIATED_CELL_TYPE_RX);
+    } else if(need_keep_alive) {
+        msf_sixp_count_send_request();
+        need_keep_alive = false;
+    } else {
+        /* nothing to do */
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_num_cells_show(shell_output_func output)

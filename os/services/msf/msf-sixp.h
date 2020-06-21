@@ -78,8 +78,10 @@ void msf_sixp_set_cell_params(uint8_t *buf, const tsch_link_t *cell);
 void msf_sixp_get_cell_params(const uint8_t *buf,
                               uint16_t *slot_offset, uint16_t *channel_offset);
 
+//=============================================================================
 /**
  * \brief Return whether the waiting timer is expired or not
+          this timer used by 6P transactons, that ocupy resources (ADD/REL), if fail.
  * \return true if it's expired, otherwise false
  */
 bool msf_sixp_is_request_wait_timer_expired(void);
@@ -94,6 +96,24 @@ void msf_sixp_stop_request_wait_timer(void);
  */
 void msf_sixp_start_request_wait_timer(void);
 
+/**
+ * \brief Return whether the waiting retry timer is expired or not.
+ *          this timer used by 6P transactons, that not takes resources (DEL), if fail.
+ * \return true if it's expired, otherwise false
+ */
+bool msf_sixp_is_retry_wait_timer_expired(void);
+
+/**
+ * \brief Stop the waiting timer
+ */
+void msf_sixp_stop_retry_wait_timer(void);
+
+/**
+ * \brief Start the waiting timer
+ */
+void msf_sixp_start_retry_wait_timer(void);
+
+//=============================================================================
 /**
  * \brief Fill a CellList buffer with reserved cells
  * \param peer_addr MAC address of the target peer for which cells are reserved

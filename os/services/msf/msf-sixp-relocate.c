@@ -310,10 +310,14 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
                         msf_rel_sent_callback_initiator, NULL, 0) < 0) {
     LOG_ERR("failed to send a RELOCATE request \n");
     msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_retry_wait_timer();
+    //this will mark that relocate starts, so not take it for relocation
+    msf_avoid_expose_link_cell(cell_to_relocate);
   }
-  //this will mark taht relocate starts, so not take it for relocation
-  msf_avoid_expose_link_cell(cell_to_relocate);
+  else {
+      //this will mark that relocate starts, so not take it for relocation
+      msf_avoid_expose_link_cell(cell_to_relocate);
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
