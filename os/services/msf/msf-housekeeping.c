@@ -232,6 +232,8 @@ msf_housekeeping_stop(void)
   }
 }
 /*---------------------------------------------------------------------------*/
+#define MSF_SOFT_PARENT_SWITCH 1
+
 void
 msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
 {
@@ -243,6 +245,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
   LOG_INFO_LLADDR(new_parent);
   LOG_INFO_("\n");
 
+#if !MSF_SOFT_PARENT_SWITCH
   if(parent_addr != NULL) {
     /* CLEAR all the cells scheduled with the old parent */
     sixp_trans_t *trans = sixp_trans_find_for_sfid(parent_addr, MSF_SFID);
@@ -259,9 +262,11 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
     }
   }
 
+  cell_to_relocate = NULL;
+#endif
+
   /* start allocating negotiated cells with new_parent */
   /* reset the timer so as to send a request immediately */
-  cell_to_relocate = NULL;
   msf_sixp_stop_request_wait_timer();
   assert(msf_sixp_is_request_wait_timer_expired());
 
