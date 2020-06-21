@@ -911,6 +911,12 @@ int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
 }
 
 int nrsf_task_notify_cells(nrsfTask* t, const char* info){
+
+    const linkaddr_t *peer_addr = tsch_queue_get_nbr_address(t->nbr);
+    if (sixp_trans_find(peer_addr) != NULL){
+        return 0;
+    }
+
     SIXPeerHandle hpeer;
     sixp_cell_t ops[nrsfREQ_OPS_LIMIT];
     SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
@@ -927,7 +933,7 @@ int nrsf_task_notify_cells(nrsfTask* t, const char* info){
     sixp_pkt_cells_assign(&hpeer.h, op);
     hpeer.h.body_len  = sizeof(sixp_cell_t)*ok;
     hpeer.h.code.cmd  = SIXP_PKT_CMD_ADD;
-    hpeer.addr        = tsch_queue_get_nbr_address(t->nbr);
+    hpeer.addr        = peer_addr;
     nrsf_sixp_single_send_request(&hpeer, info);
     return 1;
 }
