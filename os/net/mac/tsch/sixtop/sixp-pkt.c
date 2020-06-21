@@ -1275,5 +1275,31 @@ SIXPError sixp_pkt_parse_next_cells(SIXPHandle* h, SIXPCellsHandle* dst){
     return ok;
 }
 
+bool sixp_pkt_cells_have(SIXPCellsPkt* pkt, sixp_cell_t x){
+    for (int i = 0; i < pkt->head.num_cells; ++i)
+        if (pkt->cells[i].raw == x.raw)
+            return true;
+    return false;
+}
+
+//==============================================================================
+const char* sixp_pkt_cell_option_name(sixp_pkt_cell_option_t x){
+    switch (x){
+        case SIXP_PKT_CELL_OPTION_TX: return "TX";
+        case SIXP_PKT_CELL_OPTION_RX: return "RX";
+        case SIXP_PKT_CELL_OPTION_SHARED:return "SH";
+        default: return "xx";
+    }
+}
+
+const char* sixp_pkt_cell_options_str(sixp_pkt_cell_options_t x){
+    if (x == SIXP_PKT_CELL_OPTION_TX)
+        return "TX";
+    else if (x == SIXP_PKT_CELL_OPTION_RX)
+        return "RX";
+    else
+        return "xx";
+}
+
 
 /** @} */

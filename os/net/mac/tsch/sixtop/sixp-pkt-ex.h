@@ -118,9 +118,20 @@ void sixp_pkt_cells_reset(SIXPCellsPkt* pkt){
 }
 
 static inline
+unsigned sixp_pkt_cells_size(SIXPCellsPkt* pkt){
+    return (pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
+}
+
+static inline
+unsigned sixp_pkt_cells_total(SIXPCellsPkt* pkt){
+    return sizeof(pkt->head)+sixp_pkt_cells_size(pkt);
+}
+
+
+static inline
 void sixp_pkt_cells_assign(SIXPHandle* h, SIXPCellsPkt* pkt){
     h->body             = (const uint8_t*)&pkt->head;
-    h->body_len         = sizeof(pkt->head)+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
+    h->body_len         = sixp_pkt_cells_size(pkt);
 }
 
 static inline
@@ -148,6 +159,8 @@ sixp_cell_t sixp_pkt_get_cell(const void* buf, unsigned idx) {
     res.raw = ((sixp_pkt_cell_t*)buf)[idx].raw;
     return res;
 }
+
+bool sixp_pkt_cells_have(SIXPCellsPkt* pkt, sixp_cell_t x);
 
 
 //==============================================================================
