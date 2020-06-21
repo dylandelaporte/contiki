@@ -1275,6 +1275,13 @@ SIXPError sixp_pkt_parse_next_cells(SIXPHandle* h, SIXPCellsHandle* dst){
     return ok;
 }
 
+bool sixp_pkt_cells_have(SIXPCellsPkt* pkt, sixp_cell_t x){
+    for (int i = 0; i < pkt->head.num_cells; ++i)
+        if (pkt->cells[i].raw == x.raw)
+            return true;
+    return false;
+}
+
 //==============================================================================
 const char* sixp_pkt_cell_option_name(sixp_pkt_cell_option_t x){
     switch (x){

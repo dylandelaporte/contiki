@@ -120,6 +120,7 @@ typedef enum {
 //an application structure
 union sixp_cell {
     uint32_t    raw;
+    uint8_t     bytes[4];
     struct __attribute__((packed)) cell_t {
         uint16_t    slot;
         uint16_t    chanel;
