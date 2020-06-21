@@ -935,6 +935,8 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
         cell = list_item_next(cell))
     {
       if (cell->timeslot != x.field.slot) continue;
+      if (cell->channel_offset != x.field.chanel) continue;
+
       if (cell->link_options & LINK_OPTION_LINK_TO_DELETE)
           continue;
 
@@ -944,8 +946,7 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
       //only TX links can mix in one slot
-      bool can_overlap = is_link_tx(cell->link_options)
-                      && is_link_tx(x.field.link_options);
+      bool can_overlap = true;
 
       //try to eval that have any slot to relocate conflicting link
       long new_slot = msf_find_unused_slot_offset(slotframe);
