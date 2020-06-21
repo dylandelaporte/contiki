@@ -67,6 +67,10 @@ msf_cell_t msf_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return cell;
 }
 
+enum {
+    //< cell ffff.ffff - no value, use for deleted/absent cells
+    MSF_NOCELL = ~0ul,
+};
 
 
 enum AvoidOption{
@@ -126,6 +130,10 @@ int msf_avoid_state_of(AvoidOptionsResult x){
     return x & aoMARK_FIELD;
 }
 
+static inline
+AvoidOptions msf_avoid_link_option_xx(unsigned link_options){
+    return (link_options & LINK_OPTION_TX);
+}
 
 
 enum AvoidResult{
@@ -136,11 +144,14 @@ enum AvoidResult{
 };
 typedef enum AvoidResult AvoidResult;
 
+
+//------------------------------------------------------------------------------
 // same as reset all
 void msf_unvoid_all_cells();
 
 
 
+//------------------------------------------------------------------------------
 // locals avoid
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x);
 
@@ -170,7 +181,7 @@ typedef unsigned long msf_chanel_mask_t;
 msf_chanel_mask_t  msf_avoided_slot_chanels(uint16_t slot_offset);
 
 // avoids of nbr by local/remote using.
-AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange);
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptions userange);
 
 // completely unvoids nbr cells (forget nbr)
 void msf_unvoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);

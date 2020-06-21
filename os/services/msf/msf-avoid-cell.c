@@ -284,16 +284,20 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
 
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
     return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
-                                , aoUSE_LOCAL);
+                                , aoUSE_LOCAL
+                                    | msf_avoid_link_option_xx(x->link_options)
+                                );
 }
 
 // avoids cell, that can't move - autonomous calls are.
 AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x){
     return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
-                                , aoUSE_LOCAL | aoFIXED);
+                                , aoUSE_LOCAL | aoFIXED
+                                    | msf_avoid_link_option_xx(x->link_options)
+                                );
 }
 
-AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptions userange){
     return msf_avoid_mark_nbr_cell(x, n, userange);
 }
 
