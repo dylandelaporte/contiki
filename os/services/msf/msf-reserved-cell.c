@@ -49,6 +49,9 @@
 #include "msf-reserved-cell.h"
 #include "msf-avoid-cell.h"
 
+// provide: ffz
+#include "msf-bittwiddings.h"
+
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
 #define LOG_LEVEL LOG_LEVEL_MSF
@@ -97,29 +100,37 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe)
   return ret;
 }
 
-#if defined( __GNUC__ )
-static inline
-int ffz( unsigned int x ){  return __builtin_ctz(~x); }
-#elif  _XOPEN_SOURCE >= 700 \
-        || ! (_POSIX_C_SOURCE >= 200809L) \
-        || /* Glibc since 2.19: */ _DEFAULT_SOURCE \
-        || /* Glibc versions <= 2.19: */ _BSD_SOURCE \
-        || _SVID_SOURCE
-static inline
-int ffz( unsigned int x ){  return ffs(~x); }
-#elif defined(__CTZ)
-static inline
-int ffz( unsigned int x ){  return __CTZ(~x); }
-#endif
-
-uint16_t  msf_find_unused_slot_chanel(uint16_t slot){
+int  msf_find_unused_slot_chanel(uint16_t slot){
     msf_chanel_mask_t busych =  msf_avoided_slot_chanels(slot);
-    if (busych != ~0ul) {
-        return ffz(busych);
-    }
-    // all chanels are busy, select any random for hope
+
+    // random ch better avoids conflicts with other nbrs
     uint16_t ch = random_rand();
-    return ch % tsch_hopping_sequence_length.val;
+    ch %= tsch_hopping_sequence_length.val;
+
+    // there is free chanels, select random one
+    if ( ((busych >> ch)& 1)==0 )
+        return ch;
+
+    int res = ffz(busych);
+    if ( res >= TSCH_JOIN_HOPPING_SEQUENCE_SIZE() ){
+        // all chanels are busy, select any random for hope
+        return -1;
+    }
+
+    //search ch-n free chanel in set of busych, wraped around it's free cells
+    for (unsigned cset = busych>>res ; ch > 0
+        ; cset = cset >> 1, ++res )
+    {
+        if (res >= tsch_hopping_sequence_length.val){
+            res = ffz(busych);
+            cset = busych>>res;
+        }
+        if ((cset&1)==0){
+            --ch;
+        }
+    }
+
+    return res;
 }
 
 /*---------------------------------------------------------------------------*/
