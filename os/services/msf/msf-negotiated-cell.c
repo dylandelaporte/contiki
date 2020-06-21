@@ -60,11 +60,16 @@
 #define LOG_MODULE "MSF"
 #define LOG_LEVEL LOG_LEVEL_MSF
 
+/* This list uses to collect TX stats on nbr transmitions. It involved to list all
+ *  nbr x cell, on demands that retransmitions are takes on then sequently.
+ *  This list is ordered on - later slottime first.
+ *
 // this is list elements as:
 //  [tsch_link_t:]
 //  [       data ]  -> [msf_negotiated_cell_data_t:]
 //  [tsch_link_t:] <-  [next:                      ]
 //  [       data ]  -> [msf_negotiated_cell_data_t:]
+ */
 typedef struct {
   tsch_link_t *next;
   uint16_t num_tx;
@@ -93,7 +98,8 @@ static bool is_marked_as_used(const tsch_link_t *cell);
 static bool is_marked_as_unused(const tsch_link_t *cell);
 static bool is_marked_as_kept(const tsch_link_t *cell);
 
-
+static
+MSFInspectResult msf_negotiated_inspect_vs_new_link(tsch_link_t* x);
 
 //==============================================================================
 enum {
@@ -353,8 +359,9 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
       }
     }
     MSF_AFTER_CELL_USE(nbr, new_cell);
-    msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
     msf_num_cells_update_peers(1, type, peer_addr);
+    msf_negotiated_inspect_vs_new_link(new_cell);
+    msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
   }
 
   return new_cell == NULL ? -1 : 0;
@@ -954,6 +961,9 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
       if (cell->link_options & LINK_OPTION_LINK_TO_DELETE)
           continue;
+      // reserved links are inspects on negotiation add
+      if (cell->link_options & LINK_OPTION_RESERVED_LINK)
+          continue;
 
       //inspection alredy managed;
       if (msf_is_marked_as_relocate(cell))
@@ -961,7 +971,6 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
       //local links links can mix in one slot only TX
-      //bool can_overlap = true;
       bool can_overlap = msf_cellid_is_remote(x)
                       || ( is_link_tx(cell->link_options) && msf_cellid_is_tx(x) )
                       ;
@@ -971,28 +980,24 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
       //try to eval that have any slot to relocate conflicting link
       long new_slot = msf_find_unused_slot_offset(slotframe);
-      msf_chanel_mask_t busych =  msf_avoided_slot_chanels(new_slot);
+      msf_chanel_mask_t busych = -1;
+      if (new_slot >= 0){
+          // nothing can do with it
+          busych =  msf_avoided_slot_chanels(new_slot);
+      }
 
       if (busych != 0){
           // have no unconflicting slots!
-          if (!can_overlap){
+          if (!can_overlap || (busych < 0) ){
               // nothing can do with it
               LOG_ERR("!new link conflicts with ->");
               LOG_ERR_LLADDR(&cell->addr);
               LOG_ERR_("for slot %d\n", cell->timeslot);
               return irFAIL;
           }
-          //check that have unconflict chanels
-          if (cell->channel_offset != x.field.chanel)
-              return irOK;
       }
       else {
-          // since able allocate unconflicting slots, drop preserved.
-          //    This prevents from alloc link that later reallocate
-          if (cell->link_options & LINK_OPTION_RESERVED_LINK){
-              msf_reserved_release_link(cell);
-              return irOK;
-          }
+          // since able allocate unconflicting slots.
       }
 
       LOG_INFO("new link relocate slot %d ->", cell->timeslot);
@@ -1002,4 +1007,17 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
       return irRELOCATE;
     }
     return irNOCELL;
+}
+
+static
+MSFInspectResult msf_negotiated_inspect_vs_new_link(tsch_link_t* x){
+    //if ( msf_is_avoid_local_cell( msf_cell_of_link(x) ) < 0 )
+    if ( msf_is_avoid_cell(msf_cell_of_link(x)) < 0){
+        return irNOCELL;
+    }
+    LOG_INFO("new cell(%u+%u) relocate ->", x->timeslot, x->channel_offset);
+    LOG_INFO_LLADDR(&x->addr);
+    LOG_INFO_("\n");
+    msf_housekeeping_request_cell_to_relocate(x);
+    return irRELOCATE;
 }
