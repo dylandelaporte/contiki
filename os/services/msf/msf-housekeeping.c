@@ -318,7 +318,7 @@ void msf_housekeeping_inspect_link_consintensy(tsch_link_t *cell){
 
 void msf_housekeeping_inspect_cell_consintensy(
                                 msf_cell_t cell,  tsch_neighbor_t *n,
-                                sixp_pkt_cell_options_t cell_opts)
+                                uint8_t cell_opts)
 {
     // check auto here, since it lightweight
     if (msf_autonomous_inspect_vs_cell(cell))

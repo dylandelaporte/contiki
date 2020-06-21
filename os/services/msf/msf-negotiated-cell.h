@@ -64,6 +64,8 @@ union MSFCellID{
     struct {
         uint16_t    slot;
         uint8_t     chanel;
+        // @sa AvoidOptions - this is a mix of cell:meta + options, that represents
+        //           AvoidOptions of cell
         uint8_t     link_options;
     }           field;
     //unsigned long   raw;
@@ -77,18 +79,29 @@ MSFCellID   msf_cellid_of_link(const tsch_link_t* x){
     cell.field.slot         = x->timeslot;
     assert(x->channel_offset <= 0xff);
     cell.field.chanel       = x->channel_offset;
-    cell.field.link_options = (uint8_t)x->link_options;
+    // TODO: need aoFIXED status here somehow.
+    cell.field.link_options = (uint8_t)(x->link_options & aoTX);
     return cell;
 }
 
 static inline
-MSFCellID   msf_cellid_of_sixp(msf_cell_t x, sixp_pkt_cell_options_t opts){
+MSFCellID   msf_cellid_of_sixp(msf_cell_t x, uint8_t opts){
     MSFCellID cell;
     cell.field.slot         = x.field.slot;
     assert(x.field.chanel <= 0xff);
     cell.field.chanel       = x.field.chanel;
     cell.field.link_options = (uint8_t)opts;
     return cell;
+}
+
+static inline
+bool msf_cellid_is_remote(MSFCellID x){
+    return (x.field.link_options & aoUSE_REMOTE) != 0;
+}
+
+static inline
+bool msf_cellid_is_tx(MSFCellID x){
+    return (x.field.link_options & aoTX) != 0;
 }
 
 
