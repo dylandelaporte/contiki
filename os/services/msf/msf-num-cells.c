@@ -210,6 +210,49 @@ msf_num_cells_update(void)
     update(MSF_NEGOTIATED_CELL_TYPE_RX);
   }
 }
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Update NumCells* counters, provided by specified peer
+ * \details This is event handler, to update NumCells* counters on add/delete
+ *          negotiated links.
+ *      It upadates Scheduled counters, to provide actual value at runtime.
+ *      This is requred to avoid 6p_transaction trigger caused by inadecvate
+ *          obsolete Scheduled value.
+ *      This rises when parent peer opens/delete cells concuretly, by conflicts
+ *          resolution involved
+ */
+void msf_num_cells_update_peers(int inc, msf_negotiated_cell_type_t cell_type
+                                , const linkaddr_t *peer_addr)
+{
+    if (inc == 0) return;
+
+    const linkaddr_t * parent_addr = msf_housekeeping_get_parent_addr();
+    if(parent_addr == NULL) return;
+
+    if ( !linkaddr_cmp(parent_addr, peer_addr)) return;
+
+    CellsStats*   num_cells;
+    if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+      num_cells = &tx_num_cells;
+    }
+    else if(cell_type == MSF_NEGOTIATED_CELL_TYPE_RX) {
+        num_cells = &rx_num_cells;
+    }
+    else {
+        // WT?
+        return;
+    }
+
+    assert( (num_cells->scheduled + inc) >= 0 );
+    if ( (num_cells->scheduled + inc) >= 0)
+        num_cells->scheduled += inc;
+
+    LOG_DBG("for upward %s NumCellsScheduled: %u\n", msf_negotiated_cell_type_str(cell_type)
+                , num_cells->scheduled
+            );
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_num_cells_update_parent_tx_used(uint16_t count)

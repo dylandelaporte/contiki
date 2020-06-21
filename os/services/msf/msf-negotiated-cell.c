@@ -53,6 +53,7 @@
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
 #include "msf-avoid-cell.h"
+#include "msf-num-cells.h"
 #include "msf-sixp-relocate.h"
 
 #include "sys/log.h"
@@ -353,6 +354,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
     }
     MSF_AFTER_CELL_USE(nbr, new_cell);
     msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
+    msf_num_cells_update_peers(1, type, peer_addr);
   }
 
   return new_cell == NULL ? -1 : 0;
@@ -481,6 +483,7 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 
   msf_unvoid_link_cell(cell);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
+  msf_num_cells_update_peers(-1, cell_type, &cell->addr);
 }
 
 void msf_negotiated_cell_delete(tsch_link_t *cell){
