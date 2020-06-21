@@ -45,6 +45,7 @@
 
 #include "msf-conf.h"
 #include "msf-avoid-cell.h"
+#include "msf-negotiated-cell.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF void"
@@ -696,4 +697,67 @@ int msf_avoid_append_nbr_cell_to_relocate(SIXPCellsPkt* pkt, tsch_neighbor_t *n)
         }
     }
     return 0;
+}
+
+//------------------------------------------------------------------------------
+static
+const char* cell_arrow(int x){
+    return msf_negotiated_cell_type_arrow(
+            (x & aoTX)? MSF_NEGOTIATED_CELL_TYPE_TX
+                                    : MSF_NEGOTIATED_CELL_TYPE_RX
+                                         );
+}
+
+
+// @brief Dumps nbr cell
+#define MSF_PRINTF(...) LOG_OUTPUT(__VA_ARGS__)
+void msf_avoid_dump_idx_cell(int idx){
+    msf_cell_t* cell = &(avoids_list[idx]);
+    MSF_PRINTF("[%02u+%02u] : %02x %s", cell->field.slot, cell->field.chanel
+                    , avoids_ops[idx], cell_arrow(avoids_ops[idx])
+                    );
+    LOG_LLADDR(LOG_LEVEL_ERR, tsch_queue_get_nbr_address(avoids_nbrs[idx]) );
+    MSF_PRINTF("\n");
+}
+
+void msf_avoid_dump_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
+    int idx = msf_avoids_nbr_cell_idx(x, n);
+    if (idx >= 0)
+        msf_avoid_dump_idx_cell(idx);
+}
+
+void msf_avoid_dump_peer_cell(msf_cell_t x, const linkaddr_t * peer_addr){
+    msf_avoid_dump_nbr_cell(x, get_addr_nbr(peer_addr) );
+}
+
+void msf_avoid_dump_cell(msf_cell_t x){
+    msf_cell_t* cell = avoids_list;
+    bool ok = false;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->raw == x.raw){
+            msf_avoid_dump_idx_cell(idx);
+            ok = true;
+        }
+    }
+    if (!ok){
+        MSF_PRINTF("[%02u+%02u] : #\n", x.field.slot, x.field.chanel);
+    }
+}
+
+void msf_avoid_dump_local_cells(void){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->raw != cellFREE)
+        if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0 )
+            msf_avoid_dump_idx_cell(idx);
+    }
+}
+
+void msf_avoid_dump_slot(unsigned slot){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->field.slot != slot)
+        if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0 )
+            msf_avoid_dump_idx_cell(idx);
+    }
 }

@@ -158,9 +158,11 @@ void msf_rel_sent_callback_responder(void *arg, uint16_t arg_len,
       if(msf_negotiated_cell_add(dest_addr, MSF_NEGOTIATED_CELL_TYPE_RX,
                                  slot_offset, channel_offset) >= 0)
       {
-          if (msf_is_negotiated_cell(cell_to_relocate))
+          if (msf_is_negotiated_cell(cell_to_relocate)){
+              LOG_INFO("relocated cell well, drop original\n");
               /* all good */
               msf_negotiated_cell_delete(cell_to_relocate);
+          }
           else{
               LOG_ERR("relocated cell loosed!\n");
           }

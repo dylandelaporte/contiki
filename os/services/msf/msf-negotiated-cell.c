@@ -266,6 +266,17 @@ const char* msf_negotiated_cell_type_str(msf_negotiated_cell_type_t type){
         return "?X";
 }
 
+const char* msf_negotiated_cell_type_arrow(msf_negotiated_cell_type_t x){
+    if(x == MSF_NEGOTIATED_CELL_TYPE_TX)
+        return "->";
+    else if (x == MSF_NEGOTIATED_CELL_TYPE_RX)
+        return "<-";
+    else if (x == MSF_NEGOTIATED_CELL_TYPE_NO)
+        return "-#-";
+    else
+        return "?-";
+}
+/*---------------------------------------------------------------------------*/
 int
 msf_negotiated_cell_add(const linkaddr_t *peer_addr,
                         msf_negotiated_cell_type_t type,
@@ -990,9 +1001,10 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
           // have no unconflicting slots!
           if (!can_overlap || (busych < 0) ){
               // nothing can do with it
-              LOG_ERR("!new link conflicts with ->");
+              LOG_ERR("!new link[%u+%u]:%x conflicts with ->"
+                          , x.field.slot, x.field.chanel, x.field.link_options );
               LOG_ERR_LLADDR(&cell->addr);
-              LOG_ERR_("for slot %d\n", cell->timeslot);
+              LOG_ERR_("\n");
               return irFAIL;
           }
       }
@@ -1011,13 +1023,19 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
 static
 MSFInspectResult msf_negotiated_inspect_vs_new_link(tsch_link_t* x){
+    msf_cell_t cell = msf_cell_of_link(x);
+
     //if ( msf_is_avoid_local_cell( msf_cell_of_link(x) ) < 0 )
-    if ( msf_is_avoid_cell(msf_cell_of_link(x)) < 0){
+    if ( msf_is_avoid_cell(cell) < 0){
         return irNOCELL;
     }
+
     LOG_INFO("new cell(%u+%u) relocate ->", x->timeslot, x->channel_offset);
     LOG_INFO_LLADDR(&x->addr);
-    LOG_INFO_("\n");
+    LOG_INFO_(" by busy:\n");
+    if (LOG_LEVEL >= LOG_LEVEL_INFO)
+        msf_avoid_dump_cell(cell);
+
     msf_housekeeping_request_cell_to_relocate(x);
     return irRELOCATE;
 }

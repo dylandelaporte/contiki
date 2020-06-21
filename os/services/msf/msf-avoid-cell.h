@@ -202,6 +202,8 @@ AvoidOptionsResult  msf_is_avoid_link_cell(const tsch_link_t* x);
 AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
 
 
+
+//------------------------------------------------------------------------------
 // mark avoid cell defult - denotes, that all nbrs are know it.
 //      default cells are ignored in enumerations
 void msf_avoid_link_cell_default(const tsch_link_t* x);
@@ -264,6 +266,18 @@ tsch_neighbor_t* msf_avoid_append_cell_to_relocate(SIXPCellsPkt* cells);
 // @return - =0 - no cells to enumerate
  * */
 int msf_avoid_append_nbr_cell_to_relocate(SIXPCellsPkt* cells, tsch_neighbor_t *n);
+
+
+
+//------------------------------------------------------------------------------
+// @brief Dumps nbr cell
+void msf_avoid_dump_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+void msf_avoid_dump_peer_cell(msf_cell_t x, const linkaddr_t * parent_addr);
+void msf_avoid_dump_cell(msf_cell_t x);
+void msf_avoid_dump_slot(unsigned slot);
+void msf_avoid_dump_local_cells(void);
+
+
 
 
 #endif /* _MSF_RESERVED_CELL_H_ */

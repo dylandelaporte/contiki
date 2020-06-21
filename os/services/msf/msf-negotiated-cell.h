@@ -57,6 +57,7 @@ typedef enum {
 } msf_negotiated_cell_type_t;
 
 const char* msf_negotiated_cell_type_str(msf_negotiated_cell_type_t x);
+const char* msf_negotiated_cell_type_arrow(msf_negotiated_cell_type_t x);
 
 
 //----------------------------------------------------------------------------

@@ -146,6 +146,10 @@ msf_sixp_fill_cell_list(const linkaddr_t *peer_addr,
   while(filled_cell_list_len < cell_list_len) {
     reserved_cell = msf_reserved_cell_add(peer_addr, cell_type, -1, -1);
     if(reserved_cell == NULL) {
+      if (LOG_LEVEL >= LOG_LEVEL_DBG){
+            LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
+            msf_avoid_dump_local_cells();
+      }
       break;
     } else {
       msf_sixp_set_cell_params(cell_list + filled_cell_list_len, reserved_cell);
@@ -172,18 +176,30 @@ msf_sixp_reserve_one_cell(const linkaddr_t *peer_addr,
         offset += sizeof(sixp_pkt_cell_t)) {
       msf_sixp_get_cell_params(cell_list + offset,
                                &slot_offset, &channel_offset);
-      if((reserved_cell = msf_reserved_cell_add(peer_addr,
-                                                cell_type,
-                                                slot_offset,
-                                                channel_offset)) != NULL) {
-        break;
+      reserved_cell = msf_reserved_cell_add(peer_addr, cell_type,
+                                            slot_offset, channel_offset);
+      if((reserved_cell) != NULL)
+      {
+        return reserved_cell;
       } else {
         /*
          * cannot reserve a cell (most probably, this slot_offset is
          * occupied; try the next one
          */
+        if (LOG_LEVEL >= LOG_LEVEL_DBG){
+            LOG_DBG_("cell busy:");
+            msf_avoid_dump_cell( msf_cell_at(slot_offset, channel_offset) );
+        }
       }
     }
+  }
+  /*
+   * cannot reserve a cell (most probably, this slot_offset is
+   * occupied; try the next one
+   */
+  if (LOG_LEVEL >= LOG_LEVEL_DBG){
+      LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
+      msf_avoid_dump_local_cells();
   }
   return reserved_cell;
 }
