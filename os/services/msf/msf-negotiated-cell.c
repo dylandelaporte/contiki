@@ -990,7 +990,7 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
       if (cell->channel_offset != x.field.chanel) continue;
 
       //try to eval that have any slot to relocate conflicting link
-      long new_slot = msf_find_unused_slot_offset(slotframe);
+      long new_slot = msf_find_unused_slot_offset(slotframe, RESERVE_NEW_CELL, NULL );
       msf_chanel_mask_t busych = -1;
       if (new_slot >= 0){
           // nothing can do with it

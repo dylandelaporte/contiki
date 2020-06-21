@@ -136,20 +136,16 @@ msf_sixp_start_request_wait_timer(void)
   LOG_DBG("delay the next request for %lu seconds\n", wait_duration_seconds);
 }
 /*---------------------------------------------------------------------------*/
-size_t
-msf_sixp_fill_cell_list(const linkaddr_t *peer_addr,
-                        msf_negotiated_cell_type_t cell_type,
+static
+size_t msf_sixp_reserves_cell_list(const linkaddr_t *peer_addr,
+                        msf_negotiated_cell_type_t cell_type, ReserveMode mode,
                         uint8_t *cell_list, size_t cell_list_len)
 {
   tsch_link_t *reserved_cell;
   size_t filled_cell_list_len = 0;
   while(filled_cell_list_len < cell_list_len) {
-    reserved_cell = msf_reserved_cell_add(peer_addr, cell_type, -1, -1);
+    reserved_cell = msf_reserved_cell_add(peer_addr, cell_type, mode, -1);
     if(reserved_cell == NULL) {
-      if (LOG_LEVEL >= LOG_LEVEL_DBG){
-            LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
-            msf_avoid_dump_local_cells();
-      }
       break;
     } else {
       msf_sixp_set_cell_params(cell_list + filled_cell_list_len, reserved_cell);
@@ -158,15 +154,71 @@ msf_sixp_fill_cell_list(const linkaddr_t *peer_addr,
   }
   return filled_cell_list_len;
 }
+
+size_t
+msf_sixp_fill_cell_list(const linkaddr_t *peer_addr,
+                        msf_negotiated_cell_type_t cell_type,
+                        uint8_t *cell_list, size_t cell_list_len)
+{
+    return msf_sixp_reserves_cell_list(peer_addr, cell_type, RESERVE_NEW_CELL
+                                        , cell_list, cell_list_len);
+}
+
+static
+size_t msf_sixp_reserve_cell_pkt(const linkaddr_t *peer_addr, ReserveMode mode,
+                                SIXPCellsPkt* pkt, unsigned cells_limit
+                                )
+{
+    size_t len;
+    msf_negotiated_cell_type_t cell_type = (msf_negotiated_cell_type_t)pkt->head.cell_options;
+    len = msf_sixp_reserves_cell_list(peer_addr, cell_type, mode
+            , (uint8_t*)&(pkt->cells[pkt->head.num_cells])
+            , (cells_limit - pkt->head.num_cells)* sizeof(sixp_cell_t)
+            );
+    len = len/sizeof(sixp_cell_t);
+    pkt->head.num_cells+= len;
+    return len;
+}
 /*---------------------------------------------------------------------------*/
-tsch_link_t *
-msf_sixp_reserve_one_cell(const linkaddr_t *peer_addr,
+size_t msf_sixp_reserve_cells_pkt(const linkaddr_t *peer_addr,
+                                SIXPCellsPkt* pkt, unsigned cells_limit
+                                )
+{
+    /* prefer to reserve slots, that are used by close nbrs. This helps keep free
+     * slots avail to same nbrs
+     * */
+    int cnt = msf_sixp_reserve_cell_pkt(peer_addr, RESERVE_NBR_BUSY_CELL ,pkt, cells_limit);
+    if( cnt > 0 )
+        LOG_DBG("reserved %d 1hop cells\n", cnt);
+
+    if (pkt->head.num_cells >= cells_limit)
+        return cnt;
+
+    cnt += msf_sixp_reserve_cell_pkt(peer_addr, RESERVE_NEW_CELL, pkt, cells_limit);
+
+    if (cnt < cells_limit)
+    if (LOG_LEVEL >= LOG_LEVEL_DBG){
+          msf_negotiated_cell_type_t cell_type
+                      = (msf_negotiated_cell_type_t)pkt->head.cell_options;
+          LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
+          msf_avoid_dump_local_cells();
+    }
+
+    return cnt;
+}
+/*---------------------------------------------------------------------------*/
+static
+tsch_link_t * msf_sixp_reserve_one_cell_of_list(const linkaddr_t *peer_addr,
+                            // this is slot wich is reserves by override strategy
+                            uint16_t slot_override,
                           msf_negotiated_cell_type_t cell_type,
-                          const uint8_t *cell_list, size_t cell_list_len)
+                          const void *cell_src, size_t cell_list_len
+                          )
 {
   size_t offset;
   uint16_t slot_offset, channel_offset;
   tsch_link_t *reserved_cell;
+  const uint8_t* cell_list = (const uint8_t *)cell_src;
 
   if(peer_addr == NULL || cell_list == NULL) {
     reserved_cell = NULL;
@@ -176,8 +228,12 @@ msf_sixp_reserve_one_cell(const linkaddr_t *peer_addr,
         offset += sizeof(sixp_pkt_cell_t)) {
       msf_sixp_get_cell_params(cell_list + offset,
                                &slot_offset, &channel_offset);
+      if (slot_offset != slot_override)
       reserved_cell = msf_reserved_cell_add(peer_addr, cell_type,
                                             slot_offset, channel_offset);
+      else
+          reserved_cell = msf_reserved_cell_over(peer_addr, cell_type,
+                                  msf_cell_at(slot_offset, channel_offset) );
       if((reserved_cell) != NULL)
       {
         return reserved_cell;
@@ -202,6 +258,24 @@ msf_sixp_reserve_one_cell(const linkaddr_t *peer_addr,
       msf_avoid_dump_local_cells();
   }
   return reserved_cell;
+}
+
+/*---------------------------------------------------------------------------*/
+tsch_link_t * msf_sixp_reserve_one_cell(const linkaddr_t *peer_addr,
+                          msf_negotiated_cell_type_t cell_type,
+                          const uint8_t *cell_list, size_t cell_list_len)
+{
+    return msf_sixp_reserve_one_cell_of_list(peer_addr, (uint16_t)~0u, cell_type
+                        ,cell_list, cell_list_len);
+}
+
+tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
+                                       const void *cell_list, size_t cell_list_len)
+{
+    return msf_sixp_reserve_one_cell_of_list( &cell_to_override->addr
+                        , cell_to_override->timeslot
+                        , msf_negotiated_link_cell_type(cell_to_override)
+                        , cell_list, cell_list_len);
 }
 /*---------------------------------------------------------------------------*/
 tsch_link_t *

@@ -53,6 +53,8 @@
 #include "msf-sixp-delete.h"
 #include "msf-sixp-relocate.h"
 
+#include "net/mac/tsch/sixtop/sixp-pkt-ex.h"
+
 /**
  * \brief Return a string for a specifired return code
  */
@@ -104,6 +106,20 @@ size_t msf_sixp_fill_cell_list(const linkaddr_t *peer_addr,
                                uint8_t *cell_list, size_t cell_list_len);
 
 /**
+ * \brief Fill a CellList pkt buffer with reserved cells
+          prefer to reserve slots, that are used by close nbrs. This helps keep free
+          slots avail to same nbrs
+ * \param peer_addr MAC address of the target peer for which cells are reserved
+ * \param cell_type Type of reserved cells (TX or RX)
+ * \param pkt       A pointer to a CellList buffer
+ * \param cells_limit Length of the packet CellList buffer
+ * \return the number of cells appends to pkt
+ */
+size_t msf_sixp_reserve_cells_pkt(const linkaddr_t *peer_addr,
+                                SIXPCellsPkt* pkt, unsigned pkt_limit
+                                );
+
+/**
  * \brief Reserve one of cells found in a given CellList
  * \param peer_addr MAC address of the peer
  * \param cell_type Type of a cell to reserve
@@ -117,6 +133,21 @@ tsch_link_t *msf_sixp_reserve_one_cell(const linkaddr_t *peer_addr,
                                        size_t cell_list_len);
 
 /**
+ * \brief Reserve one of cells found in a given CellList, and can override
+ *          <cell_to_override> with differ chanel. REPLACE use it.
+ *        This is selects cells from CellList, and if in same slot as <cell_to_override>
+ *          - reserves link on differ chanel for later drop original link.
+ *
+ * \param peer_addr MAC address of the peer
+ * \param cell_type Type of a cell to reserve
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
+                                       const void* cell_list, size_t cell_list_len);
+
+/**
  * \brief Return a scheduled cell from a given CellList
  * \param peer_addr MAC address of the peer
  * \param link_options Link options of interest
@@ -128,5 +159,22 @@ tsch_link_t *msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,
                                           uint8_t link_options,
                                           const uint8_t *cell_list,
                                           size_t cell_list_len);
+
+
+
+//=============================================================================
+// this is a ordinary maximum 6P packet, that handy for temporary buffer to build
+//      6P MSF messages
+enum {
+    //RELOCATION cmd need this size
+    MSFCellsPkt_LIMIT = MSF_6P_CELL_LIST_MAX_LEN+1
+};
+union MSFCellsPkt {
+        sixp_cell_t   as_cells[MSFCellsPkt_LIMIT + 1];
+        SIXPCellsPkt  as_pkt;
+        uint8_t       body[0];
+};
+typedef union MSFCellsPkt MSFCellsPkt;
+
 #endif /* !_MSF_SIXP_COMMON_H_ */
 /** @} */

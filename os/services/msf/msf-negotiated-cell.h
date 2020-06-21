@@ -59,6 +59,11 @@ typedef enum {
 const char* msf_negotiated_cell_type_str(msf_negotiated_cell_type_t x);
 const char* msf_negotiated_cell_type_arrow(msf_negotiated_cell_type_t x);
 
+static inline
+msf_negotiated_cell_type_t msf_negotiated_link_cell_type(const tsch_link_t* x){
+    return (msf_negotiated_cell_type_t)
+                ( x->link_options & (LINK_OPTION_TX|LINK_OPTION_RX) );
+}
 
 //----------------------------------------------------------------------------
 // @brief compact cell link id, for pass as process event parameter

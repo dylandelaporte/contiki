@@ -188,6 +188,23 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
     return -1;
 }
 
+/* @brief check that cell is used by 1hop nbr, not local
+ * @return < 0 - no cell found
+ *         >= 0 - have some cell
+*/
+int  msf_is_avoid_close_slot_outnbr(uint16_t slot_offset, const tsch_neighbor_t *skip_nbr)
+{
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (avoids_nbrs[idx] != skip_nbr)
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE) == aoUSE_REMOTE_1HOP)
+                return avoids_ops[idx];
+        }
+    }
+    return -1;
+}
+
 
 AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
     msf_cell_t* cell = avoids_list;
