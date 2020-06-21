@@ -67,6 +67,8 @@ msf_cell_t msf_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return cell;
 }
 
+
+
 enum AvoidOption{
     //aoRX    = LINK_OPTION_RX,
     //aoTX    = LINK_OPTION_TX,
@@ -109,7 +111,18 @@ enum AvoidOption{
     aoRELOCATING    = aoRELOCATE | aoMARK,
 };
 typedef enum AvoidOption AvoidOption;
+
+/* @return < 0 - no cell found
+ *         >= 0 - AvoidOptions for cell
+ * */
 typedef int             AvoidOptionsResult;
+
+static inline
+int msf_avoid_state_of(AvoidOptionsResult x){
+    return x & aoMARK_FIELD;
+}
+
+
 
 enum AvoidResult{
     arNEW = 1 ,             //< for new cell appends
@@ -169,8 +182,9 @@ void msf_release_nbr_cells_local(const tsch_neighbor_t* n);
 /* @return < 0 - no cell found
  *         >= 0 - AvoidOptions for cell
  * */
-int  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
-int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
+AvoidOptionsResult  msf_is_avoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+AvoidOptionsResult  msf_is_avoid_link_cell(const tsch_link_t* x);
+AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
 
 
 // mark avoid cell defult - denotes, that all nbrs are know it.

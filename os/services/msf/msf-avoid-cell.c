@@ -102,7 +102,11 @@ int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return msf_is_avoid_cell( msf_cell_at(slot_offset, channel_offset) );
 }
 
-int  msf_is_avoid_nbr_cell(msf_cell_t cell, const tsch_neighbor_t *n){
+AvoidOptionsResult  msf_is_avoid_link_cell(const tsch_link_t* x){
+    return msf_is_avoid_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr));
+}
+
+AvoidOptionsResult  msf_is_avoid_nbr_cell(msf_cell_t cell, const tsch_neighbor_t *n){
     int x = msf_avoids_nbr_cell_idx(cell, n);
     if (x < 0)
         return x;
@@ -184,7 +188,7 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
 }
 
 
-int  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
+AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->field.slot == slot_offset){
