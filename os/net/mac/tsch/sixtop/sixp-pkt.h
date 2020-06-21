@@ -501,5 +501,11 @@ void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t cod
 int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
                     const uint8_t *body, uint16_t body_len );
 
+
+//-----------------------------------------------------------------------------
+const char* sixp_pkt_cell_option_name(sixp_pkt_cell_option_t x);
+const char* sixp_pkt_cell_options_str(sixp_pkt_cell_options_t x);
+
+
 #endif /* !_SIXP_PKT_H_ */
 /** @} */
