@@ -119,8 +119,11 @@ static
 int msf_avoids_cell_idx(msf_cell_t x){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = avoids_list_num; idx > 0; --idx, cell++){
-        if (cell->raw == x.raw)
-            return cell-avoids_list;
+        if (cell->raw == x.raw){
+            int idx = cell-avoids_list;
+            if (avoids_ops[idx]& aoUSE)
+                return idx;
+        }
     }
     return -1;
 }
@@ -163,6 +166,7 @@ int msf_avoids_nbr_cell_idx(msf_cell_t x, const tsch_neighbor_t *n){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->raw == x.raw)
         if (avoids_nbrs[idx] == n)
+        if (avoids_ops[idx]& aoUSE)
             return idx;
     }
     return -1;
@@ -171,8 +175,11 @@ int msf_avoids_nbr_cell_idx(msf_cell_t x, const tsch_neighbor_t *n){
 int  msf_is_avoid_slot(uint16_t slot_offset){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = avoids_list_num; idx > 0; --idx, cell++){
-        if (cell->field.slot == slot_offset)
-            return 1;
+        if (cell->field.slot == slot_offset){
+            int idx = cell-avoids_list;
+            if (avoids_ops[idx]& aoUSE)
+                return idx;
+        }
     }
     return -1;
 }
@@ -211,6 +218,7 @@ AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neigh
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->field.slot == slot_offset){
             if (avoids_nbrs[idx] == n)
+            if (avoids_ops[idx]& aoUSE)
                 return avoids_ops[idx];
         }
     }
@@ -589,6 +597,7 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
 }
 
 
+/* Drop from pkt cells that belongs nbr */
 int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
     int res = 0;
     sixp_cell_t* cell = pkt->cells;
