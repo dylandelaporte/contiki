@@ -961,7 +961,7 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
               return irFAIL;
           }
           //check that have unconflict chanels
-          if (cell->channel_offset != x->channel_offset)
+          if (cell->channel_offset != x.field.chanel)
               return irOK;
       }
       else {
