@@ -189,22 +189,18 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
 
     /* start an ADD or a DELETE transaction if necessary and possible */
     bool need6p= (parent_addr != NULL) && msf_sixp_is_request_wait_timer_expired();
-    if (need6p)
-        need6p = (sixp_trans_find_for_sfid(parent_addr, MSF_SFID) == NULL);
-    if(need6p) {
+    if (!need6p)
+        continue;
+
+    if( sixp_trans_find(parent_addr) == NULL ) { //sixp_trans_find_for_sfid(parent_addr, MSF_SFID)
       msf_num_cells_trigger_6p_transaction();
-    } else {
-      /*
-       * We cannot send a request since we don't have the parent or
-       * we're busy on an on-going transaction with the parent. try it
-       * later.
-       */
     }
 
     if(cell_to_relocate != NULL) {
       // check that cell still exists
       if (msf_is_negotiated_cell(cell_to_relocate)) {
-          bool can6p = (sixp_trans_find_for_sfid(&cell_to_relocate->addr, MSF_SFID) == NULL);
+          //bool can6p = ( sixp_trans_find_for_sfid(&cell_to_relocate->addr, MSF_SFID) == NULL);
+          bool can6p = ( sixp_trans_find(&cell_to_relocate->addr) == NULL);
           if (can6p) {
               msf_sixp_relocate_send_request(cell_to_relocate);
           }
