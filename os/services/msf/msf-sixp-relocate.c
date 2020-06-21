@@ -365,6 +365,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       LOG_INFO("received an empty CellList; "
                "try another RELOCATE request later\n");
       msf_reserved_cell_delete_all(peer_addr);
+      msf_sixp_start_request_wait_timer();
     } else if(cell_list_len != sizeof(sixp_pkt_cell_t)) {
       /* invalid length; MSF always requests one cell per RELOCATE request */
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);

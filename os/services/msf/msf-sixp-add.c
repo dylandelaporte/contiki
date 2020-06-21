@@ -336,6 +336,8 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
     } else if(cell_list_len == 0) {
       LOG_INFO("received an empty CellList; try another ADD request later\n");
       msf_reserved_cell_delete_all(peer_addr);
+      //next attempt try after some time
+      msf_sixp_start_request_wait_timer();
     } else if(cell_list_len != sizeof(sixp_pkt_cell_t)) {
       /* invalid length since MSF always requests one cell per ADD request */
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);
