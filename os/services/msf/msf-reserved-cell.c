@@ -110,8 +110,8 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe
   return ret;
 }
 
-int  msf_find_unused_slot_chanel(uint16_t slot){
-    msf_chanel_mask_t busych =  msf_avoided_slot_chanels(slot);
+int  msf_find_unused_slot_chanel(uint16_t slot, msf_chanel_mask_t skip){
+    msf_chanel_mask_t busych = skip | msf_avoided_slot_chanels(slot);
 
     // random ch better avoids conflicts with other nbrs
     uint16_t ch = random_rand();
@@ -214,18 +214,26 @@ bool is_valid_new_link(const linkaddr_t *peer_addr,
     {
         if (cell->timeslot != slot_offset) continue;
 
+        // RELOCATION may requre chanel migration in one slot.
+        // so allow to insert TX-TX/RX-RX to peer on different chanels.
+        if (linkaddr_cmp(&cell->addr, peer_addr)){
+            if ( ((cell->link_options & LINK_OPTION_RX) != 0)
+                 != (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX)
+                )
+                return false;
+
+            if (cell->channel_offset == channel)
+                return false;
+
+            continue;
+        }
+
         // don't allow RX at one slot, only TX can mix concurently
         if ( (cell->link_options & LINK_OPTION_RX) != 0
             || (cell_type == MSF_NEGOTIATED_CELL_TYPE_RX)
             )
             return false;
 
-        // don't allow TX to same peer at one slot,
-        if (!linkaddr_cmp(&cell->addr, peer_addr))
-            continue;
-
-        // RELOCATION may requre chanel migration in one slot.
-        // so allow to insert TX to peer on different chanels.
         if (cell->channel_offset != channel)
             continue;
 
@@ -317,7 +325,7 @@ tsch_link_t * msf_reserved_cell_add_anyvoid(const linkaddr_t *peer_addr,
   if(_slot_offset >= 0) {
     if(channel_offset < 0) {
       /* pick a channel offset */
-      _channel_offset = msf_find_unused_slot_chanel(_slot_offset);
+      _channel_offset = msf_find_unused_slot_chanel(_slot_offset, 0);
     } else if (channel_offset > (tsch_hopping_sequence_length.val - 1)) {
       /* invalid channel offset */
       _channel_offset = -1;

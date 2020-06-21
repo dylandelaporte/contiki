@@ -141,6 +141,20 @@ size_t msf_sixp_reserve_cells_pkt(const linkaddr_t *peer_addr,
                                 );
 
 /**
+ * \brief Fill a CellList pkt buffer with reserved cells at different chanels at
+ *          slot of cell_to_relocate. This is a last chance to relocate, when
+ *          no other slots avail.
+ * \param cell_to_relocate - link, with chanel should migrate
+ * \param pkt       A pointer to a CellList buffer
+ * \param cells_limit Length of the packet CellList buffer
+ * \return the number of cells appends to pkt
+ */
+
+size_t msf_sixp_reserve_migrate_chanels_pkt(const tsch_link_t *cell_to_relocate,
+                                SIXPCellsPkt* pkt, unsigned pkt_limit
+                                );
+
+/**
  * \brief Reserve one of cells found in a given CellList
  * \param peer_addr MAC address of the peer
  * \param cell_type Type of a cell to reserve

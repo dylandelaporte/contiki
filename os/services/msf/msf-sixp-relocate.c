@@ -299,6 +299,13 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
 
   int candidate_cell_list_len =
   msf_sixp_reserve_cells_pkt(parent_addr, &msg.as_pkt, 1+MSF_6P_CELL_LIST_MAX_LEN);
+  if (candidate_cell_list_len < MSF_6P_CELL_LIST_MAX_LEN){
+      // for last chance to migrate, provide cells at same slot, that will be ready
+      //    for replace original one at no-confilct chanel
+      candidate_cell_list_len +=  msf_sixp_reserve_migrate_chanels_pkt(
+                                      cell_to_relocate
+                                      , &msg.as_pkt, 1+MSF_6P_CELL_LIST_MAX_LEN );
+  }
   body_len = sixp_pkt_cells_total(&msg.as_pkt);
   //reset pkt.num to count of relocating cells
   msg.as_pkt.head.num_cells     = num_cells;

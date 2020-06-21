@@ -306,6 +306,46 @@ tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
                         , msf_negotiated_link_cell_type(cell_to_override)
                         , cell_list, cell_list_len);
 }
+
+/*---------------------------------------------------------------------------*/
+size_t msf_sixp_reserve_migrate_chanels_pkt(const tsch_link_t *cell_to_relocate,
+                                SIXPCellsPkt* pkt, unsigned pkt_limit
+                                )
+{
+    msf_negotiated_cell_type_t cell_type = (msf_negotiated_cell_type_t)pkt->head.cell_options;
+
+    LOG_DBG("reserving last-chance chanels for slot %d\n", cell_to_relocate->timeslot);
+
+    int len = pkt->head.num_cells;
+
+    msf_cell_t new_cell;
+    new_cell.field.slot = cell_to_relocate->timeslot;
+    msf_chanel_mask_t ocupied_ch = 0;
+
+    if (len < pkt_limit)
+    if (LOG_LEVEL >= LOG_LEVEL_DBG){
+        LOG_DBG("cells %s busy for slot:\n", msf_negotiated_cell_type_str(cell_type));
+        msf_avoid_dump_slot(new_cell.field.slot);
+    }
+
+    for (int i = len; i < pkt_limit; ++i){
+        int new_ch = msf_find_unused_slot_chanel(new_cell.field.slot, ocupied_ch);
+        if (new_ch <= 0)
+            break;
+
+        tsch_link_t *reserved;
+        reserved = msf_reserved_cell_add_anyvoid( &cell_to_relocate->addr
+                                , cell_type, cell_to_relocate->timeslot, new_ch);
+        if (reserved == NULL)
+            break;
+
+        ocupied_ch |= 1<< new_ch;
+        new_cell.field.chanel = new_ch;
+        pkt->cells[i].raw = new_cell.raw;
+        pkt->head.num_cells++;
+    }
+    return pkt->head.num_cells - len;
+}
 /*---------------------------------------------------------------------------*/
 tsch_link_t *
 msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,

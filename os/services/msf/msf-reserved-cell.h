@@ -125,7 +125,7 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe
                                     //< used for mode RESERVE_NBR_BUSY_CELL
                                     , const linkaddr_t *peer_addr
                                     );
-int  msf_find_unused_slot_chanel(uint16_t slot);
+int  msf_find_unused_slot_chanel(uint16_t slot, msf_chanel_mask_t skip );
 
 
 
