@@ -649,7 +649,10 @@ msf_negotiated_cell_get_num_cells(msf_negotiated_cell_type_t cell_type,
             cell != NULL;
             cell = list_item_next(cell))
         {
-          if(linkaddr_cmp(&cell->addr, peer_addr) && is_link_rx(cell->link_options) ) {
+          // take into account only active links
+          if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
+                continue;
+          if(linkaddr_cmp(&cell->addr, peer_addr) && is_link_rx(cell->link_options)) {
             ret++;
           } else {
             /* skip TX or reserved cells */
