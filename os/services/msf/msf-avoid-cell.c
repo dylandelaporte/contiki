@@ -557,10 +557,12 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
         ++res;
         if (pkt)
         //if ( pkt->head.num_cells < limit)
+        if (!sixp_pkt_cells_have(pkt, *cell))
         {
-            msf_cell_t* x = pkt->cells + pkt->head.num_cells;
-            x->field.slot   = cell->field.slot;
-            x->field.chanel = cell->field.chanel;
+            //msf_cell_t* x = pkt->cells + pkt->head.num_cells;
+            //x->field.slot   = cell->field.slot;
+            //x->field.chanel = cell->field.chanel;
+            pkt->cells[pkt->head.num_cells].raw = cell->raw;
             ++(pkt->head.num_cells);
             if (pkt->head.num_cells >= limit)
                 return res;
