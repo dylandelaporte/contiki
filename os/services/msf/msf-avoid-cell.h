@@ -123,7 +123,7 @@ int  msf_is_avoid_slot(uint16_t slot_offset);
 int  msf_is_avoid_local_cell(msf_cell_t x);
 int  msf_is_avoid_local_slot(uint16_t slot_offset);
 
-typedef int msf_chanel_mask_t;
+typedef unsigned long msf_chanel_mask_t;
 msf_chanel_mask_t  msf_avoided_slot_chanels(uint16_t slot_offset);
 
 // avoids of nbr by local/remote using.
