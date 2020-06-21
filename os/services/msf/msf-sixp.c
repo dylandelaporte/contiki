@@ -318,3 +318,13 @@ msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,
   return cell;
 }
 /*---------------------------------------------------------------------------*/
+bool msf_sixp_is_valid_rxtx(sixp_pkt_cell_options_t cell_options){
+    if(cell_options == SIXP_PKT_CELL_OPTION_TX
+       || cell_options == SIXP_PKT_CELL_OPTION_RX
+       )
+        return true;
+
+    LOG_INFO("bad CellOptions - %02X (should be %02X or %02X)\n",
+           cell_options, SIXP_PKT_CELL_OPTION_TX, SIXP_PKT_CELL_OPTION_RX);
+    return false;
+}

@@ -78,11 +78,8 @@ is_valid_request(sixp_pkt_cell_options_t cell_options,
 {
   bool ret = false;
 
-  if(cell_options != SIXP_PKT_CELL_OPTION_TX &&
-     cell_options != SIXP_PKT_CELL_OPTION_RX) {
-    LOG_INFO("bad CellOptions - %02X (should be %02X or %02X)\n",
-             cell_options, SIXP_PKT_CELL_OPTION_TX, SIXP_PKT_CELL_OPTION_RX);
-  } else if(num_cells != 1) {
+  if(!msf_sixp_is_valid_rxtx(cell_options)) {}
+  else if(num_cells != 1) {
     LOG_INFO("bad NumCells - %u (should be 1)\n", num_cells);
   } else if(cell_list == NULL) {
     LOG_INFO("no CellList\n");

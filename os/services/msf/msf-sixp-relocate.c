@@ -85,10 +85,8 @@ is_valid_request(sixp_pkt_cell_options_t cell_options,
 {
   bool ret = false;
 
-  if(cell_options != SIXP_PKT_CELL_OPTION_TX) {
-    LOG_INFO("bad CellOptions - %02X (should be %02X)\n",
-             cell_options, SIXP_PKT_CELL_OPTION_TX);
-  } else if(num_cells != 1) {
+  if(!msf_sixp_is_valid_rxtx(cell_options)) {}
+  else if(num_cells != 1) {
     LOG_INFO("bad NumCells - %u (should be 1)\n", num_cells);
   } else if(relocation_cell_list == NULL) {
     LOG_INFO("no RelocationCellList\n");
@@ -195,6 +193,13 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
 
   assert(peer_addr != NULL);
 
+  msf_negotiated_cell_type_t cell_type;
+  if(cell_options == SIXP_PKT_CELL_OPTION_TX) {
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+  } else {
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+  }
+
   if(! is_valid_request(cell_options, num_cells,
                       relocation_cell_list, relocation_cell_list_len,
                       candidate_cell_list, candidate_cell_list_len) ) {
@@ -212,14 +217,13 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
   }
   else if((cell_to_relocate =
              msf_sixp_find_scheduled_cell(peer_addr,
-                                          LINK_OPTION_RX,
+                                          cell_type,
                                           relocation_cell_list,
                                           relocation_cell_list_len)) == NULL) {
     rc = SIXP_PKT_RC_ERR_CELLLIST;
     reserved_cell = NULL;
   } else {
     rc = SIXP_PKT_RC_SUCCESS;
-    /* RELOCATE can happen only with negotiated RX cells */
     if((reserved_cell =
              msf_sixp_reserve_cell_over(cell_to_relocate,
                                        candidate_cell_list,
@@ -250,7 +254,8 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
 void
 msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
 {
-  const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  //const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  const linkaddr_t *parent_addr = &cell_to_relocate->addr;
 
   // TODO: need to improve reservation links so that allow concurent querys
   //          operaqtes on same peer. this is reduce schedule time-to-converge,
@@ -383,7 +388,19 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       if(msf_reserved_cell_get(peer_addr, slot_offset, channel_offset)) {
         /* this is a cell which we proposed in the request */
         msf_reserved_cell_delete_all(peer_addr);
-        if(msf_negotiated_cell_add(peer_addr, MSF_NEGOTIATED_CELL_TYPE_TX,
+
+        sixp_pkt_cell_options_t cell_options;
+        sixp_pkt_get_cell_options(SIXP_PKT_TYPE_RESPONSE, (sixp_pkt_code_t)(uint8_t)SIXP_PKT_RC_SUCCESS
+                                , &cell_options, body, body_len);
+
+        msf_negotiated_cell_type_t cell_type;
+        if(cell_options == SIXP_PKT_CELL_OPTION_TX) {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+        } else {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+        }
+
+        if(msf_negotiated_cell_add(peer_addr, cell_type,
                                    slot_offset, channel_offset) < 0) {
           msf_housekeeping_resolve_inconsistency(peer_addr);
         } else {

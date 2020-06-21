@@ -43,6 +43,7 @@
 #define _MSF_SIXP_COMMON_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "net/mac/tsch/tsch.h"
 #include "net/mac/tsch/sixtop/sixp-pkt.h"
@@ -175,6 +176,13 @@ union MSFCellsPkt {
         uint8_t       body[0];
 };
 typedef union MSFCellsPkt MSFCellsPkt;
+
+
+
+//=============================================================================
+// validates that cell_options is RX or TX
+bool msf_sixp_is_valid_rxtx(sixp_pkt_cell_options_t cell_options);
+
 
 #endif /* !_MSF_SIXP_COMMON_H_ */
 /** @} */
