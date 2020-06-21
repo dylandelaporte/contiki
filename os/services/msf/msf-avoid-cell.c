@@ -229,7 +229,11 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
                 , was, avoids_ops[idxnbr]);
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
-        return (avoids_ops[idxnbr] != was)? arEXIST_CHANGE: arEXIST_KEEP;
+        if (avoids_ops[idxnbr] != was){
+            avoids_ops[idxnbr] &= ~aoMARK;
+            return arEXIST_CHANGE;
+        }
+        return arEXIST_KEEP;
     }
 
     //local and close cells are sure valid, and so it ready for concurent
@@ -241,7 +245,7 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
     if (idx >= 0){
         AvoidOption was  = avoids_ops[idx];
         // check that not override by far cells
-        if ((was & aoUSE) > ops) {
+        if ((was & aoUSE) > (ops & aoUSE)) {
             //override current cell, by more close
             avoids_nbrs[avoids_list_num] = n;
             avoids_ops[idx]  = ops | (was & ~aoUSE);
@@ -252,7 +256,10 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
 
-        return (avoids_ops[idx] != was)? arEXIST_CHANGE: arEXIST_KEEP;
+        if (avoids_ops[idx] != was){
+            avoids_ops[idx] &= ~aoMARK;
+            return arEXIST_CHANGE;
+        }
         }
         return arEXIST_KEEP;
     }
@@ -397,7 +404,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
             continue;
 
         int save = avoids_ops[idx];
-        // looks that this far echo, skip it
+        // for close cells make a drop.
         if ((save&aoUSE_REMOTE) <= range) {
 
             // close cells should validates for exact nbrs, since thay can concurent
@@ -405,7 +412,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
             if ( avoids_nbrs[idx] != n )
                 continue;
 
-            avoids_ops[idx]  &= ~aoUSE_REMOTE;
+            avoids_ops[idx]  &= ~(aoUSE_REMOTE | aoMARK);
             //assign nbr of clearer
             nbrs[idx]           = n;
 
@@ -415,6 +422,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
                         , avoids_ops[idx]);
         }
         else {
+            // far cells unvoids
             ++nouse_free_count;
             LOG_DBG("free %u+%u\n", (unsigned)cells->field.slot, (unsigned)cells->field.chanel);
             cells->raw = cellFREE;
