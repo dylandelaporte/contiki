@@ -95,7 +95,7 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
 
     NRSFMeta meta;
     meta.raw = hcells->meta;
-    unsigned avoiduse = meta.field.avoid_use & aoUSE_REMOTE;
+    unsigned avoiduse = meta.field.avoid_use & (aoUSE_REMOTE|aoFIXED);
     if (avoiduse > NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP ){
         LOG_DBG("ingnore hop%x cells\n", avoiduse);
         return;
@@ -852,13 +852,15 @@ void nrsf_tasks_exec(){
                                 , &nrsf_task_use, aoUSE_LOCAL
                                 , "USE"
                                 );
-        msf_avoid_mark_all();
+        msf_avoid_mark_all_fresh();
     }
 
     if (ok > 0)
         nrsf_tasks_poll();
 }
 
+// TODO: need provide support for aoFIXED option for exposed cells -
+//       need establish them to separate list with meta
 int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
     int total = 0;
     if (t->notify_use < aoUSE_REMOTE_1HOP) {
