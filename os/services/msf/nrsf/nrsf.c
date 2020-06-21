@@ -95,7 +95,7 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
 
     NRSFMeta meta;
     meta.raw = hcells->meta;
-    unsigned avoiduse = meta.field.avoid_use & (aoUSE_REMOTE|aoFIXED);
+    unsigned avoiduse = meta.field.avoid_use & aoUSE_REMOTE;
     if (avoiduse > NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP ){
         LOG_DBG("ingnore hop%x cells\n", avoiduse);
         return;
@@ -103,6 +103,12 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     LOG_DBG("avoid hop%x cells[%u]:\n", avoiduse, hcells->num_cells);
 
     avoiduse += aoUSE_REMOTE_1HOP;
+
+    //this set of options describe cell passes for conflict checks
+    unsigned cell_avoidopt = (meta.field.avoid_use & ~aoUSE)
+                            | (avoiduse & aoUSE_REMOTE)
+                            | (hcells->cell_options & aoTX);
+
     int rel = 0;
     for (unsigned i = 0; i < hcells->num_cells; ++i){
         sixp_cell_t c = sixp_pkt_get_cell(hcells->cell_list, i);
@@ -115,7 +121,7 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
             ++rel;
 
         if (should_relay >= arEXIST_CHANGE){
-            msf_housekeeping_inspect_cell_consintensy(c, n, hcells->cell_options);
+            msf_housekeeping_inspect_cell_consintensy(c, n, cell_avoidopt );
         }
     }
 
