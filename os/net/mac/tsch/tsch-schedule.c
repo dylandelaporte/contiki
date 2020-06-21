@@ -264,12 +264,12 @@ tsch_schedule_add_link(struct tsch_slotframe *slotframe,
         tsch_release_lock();
         tsch_schedule_link_addr_aqure(l);
 
-        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %u/%u [%u+%u] %x\n",
+        TSCH_PRINTF8("TSCH-schedule: add_link sf%u %x/%u [%u+%u] %x\n",
                slotframe->handle, link_options, link_type
                , timeslot, channel_offset
                , TSCH_LOG_ID_FROM_LINKADDR(address));
 
-        LOG_INFO("add_link sf=%u opt=%s type=%s ts=%u ch=%u addr=",
+        LOG_INFO("add_link sf=%u opt=%s type=%s [%u+%u] addr=",
                  slotframe->handle,
                  print_link_options(link_options),
                  print_link_type(link_type), timeslot, channel_offset);
