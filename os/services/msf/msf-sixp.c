@@ -226,7 +226,7 @@ size_t msf_sixp_reserve_cells_pkt(const linkaddr_t *peer_addr,
     cnt += msf_sixp_reserve_cell_pkt(peer_addr, RESERVE_NEW_CELL, pkt, cells_limit);
 
     if (cnt < cells_limit)
-    if (LOG_LEVEL >= LOG_LEVEL_DBG){
+    if (LOG_LEVEL > LOG_LEVEL_DBG){
           msf_negotiated_cell_type_t cell_type
                       = (msf_negotiated_cell_type_t)pkt->head.cell_options;
           LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
@@ -271,9 +271,10 @@ tsch_link_t * msf_sixp_reserve_one_cell_of_list(const linkaddr_t *peer_addr,
          * cannot reserve a cell (most probably, this slot_offset is
          * occupied; try the next one
          */
-        if (LOG_LEVEL >= LOG_LEVEL_DBG){
-            LOG_DBG_("cell busy:");
-            msf_avoid_dump_cell( msf_cell_at(slot_offset, channel_offset) );
+        if (LOG_LEVEL > LOG_LEVEL_DBG){
+            LOG_DBG_("slot[%u] busy:", slot_offset);
+            msf_avoid_dump_slot( slot_offset );
+            //msf_avoid_dump_cell( msf_cell_at(slot_offset, channel_offset) );
         }
       }
     }
@@ -282,7 +283,7 @@ tsch_link_t * msf_sixp_reserve_one_cell_of_list(const linkaddr_t *peer_addr,
    * cannot reserve a cell (most probably, this slot_offset is
    * occupied; try the next one
    */
-  if (LOG_LEVEL >= LOG_LEVEL_DBG){
+  if (LOG_LEVEL > LOG_LEVEL_DBG){
       LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
       msf_avoid_dump_local_cells();
   }
