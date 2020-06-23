@@ -335,7 +335,11 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
 }
 
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
-    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
+    return msf_avoid_nbr_link_cell( x, get_addr_nbr(&x->addr) );
+}
+
+AvoidResult msf_avoid_nbr_link_cell(const tsch_link_t* x, const tsch_neighbor_t *n){
+    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), n
                                 , aoUSE_LOCAL
                                     | msf_avoid_link_option_xx(x->link_options)
                                 );

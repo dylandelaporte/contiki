@@ -154,6 +154,7 @@ void msf_unvoid_all_cells();
 //------------------------------------------------------------------------------
 // locals avoid
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x);
+AvoidResult msf_avoid_nbr_link_cell(const tsch_link_t* x, const tsch_neighbor_t *n);
 
 // avoids cell, that can't move - autonomous calls are.
 AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x);

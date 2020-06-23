@@ -372,7 +372,7 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
     MSF_AFTER_CELL_USE(nbr, new_cell);
     msf_num_cells_update_peers(1, type, peer_addr);
     msf_negotiated_inspect_vs_new_link(new_cell);
-    msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
+    msf_avoid_nbr_link_cell( new_cell, nbr );
   }
 
   return new_cell == NULL ? -1 : 0;
