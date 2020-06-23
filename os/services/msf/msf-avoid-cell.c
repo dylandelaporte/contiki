@@ -600,10 +600,14 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->raw == cellFREE) continue;
         if ( avoids_nbrs[idx] == nbr_skip) continue;
-        if ( (avoids_ops[idx] & skip_mark) != 0 ) continue;
+        unsigned ops = avoids_ops[idx];
+        if ( (ops & skip_mark) != 0 ) continue;
 
-        if ( (avoids_ops[idx] & aoUSE)  != range )
+        if ( (ops & aoUSE)  != range )
             continue;
+
+        if ( (range_ops & aoTX) && !(ops & aoTX)  ) continue;
+        if ( (range_ops & aoFIXED) && !(ops & aoFIXED) ) continue;
 
         ++res;
         if (pkt)

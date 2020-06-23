@@ -228,6 +228,8 @@ int msf_avoid_num_local_cells();
 // @arg calls - NULL, not collect cells, just calculates cells amount.
 // @arg range - AvoidOption set of aoUSE_xxx.
 //                  | aoMARK - denotes not skip marked cells
+//                  | aoFIXED - demands fixed cells
+//                  | aoTX - demands TX cells
 // @result - cells->head.num_cells= amount of filled cells
 // @return - >0 - amount of cells append
 // @return - =0 - no cells to enumerate
