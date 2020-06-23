@@ -756,7 +756,7 @@ void msf_avoid_dump_local_cells(void){
 void msf_avoid_dump_slot(unsigned slot){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
-        if (cell->field.slot != slot)
+        if (cell->field.slot == slot)
         if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0 )
             msf_avoid_dump_idx_cell(idx);
     }
