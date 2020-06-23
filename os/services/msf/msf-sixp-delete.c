@@ -76,11 +76,8 @@ is_valid_request(sixp_pkt_cell_options_t cell_options,
 {
   bool ret = false;
 
-  if(cell_options != SIXP_PKT_CELL_OPTION_TX &&
-     cell_options != SIXP_PKT_CELL_OPTION_RX) {
-    LOG_INFO("bad CellOptions - %02X (should be %02X or %02X)\n",
-             cell_options, SIXP_PKT_CELL_OPTION_TX, SIXP_PKT_CELL_OPTION_RX);
-  } else if(num_cells != 1) {
+  if(!msf_sixp_is_valid_rxtx(cell_options)) {}
+  else if(num_cells != 1) {
     LOG_INFO("bad NumCells - %u (should be 1)\n", num_cells);
   } else if(cell_list == NULL) {
     LOG_INFO("no CellList\n");
@@ -109,6 +106,7 @@ sent_callback_initiator(void *arg, uint16_t arg_len,
        * possible schedule inconsistency should be detected during a
        * following transaction if any.
        */
+      LOG_INFO("DELETE transaction initiated\n");
       msf_negotiated_cell_delete(cell_to_delete);
     } else {
       /* do nothing */
@@ -206,7 +204,7 @@ msf_sixp_delete_send_request(msf_negotiated_cell_type_t cell_type)
       msf_negotiated_cell_get_cell_to_delete(parent_addr, cell_type)) == NULL) {
     /* this shouldn't happen, by the way */
     LOG_ERR("delete_send_request: no negotiated %s cells scheduled with ",
-            cell_type == MSF_NEGOTIATED_CELL_TYPE_TX ? "TX" : "RX");
+             msf_negotiated_cell_type_str(cell_type) );
     LOG_ERR_LLADDR(parent_addr);
     LOG_ERR_("\n");
   } else {
@@ -225,16 +223,16 @@ msf_sixp_delete_send_request(msf_negotiated_cell_type_t cell_type)
        sixp_pkt_set_cell_list(type, code, cell_list, cell_list_len,
                               0, body, body_len) < 0) {
       LOG_ERR("cannot build a DELETE request\n");
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_retry_wait_timer();
     } else if(sixp_output(type, code, MSF_SFID, body, body_len, parent_addr,
                           sent_callback_initiator,
                           cell_to_delete, sizeof(cell_to_delete)) < 0) {
       LOG_ERR("failed to send a DELETE request to \n");
       LOG_ERR_LLADDR(parent_addr);
       LOG_ERR_("\n");
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_retry_wait_timer();
     } else {
-      LOG_INFO("sent a DELETE request to the parent: ");
+      LOG_INFO("sent a DELETE %s request to the parent: ", msf_negotiated_cell_type_str(cell_type) );
       LOG_INFO_LLADDR(parent_addr);
       LOG_INFO_("\n");
     }

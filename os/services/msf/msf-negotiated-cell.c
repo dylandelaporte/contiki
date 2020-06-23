@@ -53,17 +53,23 @@
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
 #include "msf-avoid-cell.h"
+#include "msf-num-cells.h"
 #include "msf-sixp-relocate.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF"
 #define LOG_LEVEL LOG_LEVEL_MSF
 
+/* This list uses to collect TX stats on nbr transmitions. It involved to list all
+ *  nbr x cell, on demands that retransmitions are takes on then sequently.
+ *  This list is ordered on - later slottime first.
+ *
 // this is list elements as:
 //  [tsch_link_t:]
 //  [       data ]  -> [msf_negotiated_cell_data_t:]
 //  [tsch_link_t:] <-  [next:                      ]
 //  [       data ]  -> [msf_negotiated_cell_data_t:]
+ */
 typedef struct {
   tsch_link_t *next;
   uint16_t num_tx;
@@ -92,7 +98,8 @@ static bool is_marked_as_used(const tsch_link_t *cell);
 static bool is_marked_as_unused(const tsch_link_t *cell);
 static bool is_marked_as_kept(const tsch_link_t *cell);
 
-
+static
+MSFInspectResult msf_negotiated_inspect_vs_new_link(tsch_link_t* x);
 
 //==============================================================================
 enum {
@@ -250,6 +257,26 @@ bool msf_is_negotiated_cell(tsch_link_t *cell){
 }
 
 /*---------------------------------------------------------------------------*/
+const char* msf_negotiated_cell_type_str(msf_negotiated_cell_type_t type){
+    if(type == MSF_NEGOTIATED_CELL_TYPE_TX)
+        return "TX";
+    else if (type == MSF_NEGOTIATED_CELL_TYPE_RX)
+        return "RX";
+    else
+        return "?X";
+}
+
+const char* msf_negotiated_cell_type_arrow(msf_negotiated_cell_type_t x){
+    if(x == MSF_NEGOTIATED_CELL_TYPE_TX)
+        return "->";
+    else if (x == MSF_NEGOTIATED_CELL_TYPE_RX)
+        return "<-";
+    else if (x == MSF_NEGOTIATED_CELL_TYPE_NO)
+        return "-#-";
+    else
+        return "?-";
+}
+/*---------------------------------------------------------------------------*/
 int
 msf_negotiated_cell_add(const linkaddr_t *peer_addr,
                         msf_negotiated_cell_type_t type,
@@ -257,27 +284,23 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
 {
   tsch_neighbor_t *nbr;
   uint8_t cell_options;
-  const char* cell_type_str;
   tsch_link_t *new_cell;
 
   assert(slotframe != NULL);
   assert(peer_addr != NULL);
-  (void)cell_type_str;
 
   if(type == MSF_NEGOTIATED_CELL_TYPE_TX) {
     cell_options = LINK_OPTION_TX;
-    cell_type_str = "TX";
   } else {
     assert(type == MSF_NEGOTIATED_CELL_TYPE_RX);
     cell_options = LINK_OPTION_RX;
-    cell_type_str = "RX";
   }
 
   // WHAT IT? try add nbr twice?
   if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL)
   if((nbr = tsch_queue_add_nbr(peer_addr)) == NULL) {
     LOG_ERR("failed to add a negotiated %s cell because nbr is not available\n",
-            cell_type_str);
+            msf_negotiated_cell_type_str(type) );
     return irNOCELL;
   }
 
@@ -301,12 +324,12 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
   }
 
   if(new_cell == NULL) {
-    LOG_ERR("failed to add a negotiated %s cell for ", cell_type_str);
+    LOG_ERR("failed to add a negotiated %s cell for ", msf_negotiated_cell_type_str(type) );
     LOG_ERR_LLADDR(peer_addr);
     LOG_ERR_(" at slot_offset:%u, channel_offset:%u\n",
              slot_offset, channel_offset);
   } else {
-    LOG_INFO("added a negotiated %s cell for ", cell_type_str);
+    LOG_INFO("added a negotiated %s cell for ", msf_negotiated_cell_type_str(type) );
     LOG_INFO_LLADDR(peer_addr);
     LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
               slot_offset, channel_offset);
@@ -347,7 +370,9 @@ msf_negotiated_cell_add(const linkaddr_t *peer_addr,
       }
     }
     MSF_AFTER_CELL_USE(nbr, new_cell);
-    msf_avoid_nbr_use_cell(msf_cell_of_link(new_cell), nbr, aoUSE_LOCAL);
+    msf_num_cells_update_peers(1, type, peer_addr);
+    msf_negotiated_inspect_vs_new_link(new_cell);
+    msf_avoid_nbr_link_cell( new_cell, nbr );
   }
 
   return new_cell == NULL ? -1 : 0;
@@ -428,9 +453,9 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 {
   // this is for LOG_
   linkaddr_t peer_addr;
-  const char *cell_type_str;
   (void)peer_addr;
-  (void)cell_type_str;
+
+  msf_negotiated_cell_type_t cell_type;
 
   uint16_t slot_offset, channel_offset;
 
@@ -443,7 +468,7 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 
   tsch_neighbor_t *nbr = NULL;
   if(cell->link_options & LINK_OPTION_TX) {
-    cell_type_str = "TX";
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
 
     if (how == doCAREFUL) {
         // manage links and  send queues
@@ -454,16 +479,18 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
     }
 
   } else if(cell->link_options & LINK_OPTION_RX){
-    cell_type_str = "RX";
+
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+
   }
   else {
-      cell_type_str = "?X";
+      cell_type = MSF_NEGOTIATED_CELL_TYPE_NO;
   }
 
   slot_offset = cell->timeslot;
   channel_offset = cell->channel_offset;
   msf_housekeeping_delete_cell_later(cell);
-  LOG_INFO("removed a negotiated %s cell for ", cell_type_str);
+  LOG_INFO("removed a negotiated %s cell for ", msf_negotiated_cell_type_str(cell_type));
   LOG_INFO_LLADDR(&peer_addr);
   LOG_INFO_(" at slot_offset:%u, channel_offset:%u\n",
             slot_offset, channel_offset);
@@ -474,6 +501,7 @@ void msf_negotiated_cell_delete_as(tsch_link_t *cell, DeleteOption how)
 
   msf_unvoid_link_cell(cell);
   MSF_AFTER_CELL_RELEASE(nbr, cell);
+  msf_num_cells_update_peers(-1, cell_type, &cell->addr);
 }
 
 void msf_negotiated_cell_delete(tsch_link_t *cell){
@@ -541,13 +569,13 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
 }
 /*---------------------------------------------------------------------------*/
 bool
-msf_negotiated_nbr_is_scheduled_tx(tsch_neighbor_t *nbr)
+msf_negotiated_nbr_is_scheduled_tx(const tsch_neighbor_t *nbr)
 {
   assert(nbr != NULL);
   return nbr->negotiated_tx_cell != NULL;
 }
 /*---------------------------------------------------------------------------*/
-bool msf_negotiated_is_scheduled_nbr(tsch_neighbor_t *nbr){
+bool msf_negotiated_is_scheduled_nbr(const tsch_neighbor_t *nbr){
     if (msf_negotiated_nbr_is_scheduled_tx(nbr))
         return true;
 
@@ -649,7 +677,10 @@ msf_negotiated_cell_get_num_cells(msf_negotiated_cell_type_t cell_type,
             cell != NULL;
             cell = list_item_next(cell))
         {
-          if(linkaddr_cmp(&cell->addr, peer_addr) && is_link_rx(cell->link_options) ) {
+          // take into account only active links
+          if ((cell->link_options & (LINK_OPTION_RESERVED_LINK|LINK_OPTION_LINK_TO_DELETE))!= 0)
+                continue;
+          if(linkaddr_cmp(&cell->addr, peer_addr) && is_link_rx(cell->link_options)) {
             ret++;
           } else {
             /* skip TX or reserved cells */
@@ -941,6 +972,9 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
       if (cell->link_options & LINK_OPTION_LINK_TO_DELETE)
           continue;
+      // reserved links are inspects on negotiation add
+      if (cell->link_options & LINK_OPTION_RESERVED_LINK)
+          continue;
 
       //inspection alredy managed;
       if (msf_is_marked_as_relocate(cell))
@@ -948,7 +982,6 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
 
       //if( cell->link_options == LINK_OPTION_RX && is_marked_as_used(cell))
       //local links links can mix in one slot only TX
-      //bool can_overlap = true;
       bool can_overlap = msf_cellid_is_remote(x)
                       || ( is_link_tx(cell->link_options) && msf_cellid_is_tx(x) )
                       ;
@@ -957,29 +990,26 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
       if (cell->channel_offset != x.field.chanel) continue;
 
       //try to eval that have any slot to relocate conflicting link
-      long new_slot = msf_find_unused_slot_offset(slotframe);
-      msf_chanel_mask_t busych =  msf_avoided_slot_chanels(new_slot);
+      long new_slot = msf_find_unused_slot_offset(slotframe, RESERVE_NEW_CELL, NULL );
+      msf_chanel_mask_t busych = -1;
+      if (new_slot >= 0){
+          // nothing can do with it
+          busych =  msf_avoided_slot_chanels(new_slot);
+      }
 
       if (busych != 0){
           // have no unconflicting slots!
-          if (!can_overlap){
+          if (!can_overlap || (busych < 0) ){
               // nothing can do with it
-              LOG_ERR("!new link conflicts with ->");
+              LOG_ERR("!new link[%u+%u]:%x conflicts with ->"
+                          , x.field.slot, x.field.chanel, x.field.link_options );
               LOG_ERR_LLADDR(&cell->addr);
-              LOG_ERR_("for slot %d\n", cell->timeslot);
+              LOG_ERR_("\n");
               return irFAIL;
           }
-          //check that have unconflict chanels
-          if (cell->channel_offset != x.field.chanel)
-              return irOK;
       }
       else {
-          // since able allocate unconflicting slots, drop preserved.
-          //    This prevents from alloc link that later reallocate
-          if (cell->link_options & LINK_OPTION_RESERVED_LINK){
-              msf_reserved_release_link(cell);
-              return irOK;
-          }
+          // since able allocate unconflicting slots.
       }
 
       LOG_INFO("new link relocate slot %d ->", cell->timeslot);
@@ -989,4 +1019,23 @@ MSFInspectResult msf_negotiated_inspect_vs_cellid(MSFCellID x)
       return irRELOCATE;
     }
     return irNOCELL;
+}
+
+static
+MSFInspectResult msf_negotiated_inspect_vs_new_link(tsch_link_t* x){
+    msf_cell_t cell = msf_cell_of_link(x);
+
+    //if ( msf_is_avoid_local_cell( msf_cell_of_link(x) ) < 0 )
+    if ( msf_is_avoid_cell(cell) < 0){
+        return irNOCELL;
+    }
+
+    LOG_INFO("new cell(%u+%u) relocate ->", x->timeslot, x->channel_offset);
+    LOG_INFO_LLADDR(&x->addr);
+    LOG_INFO_(" by busy:\n");
+    if (LOG_LEVEL >= LOG_LEVEL_INFO)
+        msf_avoid_dump_cell(cell);
+
+    msf_housekeeping_request_cell_to_relocate(x);
+    return irRELOCATE;
 }

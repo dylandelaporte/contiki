@@ -78,11 +78,8 @@ is_valid_request(sixp_pkt_cell_options_t cell_options,
 {
   bool ret = false;
 
-  if(cell_options != SIXP_PKT_CELL_OPTION_TX &&
-     cell_options != SIXP_PKT_CELL_OPTION_RX) {
-    LOG_INFO("bad CellOptions - %02X (should be %02X or %02X)\n",
-             cell_options, SIXP_PKT_CELL_OPTION_TX, SIXP_PKT_CELL_OPTION_RX);
-  } else if(num_cells != 1) {
+  if(!msf_sixp_is_valid_rxtx(cell_options)) {}
+  else if(num_cells != 1) {
     LOG_INFO("bad NumCells - %u (should be 1)\n", num_cells);
   } else if(cell_list == NULL) {
     LOG_INFO("no CellList\n");
@@ -178,23 +175,47 @@ send_response(const linkaddr_t *peer_addr,
 
   assert(peer_addr != NULL);
 
+  msf_negotiated_cell_type_t cell_type;
+  if(cell_options == SIXP_PKT_CELL_OPTION_TX) {
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+  } else {
+    cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+  }
+
   if(is_valid_request(cell_options, num_cells, cell_list, cell_list_len)) {
-    msf_negotiated_cell_type_t cell_type;
-    rc = SIXP_PKT_RC_SUCCESS;
-    if(cell_options == SIXP_PKT_CELL_OPTION_TX) {
-      cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
-    } else {
-      /* is_valid_request() should assure cell_options is RX here */
-      assert(cell_options == SIXP_PKT_CELL_OPTION_RX);
-      cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+    // TODO: need to improve reservation links so that allow concurent querys
+    //          operaqtes on same peer. this is reduce schedule time-to-converge,
+    //          and save transmitions, especialy when bootstrap on conflicted cell
+    if ( msf_is_reserved_for_peer(peer_addr) ){
+          LOG_ERR("busy by concurent to send an ADD %s ->", msf_negotiated_cell_type_str(cell_type) );
+          LOG_ERR_LLADDR(peer_addr);
+          LOG_ERR_("\n");
+          msf_sixp_start_retry_wait_timer();
+          rc = SIXP_PKT_RC_ERR_BUSY;
+          reserved_cell = NULL;
     }
+    else {
+
+    rc = SIXP_PKT_RC_SUCCESS;
     reserved_cell = msf_sixp_reserve_one_cell(peer_addr, cell_type,
                                               cell_list, cell_list_len);
-    if(reserved_cell == NULL) {
-      LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
+    if(reserved_cell != NULL) {
+        msf_sixp_set_cell_params((uint8_t *)&cell_to_return, reserved_cell);
     } else {
-      msf_sixp_set_cell_params((uint8_t *)&cell_to_return, reserved_cell);
+        if (cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+            const tsch_neighbor_t * n = tsch_queue_get_nbr(peer_addr);
+        // if have no any TX cells to peer, try to allocate at least one. This
+        //      helps establish good no-conflict connection to it.
+            if ( !msf_negotiated_nbr_is_scheduled_tx(n) ) {
+                LOG_WARN("Try to allocate TX in busy slot\n");
+                reserved_cell = msf_sixp_reserve_tx_over(n, cell_list, cell_list_len);
+            }
+        }
+        if(reserved_cell == NULL)
+            LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
     }
+
+    }// else if ( msf_is_reserved_for_peer(parent_addr)
   } else {
     rc = SIXP_PKT_RC_ERR;
     reserved_cell = NULL;
@@ -223,55 +244,58 @@ void
 msf_sixp_add_send_request(msf_negotiated_cell_type_t cell_type)
 {
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  msf_sixp_add_send_request_to(cell_type, parent_addr);
+}
+
+void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
+                              , const linkaddr_t *parent_addr)
+{
   const sixp_pkt_type_t type = SIXP_PKT_TYPE_REQUEST;
   const sixp_pkt_code_t code = (sixp_pkt_code_t)(uint8_t)SIXP_PKT_CMD_ADD;
-  uint8_t cell_list[MSF_6P_CELL_LIST_MAX_LEN * sizeof(sixp_pkt_cell_t)];
-  size_t cell_list_len;
-  uint8_t body[sizeof(sixp_pkt_metadata_t) +
-               sizeof(sixp_pkt_cell_options_t) +
-               sizeof(sixp_pkt_num_cells_t) +
-               sizeof(cell_list)];
   size_t body_len = 0;
   sixp_pkt_cell_options_t cell_options;
+  // amount of cells to add
   const sixp_pkt_num_cells_t num_cells = 1;
 
   assert(parent_addr != NULL);
+  if ( msf_is_reserved_for_peer(parent_addr) ){
+      LOG_ERR("busy by concurent to send an ADD %s ->", msf_negotiated_cell_type_str(cell_type));
+      LOG_ERR_LLADDR(parent_addr);
+      LOG_ERR_("\n");
+      msf_sixp_start_retry_wait_timer();
+      return;
+  }
 
-  memset(body, 0, sizeof(body));
-  cell_list_len = msf_sixp_fill_cell_list(parent_addr, cell_type,
-                                          cell_list, sizeof(cell_list));
+  MSFCellsPkt  msg;
+  memset(&msg, 0, sizeof(msg));
+
   if(cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
     cell_options = SIXP_PKT_CELL_OPTION_TX;
   } else {
     cell_options = SIXP_PKT_CELL_OPTION_RX;
   }
+  sixp_pkt_cells_reset(&msg.as_pkt);
+  msg.as_pkt.head.cell_options = cell_options;
 
-  body_len = (sizeof(sixp_pkt_metadata_t) +
-              sizeof(sixp_pkt_cell_options_t) +
-              sizeof(sixp_pkt_num_cells_t) +
-              cell_list_len);
+  int cell_list_len =
+  msf_sixp_reserve_cells_pkt(parent_addr, &msg.as_pkt, MSF_6P_CELL_LIST_MAX_LEN);
 
-  if(cell_list_len == 0) {
+  body_len = sixp_pkt_cells_total(&msg.as_pkt);
+  msg.as_pkt.head.num_cells = num_cells;
+
+  if(cell_list_len <= 0) {
     LOG_ERR("add_send_request: no cell is available\n");
     msf_sixp_start_request_wait_timer();
     return;
-  } else if(
-    sixp_pkt_set_cell_options(type, code, cell_options, body, body_len) < 0 ||
-    sixp_pkt_set_num_cells(type, code, num_cells, body, body_len) < 0 ||
-    sixp_pkt_set_cell_list(type, code, cell_list, cell_list_len,
-                           0, body, body_len) < 0) {
-    LOG_ERR("cannot build an ADD request\n");
-    msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_request_wait_timer();
-  } else if(sixp_output(type, code, MSF_SFID, body, body_len,
+  } else if(sixp_output(type, code, MSF_SFID, msg.body, body_len,
                         parent_addr, sent_callback_initiator, NULL, 0) < 0) {
-    LOG_ERR("failed to send an ADD request to \n");
+    LOG_ERR("failed to send an ADD %s ->", msf_negotiated_cell_type_str(cell_type));
     LOG_ERR_LLADDR(parent_addr);
     LOG_ERR_("\n");
     msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_retry_wait_timer();
   } else {
-    LOG_INFO("sent an ADD request to the parent: ");
+    LOG_INFO("sent an ADD %s request to the parent: ", msf_negotiated_cell_type_str(cell_type) );
     LOG_INFO_LLADDR(parent_addr);
     LOG_INFO_("\n");
   }
@@ -330,6 +354,8 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
     } else if(cell_list_len == 0) {
       LOG_INFO("received an empty CellList; try another ADD request later\n");
       msf_reserved_cell_delete_all(peer_addr);
+      //next attempt try after some time
+      msf_sixp_start_request_wait_timer();
     } else if(cell_list_len != sizeof(sixp_pkt_cell_t)) {
       /* invalid length since MSF always requests one cell per ADD request */
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);

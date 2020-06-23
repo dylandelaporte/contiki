@@ -67,12 +67,14 @@ static tsch_link_t *cell_to_relocate;
 static process_event_t PROCESS_EVENT_MSF_RELOCATE           = PROCESS_EVENT_POLL;
 static process_event_t PROCESS_EVENT_MSF_RESOLVE            = PROCESS_EVENT_POLL;
 static process_event_t PROCESS_EVENT_MSF_RESOLVE_REMOTE     = PROCESS_EVENT_POLL;
+static process_event_t PROCESS_EVENT_MSF_NEGOTIATE_NBR      = PROCESS_EVENT_POLL;
 
 
 PROCESS(msf_housekeeping_process, "MSF housekeeping");
 
 /* static functions */
 static void exec_postponed_cell_deletion(tsch_slotframe_t *slotframe);
+static void establish_nbr_tx_cell(tsch_neighbor_t* n);
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -112,6 +114,7 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
       PROCESS_EVENT_MSF_RELOCATE        = process_alloc_event();
       PROCESS_EVENT_MSF_RESOLVE         = process_alloc_event();
       PROCESS_EVENT_MSF_RESOLVE_REMOTE  = process_alloc_event();
+      PROCESS_EVENT_MSF_NEGOTIATE_NBR   = process_alloc_event();
   }
 
   while(1) {
@@ -119,6 +122,7 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
                             || ev == PROCESS_EVENT_MSF_RELOCATE
                             || ev == PROCESS_EVENT_MSF_RESOLVE
                             || ev == PROCESS_EVENT_MSF_RESOLVE_REMOTE
+                            || ev == PROCESS_EVENT_MSF_NEGOTIATE_NBR
                             || etimer_expired(&et)
                             );
     etimer_reset(&et);
@@ -158,6 +162,8 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
                 msf_autonomous_inspect_vs_cell( msf_cell_of_link(cell) );
         }
 
+    } else if(ev == PROCESS_EVENT_MSF_NEGOTIATE_NBR){
+        establish_nbr_tx_cell( (tsch_neighbor_t*)data );
     } else {
       /* etimer_expired(&et); go through */
 
@@ -181,24 +187,30 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
       timer_restart(&t_col);
     }
 
-    /* start an ADD or a DELETE transaction if necessary and possible */
-    bool need6p= (parent_addr != NULL) && msf_sixp_is_request_wait_timer_expired();
-    if (need6p)
-        need6p = (sixp_trans_find_for_sfid(parent_addr, MSF_SFID) == NULL);
-    if(need6p) {
-      msf_num_cells_trigger_6p_transaction();
-    } else {
-      /*
-       * We cannot send a request since we don't have the parent or
-       * we're busy on an on-going transaction with the parent. try it
-       * later.
-       */
+    if (parent_addr == NULL)
+        continue;
+
+    if (! msf_sixp_is_retry_wait_timer_expired())
+        continue;
+
+    if( sixp_trans_find(parent_addr) == NULL ) { //sixp_trans_find_for_sfid(parent_addr, MSF_SFID)
+      msf_num_cells_trigger_6p_del_transaction();
     }
+
+    /* start an ADD or a DELETE transaction if necessary and possible */
+    if (! msf_sixp_is_request_wait_timer_expired())
+        continue;
+
+    if( sixp_trans_find(parent_addr) != NULL ) //sixp_trans_find_for_sfid(parent_addr, MSF_SFID)
+        continue;
+
+    msf_num_cells_trigger_6p_add_transaction();
 
     if(cell_to_relocate != NULL) {
       // check that cell still exists
       if (msf_is_negotiated_cell(cell_to_relocate)) {
-          bool can6p = (sixp_trans_find_for_sfid(&cell_to_relocate->addr, MSF_SFID) == NULL);
+          //bool can6p = ( sixp_trans_find_for_sfid(&cell_to_relocate->addr, MSF_SFID) == NULL);
+          bool can6p = ( sixp_trans_find(&cell_to_relocate->addr) == NULL);
           if (can6p) {
               msf_sixp_relocate_send_request(cell_to_relocate);
           }
@@ -230,6 +242,8 @@ msf_housekeeping_stop(void)
   }
 }
 /*---------------------------------------------------------------------------*/
+#define MSF_SOFT_PARENT_SWITCH 1
+
 void
 msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
 {
@@ -241,6 +255,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
   LOG_INFO_LLADDR(new_parent);
   LOG_INFO_("\n");
 
+#if !MSF_SOFT_PARENT_SWITCH
   if(parent_addr != NULL) {
     /* CLEAR all the cells scheduled with the old parent */
     sixp_trans_t *trans = sixp_trans_find_for_sfid(parent_addr, MSF_SFID);
@@ -257,9 +272,11 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
     }
   }
 
+  cell_to_relocate = NULL;
+#endif
+
   /* start allocating negotiated cells with new_parent */
   /* reset the timer so as to send a request immediately */
-  cell_to_relocate = NULL;
   msf_sixp_stop_request_wait_timer();
   assert(msf_sixp_is_request_wait_timer_expired());
 
@@ -289,7 +306,7 @@ msf_housekeeping_delete_cell_to_relocate(void)
   if(cell_to_relocate != NULL) {
     //this will mark taht relocate starts, so not take it for relocation
     //msf_avoid_mark_link_cell(cell_to_relocate);
-
+    LOG_INFO("house: delete relocate cell\n");
     msf_negotiated_cell_delete(cell_to_relocate);
     cell_to_relocate = NULL;
   }
@@ -332,6 +349,30 @@ void msf_housekeeping_negotiate_for_parent_rx(void){
     if (msf_num_cells_request_rx_link())
         process_poll(&msf_housekeeping_process);
 }
+
+/*---------------------------------------------------------------------------*/
+void msf_housekeeping_negotiate_for_nbr_tx(const linkaddr_t *peer_addr){
+    // parent negotiates by defaut
+    if ( linkaddr_cmp(peer_addr, &parent_addr_storage) )
+        return;
+
+    process_post(&msf_housekeeping_process, PROCESS_EVENT_MSF_NEGOTIATE_NBR
+            , tsch_queue_get_nbr(peer_addr)
+            );
+}
+
+static
+void establish_nbr_tx_cell(tsch_neighbor_t* n){
+    const linkaddr_t *peer_addr = tsch_queue_get_nbr_address(n);
+    if(sixp_trans_find_for_sfid(peer_addr, MSF_SFID) == NULL) {
+        msf_sixp_add_send_request_to(MSF_NEGOTIATED_CELL_TYPE_TX, peer_addr);
+    } else {
+        LOG_WARN("busy open new link ->");
+        LOG_WARN_LLADDR(peer_addr);
+        LOG_WARN_("\n");
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 void
 msf_housekeeping_resolve_inconsistency(const linkaddr_t *peer_addr)

@@ -45,6 +45,7 @@
 
 #include "msf-conf.h"
 #include "msf-avoid-cell.h"
+#include "msf-negotiated-cell.h"
 
 #include "sys/log.h"
 #define LOG_MODULE "MSF void"
@@ -118,8 +119,11 @@ static
 int msf_avoids_cell_idx(msf_cell_t x){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = avoids_list_num; idx > 0; --idx, cell++){
-        if (cell->raw == x.raw)
-            return cell-avoids_list;
+        if (cell->raw == x.raw){
+            int idx = cell-avoids_list;
+            if (avoids_ops[idx]& aoUSE)
+                return idx;
+        }
     }
     return -1;
 }
@@ -162,6 +166,7 @@ int msf_avoids_nbr_cell_idx(msf_cell_t x, const tsch_neighbor_t *n){
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->raw == x.raw)
         if (avoids_nbrs[idx] == n)
+        if (avoids_ops[idx]& aoUSE)
             return idx;
     }
     return -1;
@@ -170,17 +175,63 @@ int msf_avoids_nbr_cell_idx(msf_cell_t x, const tsch_neighbor_t *n){
 int  msf_is_avoid_slot(uint16_t slot_offset){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = avoids_list_num; idx > 0; --idx, cell++){
-        if (cell->field.slot == slot_offset)
-            return 1;
+        if (cell->field.slot == slot_offset){
+            int idx = cell-avoids_list;
+            if (avoids_ops[idx]& aoUSE)
+                return idx;
+        }
     }
     return -1;
 }
 
-int msf_is_avoid_local_slot(uint16_t slot_offset){
+AvoidOptionsResult msf_is_avoid_local_slot(uint16_t slot_offset){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
         if (cell->field.slot == slot_offset){
             if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+                return avoids_ops[idx];
+        }
+    }
+    return -1;
+}
+
+// check for RX cells in slots
+AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t * n){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (avoids_nbrs[idx] == n)
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+                return avoids_ops[idx];
+        }
+    }
+    return -1;
+}
+
+// check for RX cells in slot
+const tsch_neighbor_t*  msf_is_avoid_local_slot_rx(uint16_t slot_offset){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+            if ((avoids_ops[idx] & aoTX) == 0)
+                return avoids_nbrs[idx];
+        }
+    }
+    return NULL;
+}
+
+/* @brief check that cell is used by 1hop nbr, not local
+ * @return < 0 - no cell found
+ *         >= 0 - have some cell
+*/
+int  msf_is_avoid_close_slot_outnbr(uint16_t slot_offset, const tsch_neighbor_t *skip_nbr)
+{
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (avoids_nbrs[idx] != skip_nbr)
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE) == aoUSE_REMOTE_1HOP)
                 return avoids_ops[idx];
         }
     }
@@ -193,6 +244,7 @@ AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neigh
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->field.slot == slot_offset){
             if (avoids_nbrs[idx] == n)
+            if (avoids_ops[idx]& aoUSE)
                 return avoids_ops[idx];
         }
     }
@@ -229,7 +281,11 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
                 , was, avoids_ops[idxnbr]);
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
-        return (avoids_ops[idxnbr] != was)? arEXIST_CHANGE: arEXIST_KEEP;
+        if (avoids_ops[idxnbr] != was){
+            avoids_ops[idxnbr] &= ~aoMARK;
+            return arEXIST_CHANGE;
+        }
+        return arEXIST_KEEP;
     }
 
     //local and close cells are sure valid, and so it ready for concurent
@@ -241,7 +297,7 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
     if (idx >= 0){
         AvoidOption was  = avoids_ops[idx];
         // check that not override by far cells
-        if ((was & aoUSE) > ops) {
+        if ((was & aoUSE) > (ops & aoUSE)) {
             //override current cell, by more close
             avoids_nbrs[avoids_list_num] = n;
             avoids_ops[idx]  = ops | (was & ~aoUSE);
@@ -252,7 +308,10 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
         LOG_DBG_LLADDR( tsch_queue_get_nbr_address(n) );
         LOG_DBG_("\n");
 
-        return (avoids_ops[idx] != was)? arEXIST_CHANGE: arEXIST_KEEP;
+        if (avoids_ops[idx] != was){
+            avoids_ops[idx] &= ~aoMARK;
+            return arEXIST_CHANGE;
+        }
         }
         return arEXIST_KEEP;
     }
@@ -276,17 +335,25 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
 }
 
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
-    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
-                                , aoUSE_LOCAL);
+    return msf_avoid_nbr_link_cell( x, get_addr_nbr(&x->addr) );
+}
+
+AvoidResult msf_avoid_nbr_link_cell(const tsch_link_t* x, const tsch_neighbor_t *n){
+    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), n
+                                , aoUSE_LOCAL
+                                    | msf_avoid_link_option_xx(x->link_options)
+                                );
 }
 
 // avoids cell, that can't move - autonomous calls are.
 AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x){
     return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
-                                , aoUSE_LOCAL | aoFIXED);
+                                , aoUSE_LOCAL | aoFIXED
+                                    | msf_avoid_link_option_xx(x->link_options)
+                                );
 }
 
-AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange){
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptions userange){
     return msf_avoid_mark_nbr_cell(x, n, userange);
 }
 
@@ -397,7 +464,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
             continue;
 
         int save = avoids_ops[idx];
-        // looks that this far echo, skip it
+        // for close cells make a drop.
         if ((save&aoUSE_REMOTE) <= range) {
 
             // close cells should validates for exact nbrs, since thay can concurent
@@ -405,7 +472,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
             if ( avoids_nbrs[idx] != n )
                 continue;
 
-            avoids_ops[idx]  &= ~aoUSE_REMOTE;
+            avoids_ops[idx]  &= ~(aoUSE_REMOTE | aoMARK);
             //assign nbr of clearer
             nbrs[idx]           = n;
 
@@ -415,6 +482,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
                         , avoids_ops[idx]);
         }
         else {
+            // far cells unvoids
             ++nouse_free_count;
             LOG_DBG("free %u+%u\n", (unsigned)cells->field.slot, (unsigned)cells->field.chanel);
             cells->raw = cellFREE;
@@ -536,18 +604,24 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->raw == cellFREE) continue;
         if ( avoids_nbrs[idx] == nbr_skip) continue;
-        if ( (avoids_ops[idx] & skip_mark) != 0 ) continue;
+        unsigned ops = avoids_ops[idx];
+        if ( (ops & skip_mark) != 0 ) continue;
 
-        if ( (avoids_ops[idx] & aoUSE)  != range )
+        if ( (ops & aoUSE)  != range )
             continue;
+
+        if ( (range_ops & aoTX) && !(ops & aoTX)  ) continue;
+        if ( (range_ops & aoFIXED) && !(ops & aoFIXED) ) continue;
 
         ++res;
         if (pkt)
         //if ( pkt->head.num_cells < limit)
+        if (!sixp_pkt_cells_have(pkt, *cell))
         {
-            msf_cell_t* x = pkt->cells + pkt->head.num_cells;
-            x->field.slot   = cell->field.slot;
-            x->field.chanel = cell->field.chanel;
+            //msf_cell_t* x = pkt->cells + pkt->head.num_cells;
+            //x->field.slot   = cell->field.slot;
+            //x->field.chanel = cell->field.chanel;
+            pkt->cells[pkt->head.num_cells].raw = cell->raw;
             ++(pkt->head.num_cells);
             if (pkt->head.num_cells >= limit)
                 return res;
@@ -557,6 +631,7 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
 }
 
 
+/* Drop from pkt cells that belongs nbr */
 int msf_avoid_clean_cells_for_nbr(SIXPCellsPkt* pkt, const tsch_neighbor_t *n){
     int res = 0;
     sixp_cell_t* cell = pkt->cells;
@@ -684,4 +759,67 @@ int msf_avoid_append_nbr_cell_to_relocate(SIXPCellsPkt* pkt, tsch_neighbor_t *n)
         }
     }
     return 0;
+}
+
+//------------------------------------------------------------------------------
+static
+const char* cell_arrow(int x){
+    return msf_negotiated_cell_type_arrow(
+            (x & aoTX)? MSF_NEGOTIATED_CELL_TYPE_TX
+                                    : MSF_NEGOTIATED_CELL_TYPE_RX
+                                         );
+}
+
+
+// @brief Dumps nbr cell
+#define MSF_PRINTF(...) LOG_OUTPUT(__VA_ARGS__)
+void msf_avoid_dump_idx_cell(int idx){
+    msf_cell_t* cell = &(avoids_list[idx]);
+    MSF_PRINTF("[%02u+%02u] : %02x %s", cell->field.slot, cell->field.chanel
+                    , avoids_ops[idx], cell_arrow(avoids_ops[idx])
+                    );
+    LOG_LLADDR(LOG_LEVEL_ERR, tsch_queue_get_nbr_address(avoids_nbrs[idx]) );
+    MSF_PRINTF("\n");
+}
+
+void msf_avoid_dump_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n){
+    int idx = msf_avoids_nbr_cell_idx(x, n);
+    if (idx >= 0)
+        msf_avoid_dump_idx_cell(idx);
+}
+
+void msf_avoid_dump_peer_cell(msf_cell_t x, const linkaddr_t * peer_addr){
+    msf_avoid_dump_nbr_cell(x, get_addr_nbr(peer_addr) );
+}
+
+void msf_avoid_dump_cell(msf_cell_t x){
+    msf_cell_t* cell = avoids_list;
+    bool ok = false;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->raw == x.raw){
+            msf_avoid_dump_idx_cell(idx);
+            ok = true;
+        }
+    }
+    if (!ok){
+        MSF_PRINTF("[%02u+%02u] : #\n", x.field.slot, x.field.chanel);
+    }
+}
+
+void msf_avoid_dump_local_cells(void){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->raw != cellFREE)
+        if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0 )
+            msf_avoid_dump_idx_cell(idx);
+    }
+}
+
+void msf_avoid_dump_slot(unsigned slot){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->field.slot == slot)
+        if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0 )
+            msf_avoid_dump_idx_cell(idx);
+    }
 }

@@ -59,6 +59,19 @@ void msf_num_cells_reset(bool clear_num_cells_required);
 void msf_num_cells_update(void);
 
 /**
+ * \brief Update NumCells* counters, provided by specified peer
+ * \details This is event handler, to update NumCells* counters on add/delete
+ *          negotiated links.
+ *      It upadates Scheduled counters, to provide actual value at runtime.
+ *      This is requred to avoid 6p_transaction trigger caused by inadecvate
+ *          obsolete Scheduled value.
+ *      This rises when parent peer opens/delete cells concuretly, by conflicts
+ *          resolution involved
+ */
+void msf_num_cells_update_peers(int inc, msf_negotiated_cell_type_t cell_type
+                                , const linkaddr_t *peer_addr);
+
+/**
  * \brief Update NumUsed for the negotiated TX cells
  * \param count A value to add to NumUsed for negotiated TX cells
  */
@@ -78,9 +91,12 @@ bool msf_num_cells_request_rx_link(void);
 
 /**
  * \brief Trigger a 6P transaction if necessary, based on NumCells*
- * counters
+ * counters.
+ *  ADD transactions are may fails with requested retry timeout
+ *  DEL transaction are suerly success, and can be executed as requests
  */
-void msf_num_cells_trigger_6p_transaction(void);
+void msf_num_cells_trigger_6p_add_transaction(void);
+void msf_num_cells_trigger_6p_del_transaction(void);
 
 /**
  * \brief Show NumCells* counters in the shell

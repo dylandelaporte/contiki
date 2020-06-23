@@ -67,6 +67,10 @@ msf_cell_t msf_cell_at(uint16_t slot_offset, uint16_t channel_offset){
     return cell;
 }
 
+enum {
+    //< cell ffff.ffff - no value, use for deleted/absent cells
+    MSF_NOCELL = ~0ul,
+};
 
 
 enum AvoidOption{
@@ -126,6 +130,10 @@ int msf_avoid_state_of(AvoidOptionsResult x){
     return x & aoMARK_FIELD;
 }
 
+static inline
+AvoidOptions msf_avoid_link_option_xx(unsigned link_options){
+    return (link_options & LINK_OPTION_TX);
+}
 
 
 enum AvoidResult{
@@ -136,13 +144,17 @@ enum AvoidResult{
 };
 typedef enum AvoidResult AvoidResult;
 
+
+//------------------------------------------------------------------------------
 // same as reset all
 void msf_unvoid_all_cells();
 
 
 
+//------------------------------------------------------------------------------
 // locals avoid
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x);
+AvoidResult msf_avoid_nbr_link_cell(const tsch_link_t* x, const tsch_neighbor_t *n);
 
 // avoids cell, that can't move - autonomous calls are.
 AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x);
@@ -164,13 +176,23 @@ int  msf_is_avoid_slot(uint16_t slot_offset);
  *         >= 0 - have some cell
 */
 int  msf_is_avoid_local_cell(msf_cell_t x);
-int  msf_is_avoid_local_slot(uint16_t slot_offset);
+AvoidOptionsResult  msf_is_avoid_local_slot(uint16_t slot_offset);
+// check for nbr cells in slot
+AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t* n);
+// check for RX cells in slot
+const tsch_neighbor_t*  msf_is_avoid_local_slot_rx(uint16_t slot_offset);
+
+/* @brief check that cell is used by 1hop nbr, not local
+ * @return < 0 - no cell found
+ *         >= 0 - have some cell
+*/
+int  msf_is_avoid_close_slot_outnbr(uint16_t slot_offset, const tsch_neighbor_t *skip_nbr);
 
 typedef unsigned long msf_chanel_mask_t;
 msf_chanel_mask_t  msf_avoided_slot_chanels(uint16_t slot_offset);
 
 // avoids of nbr by local/remote using.
-AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption userange);
+AvoidResult msf_avoid_nbr_use_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptions userange);
 
 // completely unvoids nbr cells (forget nbr)
 void msf_unvoid_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
@@ -191,6 +213,8 @@ AvoidOptionsResult  msf_is_avoid_link_cell(const tsch_link_t* x);
 AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n);
 
 
+
+//------------------------------------------------------------------------------
 // mark avoid cell defult - denotes, that all nbrs are know it.
 //      default cells are ignored in enumerations
 void msf_avoid_link_cell_default(const tsch_link_t* x);
@@ -205,6 +229,8 @@ int msf_avoid_num_local_cells();
 // @arg calls - NULL, not collect cells, just calculates cells amount.
 // @arg range - AvoidOption set of aoUSE_xxx.
 //                  | aoMARK - denotes not skip marked cells
+//                  | aoFIXED - demands fixed cells
+//                  | aoTX - demands TX cells
 // @result - cells->head.num_cells= amount of filled cells
 // @return - >0 - amount of cells append
 // @return - =0 - no cells to enumerate
@@ -253,6 +279,18 @@ tsch_neighbor_t* msf_avoid_append_cell_to_relocate(SIXPCellsPkt* cells);
 // @return - =0 - no cells to enumerate
  * */
 int msf_avoid_append_nbr_cell_to_relocate(SIXPCellsPkt* cells, tsch_neighbor_t *n);
+
+
+
+//------------------------------------------------------------------------------
+// @brief Dumps nbr cell
+void msf_avoid_dump_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n);
+void msf_avoid_dump_peer_cell(msf_cell_t x, const linkaddr_t * parent_addr);
+void msf_avoid_dump_cell(msf_cell_t x);
+void msf_avoid_dump_slot(unsigned slot);
+void msf_avoid_dump_local_cells(void);
+
+
 
 
 #endif /* _MSF_RESERVED_CELL_H_ */
