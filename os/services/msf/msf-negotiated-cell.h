@@ -172,14 +172,14 @@ void msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr);
  * \param nbr A tsch_neighbor_t object for the peer
  * \return true if it is the case, otherwise false
  */
-bool msf_negotiated_nbr_is_scheduled_tx(tsch_neighbor_t *nbr);
+bool msf_negotiated_nbr_is_scheduled_tx(const tsch_neighbor_t *nbr);
 
 /**
  * \brief Return whether scheduled any negotiated with a nbr
  * \param nbr A tsch_neighbor_t object for the peer
  * \return true if it is the case, otherwise false
  */
-bool msf_negotiated_is_scheduled_nbr(tsch_neighbor_t *nbr);
+bool msf_negotiated_is_scheduled_nbr(const tsch_neighbor_t *nbr);
 bool msf_negotiated_is_scheduled_peer(const linkaddr_t *peer_addr);
 
 /**

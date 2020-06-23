@@ -183,6 +183,20 @@ tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
                                        const void* cell_list, size_t cell_list_len);
 
 /**
+ * \brief Reserve one of TX cells found in a given CellList, mixing with existing TX
+ *          slots. This is last-chance allocation, when no any slots availiable. Used
+ *        for establish least-chance negotiated connection no-conflict with peer.
+ *        Allow provide multiple TX links in same slot to different peers.
+ * \param peer_addr MAC address of the peer
+ * \param cell_type Type of a cell to reserve
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+tsch_link_t* msf_sixp_reserve_tx_over(const tsch_neighbor_t* n,
+                                       const void* cell_src, size_t cell_list_len);
+
+/**
  * \brief Return a scheduled cell from a given CellList
  * \param peer_addr MAC address of the peer
  * \param link_options Link options of interest

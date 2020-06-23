@@ -199,10 +199,20 @@ send_response(const linkaddr_t *peer_addr,
     rc = SIXP_PKT_RC_SUCCESS;
     reserved_cell = msf_sixp_reserve_one_cell(peer_addr, cell_type,
                                               cell_list, cell_list_len);
-    if(reserved_cell == NULL) {
-      LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
+    if(reserved_cell != NULL) {
+        msf_sixp_set_cell_params((uint8_t *)&cell_to_return, reserved_cell);
     } else {
-      msf_sixp_set_cell_params((uint8_t *)&cell_to_return, reserved_cell);
+        if (cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+            const tsch_neighbor_t * n = tsch_queue_get_nbr(peer_addr);
+        // if have no any TX cells to peer, try to allocate at least one. This
+        //      helps establish good no-conflict connection to it.
+            if ( !msf_negotiated_nbr_is_scheduled_tx(n) ) {
+                LOG_WARN("Try to allocate TX in busy slot\n");
+                reserved_cell = msf_sixp_reserve_tx_over(n, cell_list, cell_list_len);
+            }
+        }
+        if(reserved_cell == NULL)
+            LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
     }
 
     }// else if ( msf_is_reserved_for_peer(parent_addr)

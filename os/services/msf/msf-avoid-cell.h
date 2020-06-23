@@ -175,7 +175,11 @@ int  msf_is_avoid_slot(uint16_t slot_offset);
  *         >= 0 - have some cell
 */
 int  msf_is_avoid_local_cell(msf_cell_t x);
-int  msf_is_avoid_local_slot(uint16_t slot_offset);
+AvoidOptionsResult  msf_is_avoid_local_slot(uint16_t slot_offset);
+// check for nbr cells in slot
+AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t* n);
+// check for RX cells in slot
+const tsch_neighbor_t*  msf_is_avoid_local_slot_rx(uint16_t slot_offset);
 
 /* @brief check that cell is used by 1hop nbr, not local
  * @return < 0 - no cell found

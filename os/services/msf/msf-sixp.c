@@ -308,6 +308,55 @@ tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
                         , cell_list, cell_list_len);
 }
 
+/**
+ * \brief Reserve one of TX cells found in a given CellList, mixing with existing TX
+ *          slots. This is last-chance allocation, when no any slots availiable. Used
+ *        for establish least-chance negotiated connection no-conflict with peer.
+ *        Allow provide multiple TX links in same slot to different peers.
+ * \param peer_addr MAC address of the peer
+ * \param cell_type Type of a cell to reserve
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+tsch_link_t* msf_sixp_reserve_tx_over(const tsch_neighbor_t* n,
+                                       const void* cell_src, size_t cell_list_len)
+{
+    size_t offset;
+    uint16_t slot_offset, channel_offset;
+    tsch_link_t *reserved_cell;
+    const uint8_t* cell_list = (const uint8_t *)cell_src;
+    const linkaddr_t *peer_addr = tsch_queue_get_nbr_address(n);
+
+    // select apropriate slot for override cell:
+    //  have no RX connects
+    //  have no any peer_addr connects
+    for(offset = 0, reserved_cell = NULL;
+        offset < cell_list_len;
+        offset += sizeof(sixp_pkt_cell_t))
+    {
+      msf_sixp_get_cell_params(cell_list + offset,
+                               &slot_offset, &channel_offset);
+      const tsch_neighbor_t* rxnbr = msf_is_avoid_local_slot_rx(slot_offset);
+      if ( rxnbr != 0 )
+          // do not allow mix with rx
+          continue;
+      AvoidOptions ops = msf_is_avoid_local_slot_nbr(slot_offset, n);
+      if ( ops >= 0 )
+          // do not allow mix to same peer
+          continue;
+
+      // found good slot?
+      reserved_cell = msf_reserved_cell_over(peer_addr, MSF_NEGOTIATED_CELL_TYPE_TX,
+                              msf_cell_at(slot_offset, channel_offset) );
+
+      if (reserved_cell != NULL)
+          return reserved_cell;
+
+    }
+    return NULL;
+}
+
 /*---------------------------------------------------------------------------*/
 size_t msf_sixp_reserve_migrate_chanels_pkt(const tsch_link_t *cell_to_relocate,
                                 SIXPCellsPkt* pkt, unsigned pkt_limit

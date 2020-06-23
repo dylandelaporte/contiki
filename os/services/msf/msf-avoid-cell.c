@@ -184,7 +184,7 @@ int  msf_is_avoid_slot(uint16_t slot_offset){
     return -1;
 }
 
-int msf_is_avoid_local_slot(uint16_t slot_offset){
+AvoidOptionsResult msf_is_avoid_local_slot(uint16_t slot_offset){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
         if (cell->field.slot == slot_offset){
@@ -193,6 +193,32 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
         }
     }
     return -1;
+}
+
+// check for RX cells in slots
+AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t * n){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (avoids_nbrs[idx] == n)
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+                return avoids_ops[idx];
+        }
+    }
+    return -1;
+}
+
+// check for RX cells in slot
+const tsch_neighbor_t*  msf_is_avoid_local_slot_rx(uint16_t slot_offset){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+            if ((avoids_ops[idx] & aoTX) == 0)
+                return avoids_nbrs[idx];
+        }
+    }
+    return NULL;
 }
 
 /* @brief check that cell is used by 1hop nbr, not local
