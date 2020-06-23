@@ -1301,5 +1301,14 @@ const char* sixp_pkt_cell_options_str(sixp_pkt_cell_options_t x){
         return "xx";
 }
 
+void sixp_pkt_cells_dump(SIXPCellsPkt* pkt){
+    printf("{%d:", pkt->head.num_cells);
+    for (int i = 0; i < pkt->head.num_cells; ++i){
+        sixp_cell_t* x = pkt->cells+i;
+        printf("[%u+%u] ", x->field.slot, x->field.chanel);
+    }
+    printf("}");
+}
+
 
 /** @} */

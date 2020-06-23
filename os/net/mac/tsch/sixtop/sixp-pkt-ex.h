@@ -161,7 +161,7 @@ sixp_cell_t sixp_pkt_get_cell(const void* buf, unsigned idx) {
 }
 
 bool sixp_pkt_cells_have(SIXPCellsPkt* pkt, sixp_cell_t x);
-
+void sixp_pkt_cells_dump(SIXPCellsPkt* pkt);
 
 //==============================================================================
 int
