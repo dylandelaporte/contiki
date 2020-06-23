@@ -113,7 +113,12 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     for (unsigned i = 0; i < hcells->num_cells; ++i){
         sixp_cell_t c = sixp_pkt_get_cell(hcells->cell_list, i);
         AvoidResult should_relay;
-        should_relay = msf_avoid_nbr_use_cell(c, n, avoiduse);
+
+        unsigned avoid_fixed = 0;
+        if (i < meta.field.fixed_cnt)
+            avoid_fixed = aoFIXED;
+
+        should_relay = msf_avoid_nbr_use_cell(c, n, avoiduse | avoid_fixed);
 
         if (avoiduse <= NRSF_RANGE_HOPS*aoUSE_REMOTE_1HOP )
         //if (avoiduse < aoUSE_REMOTE_3HOP)
@@ -859,16 +864,90 @@ void nrsf_tasks_exec(){
         nrsf_tasks_poll();
 }
 
-// TODO: need provide support for aoFIXED option for exposed cells -
-//       need establish them to separate list with meta
+// @return total op cells, filled
+static
+int nrsf_build_task_local_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned lim){
+    //sixp_pkt_cells_reset(op);
+    op->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
+
+    // report about all local TX cells
+    // op    :fixed              :n
+    // [head]:[ cells fixed ....]:[cells ...]
+    int fixed = op->head.num_cells;
+    msf_avoid_enum_cells(op, lim-1, t->notify_use | aoTX | aoFIXED, t->nbr);
+    int n     = op->head.num_cells;
+    msf_avoid_enum_cells(op, lim-1, t->notify_use | aoTX          , t->nbr);
+
+    fixed = n - fixed;
+    n = op->head.num_cells - n;
+
+    if ( (n+fixed) > 0){
+        NRSFMeta meta;
+        meta.raw = 0;
+        meta.field.avoid_use = t->notify_use;
+        meta.field.fixed_cnt = fixed;
+        op->head.meta = meta.raw;
+        LOG_DBG("notify avoid local TX fix%d+%d cells ", fixed, n);
+        if(LOG_LEVEL > LOG_LEVEL_DBG){
+            sixp_pkt_cells_dump(op);
+        }
+        LOG_DBG_("\n");
+    }
+
+    // compose RX/TX lists in ope op:
+    // op    :fixed              :n          :rop   :rfixed             :rn
+    // [head]:[ cells fixed ....]:[cells ...]:[head]:[ cells fixed ....]:[cells ...]
+
+    //reserve next - RX list head
+    SIXPCellsPkt* rop = op;
+    if(op->head.num_cells > 0) {
+        rop = (SIXPCellsPkt*)(op->cells + op->head.num_cells);
+        //alocate space for head
+        op->cells[op->head.num_cells].raw = MSF_NOCELL;
+        ++(op->head.num_cells);
+    }
+
+    // appends report about all local RX cells
+    int rfixed = op->head.num_cells;
+    msf_avoid_enum_cells(op, lim-1, t->notify_use | aoFIXED, t->nbr);
+    int rn     = op->head.num_cells;
+    msf_avoid_enum_cells(op, lim-1, t->notify_use          , t->nbr);
+
+    int total = op->head.num_cells;
+    rfixed = rn - rfixed;
+    rn = op->head.num_cells - rn;
+
+    if (rop != op) {
+        //split rx-op from tail of common op
+        sixp_pkt_cells_reset(rop);
+        rop->head.num_cells = rfixed + rn;
+        op->head.num_cells = ((sixp_cell_t*)rop - (op->cells));
+    }
+
+    rop->head.cell_options = SIXP_PKT_CELL_OPTION_RX;
+    if ( (rn+rfixed) > 0){
+        NRSFMeta meta;
+        meta.raw = 0;
+        meta.field.avoid_use = t->notify_use;
+        meta.field.fixed_cnt = rfixed;
+        rop->head.meta = meta.raw;
+        LOG_DBG("notify avoid local RX fix%d+%d cells ", rfixed, rn);
+        if(LOG_LEVEL > LOG_LEVEL_DBG){
+            sixp_pkt_cells_dump(rop);
+        }
+        LOG_DBG_("\n");
+    }
+
+    return total;
+}
+
 int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
     int total = 0;
     if (t->notify_use < aoUSE_REMOTE_1HOP) {
         // report about all local avoid and negotiated cells
-        msf_avoid_enum_cells( op, limit, t->notify_use, t->nbr);
-        if (op->head.num_cells > 0){
-            total = op->head.num_cells + 1; // enum header space
-            LOG_DBG("notify avoid local %d cells\n", total);
+        total = nrsf_build_task_local_cells(t, op, limit) + 1;
+        if (op->head.num_cells == 0){
+            total = 0; //op->head.num_cells + 1; // enum header space
         }
         t->notify_use = (t->notify_use& ~aoUSE) | aoUSE_REMOTE_1HOP;
     }
@@ -892,17 +971,27 @@ int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
         SIXPCellsPkt* hop = (SIXPCellsPkt*)(op+total);
         sixp_pkt_cells_reset(hop);
         hop->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
-        n = msf_avoid_enum_cells( hop, lim-1, t->notify_use, t->nbr);
-        if (n <=0)
+
+        int fixed = op->head.num_cells;
+        msf_avoid_enum_cells( hop, lim-1, t->notify_use | aoFIXED, t->nbr);
+        n = op->head.num_cells;
+        msf_avoid_enum_cells( hop, lim-1, t->notify_use, t->nbr);
+
+        fixed = n - fixed;
+        n = op->head.num_cells - n;
+
+        if(hop->head.num_cells > 0)
+            total += hop->head.num_cells + 1;//append cells with header
+        else
+        //if ( (n+fixed) <=0)
             continue;
 
         NRSFMeta meta;
         meta.raw = 0;
         meta.field.avoid_use = t->notify_use;
+        meta.field.fixed_cnt = fixed;
         hop->head.meta = meta.raw;
 
-        if(hop->head.num_cells > 0)
-            total += hop->head.num_cells + 1;//append cells with header
     }
     if ((t->notify_use & aoUSE) >= limit_range)
         t->notify_use = -1;

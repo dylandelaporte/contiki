@@ -60,6 +60,9 @@ union NRSFMeta{
         // nrsf_avoid_cells use it for append new avoids
         //< @sa AvoidOption:aoUSE_xxx
         uint8_t         avoid_use;
+        uint8_t         dummy:4;
+        //cells with aoFIXED placed first, count of this cells
+        uint8_t         fixed_cnt:4;
     }                   field;
     sixp_pkt_metadata_t raw;
 };
