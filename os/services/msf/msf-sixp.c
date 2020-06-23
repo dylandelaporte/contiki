@@ -330,7 +330,7 @@ size_t msf_sixp_reserve_migrate_chanels_pkt(const tsch_link_t *cell_to_relocate,
 
     for (int i = len; i < pkt_limit; ++i){
         int new_ch = msf_find_unused_slot_chanel(new_cell.field.slot, ocupied_ch);
-        if (new_ch <= 0)
+        if (new_ch < 0)
             break;
 
         tsch_link_t *reserved;
