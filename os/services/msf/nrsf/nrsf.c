@@ -81,14 +81,14 @@ static void nrsf_tasks_poll_del();
 //=============================================================================
 /*
  * @return - amount of modify/new cells
- * TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
- *          текущее решение - хранится использование локальное + ближайший сосед.
- * TODO:    Необходимо детектирование конкуренции за одну ячейку, и политика
- *              релокации ячеек, если обнаруживается конкуренция.
- *     Возможные решения:
- *      - согласовывать новую ячейку, если идет конкуренция за автономную TX ячейку
- *        должен ли так разруливаться конфликт за RXячейку?
- *        кто должен инициировать согласование?
+ * TODO: (ru) пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ -
+ *          пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ + пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ.
+ * TODO:    пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+ *              пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+ *     пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:
+ *      - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ TX пїЅпїЅпїЅпїЅпїЅпїЅ
+ *        пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ RXпїЅпїЅпїЅпїЅпїЅпїЅ?
+ *        пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ?
  */
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
      tsch_neighbor_t* n = tsch_queue_get_nbr(hpeer->addr);
@@ -139,14 +139,14 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
  * here reaction on external request for unused cells.
  *  we unuse remote cell too, and if it is not far - relay it
  *
- * TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
- *         Запрос может удалить не свою ячейку. надо выявлять этот конфликт.
- *         Существующее решение - более дальняя команда игнорируется,
- *                  а при удалении ближней ячейки, система остается без информации
- *                    о дальней.
- *          Возможный выход - при приходе запроса удаления на локальную ячейку,
- *              форсировать отправку команды её занятости - это обновит у соседей
- *              актуальную занятость ячейки.
+ * TODO: (ru) пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ -
+ *         пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+ *         пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ,
+ *                  пїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+ *                    пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+ *          пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ,
+ *              пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+ *              пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ.
  */
 void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     int avoiduse;
@@ -871,9 +871,11 @@ void nrsf_tasks_exec(){
         nrsf_tasks_poll();
 }
 
-// @return total op cells, filled
+// @return total cells, filled in op->cells[]
 static
-int nrsf_build_task_local_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned lim){
+int nrsf_build_task_local_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
+    unsigned lim = limit - SIXPKT_CELLSHEAD_CELLS;
+
     //sixp_pkt_cells_reset(op);
     op->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
 
@@ -881,9 +883,9 @@ int nrsf_build_task_local_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned lim){
     // op    :fixed              :n
     // [head]:[ cells fixed ....]:[cells ...]
     int fixed = op->head.num_cells;
-    msf_avoid_enum_cells(op, lim-1, t->notify_use | aoTX | aoFIXED, t->nbr);
+    msf_avoid_enum_cells(op, lim, t->notify_use | aoTX | aoFIXED, t->nbr);
     int n     = op->head.num_cells;
-    msf_avoid_enum_cells(op, lim-1, t->notify_use | aoTX          , t->nbr);
+    msf_avoid_enum_cells(op, lim, t->notify_use | aoTX          , t->nbr);
 
     fixed = n - fixed;
     n = op->head.num_cells - n;
@@ -911,14 +913,14 @@ int nrsf_build_task_local_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned lim){
         rop = (SIXPCellsPkt*)(op->cells + op->head.num_cells);
         //alocate space for head
         op->cells[op->head.num_cells].raw = MSF_NOCELL;
-        ++(op->head.num_cells);
+        op->head.num_cells += SIXPKT_CELLSHEAD_CELLS;
     }
 
     // appends report about all local RX cells
     int rfixed = op->head.num_cells;
-    msf_avoid_enum_cells(op, lim-1, t->notify_use | aoFIXED, t->nbr);
+    msf_avoid_enum_cells(op, lim, t->notify_use | aoFIXED, t->nbr);
     int rn     = op->head.num_cells;
-    msf_avoid_enum_cells(op, lim-1, t->notify_use          , t->nbr);
+    msf_avoid_enum_cells(op, lim, t->notify_use          , t->nbr);
 
     int total = op->head.num_cells;
     rfixed = rn - rfixed;
@@ -948,13 +950,14 @@ int nrsf_build_task_local_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned lim){
     return total;
 }
 
+//@return total cells ocupied in op->cells{}
 int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
     int total = 0;
     if (t->notify_use < aoUSE_REMOTE_1HOP) {
         // report about all local avoid and negotiated cells
-        total = nrsf_build_task_local_cells(t, op, limit) + 1;
+        total = nrsf_build_task_local_cells(t, op, limit);
         if (op->head.num_cells == 0){
-            total = 0; //op->head.num_cells + 1; // enum header space
+            total = 0;
         }
         t->notify_use = (t->notify_use& ~aoUSE) | aoUSE_REMOTE_1HOP;
     }
@@ -963,32 +966,32 @@ int nrsf_build_task_cells(nrsfTask* t, SIXPCellsPkt* op, unsigned limit){
     for (; (t->notify_use & aoUSE) <= limit_range //aoUSE_REMOTE_3HOP
          ; t->notify_use += aoUSE_REMOTE_1HOP )
     {
-        int lim = limit-total;
+        int lim = limit-total - SIXPKT_CELLSHEAD_CELLS;
         if (lim <= 0)
             break;
 
         // report about all remote hop cells
-        int n = msf_avoid_enum_cells(NULL, lim-1, t->notify_use, t->nbr);
+        int n = msf_avoid_enum_cells(NULL, lim, t->notify_use, t->nbr);
         if (n <= 0)
             continue;
         LOG_DBG("notify avoid remote[%x] %d cells\n", t->notify_use, n);
         if (n >= lim)
             break;
 
-        SIXPCellsPkt* hop = (SIXPCellsPkt*)(op+total);
+        SIXPCellsPkt* hop = (SIXPCellsPkt*)(op->cells+total);
         sixp_pkt_cells_reset(hop);
         hop->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
 
         int fixed = op->head.num_cells;
-        msf_avoid_enum_cells( hop, lim-1, t->notify_use | aoFIXED, t->nbr);
+        msf_avoid_enum_cells( hop, lim, t->notify_use | aoFIXED, t->nbr);
         n = op->head.num_cells;
-        msf_avoid_enum_cells( hop, lim-1, t->notify_use, t->nbr);
+        msf_avoid_enum_cells( hop, lim, t->notify_use, t->nbr);
 
         fixed = n - fixed;
         n = op->head.num_cells - n;
 
         if(hop->head.num_cells > 0)
-            total += hop->head.num_cells + 1;//append cells with header
+            total += hop->head.num_cells + SIXPKT_CELLSHEAD_CELLS;//append cells with header
         else
         //if ( (n+fixed) <=0)
             continue;
@@ -1022,12 +1025,12 @@ int nrsf_task_notify_cells(nrsfTask* t, const char* info){
     LOG_DBG("%s task from %x\n", info, t->notify_use);
 
     int ok;
-    ok = nrsf_build_task_cells(t, op, nrsfREQ_OPS_LIMIT-1);
-    if (ok <= 1)
+    ok = nrsf_build_task_cells(t, op, nrsfREQ_OPS_LIMIT -SIXPKT_CELLSHEAD_CELLS);
+    if (ok <= 0)
         return 0;
 
     sixp_pkt_cells_assign(&hpeer.h, op);
-    hpeer.h.body_len  = sizeof(sixp_cell_t)*ok;
+    hpeer.h.body_len  = sizeof(sixp_cell_t)*(ok+SIXPKT_CELLSHEAD_CELLS);
     hpeer.h.code.cmd  = SIXP_PKT_CMD_ADD;
     hpeer.addr        = peer_addr;
     nrsf_sixp_single_send_request(&hpeer, info);
@@ -1047,7 +1050,8 @@ int nrsf_task_notify_dels(nrsfTask* t, const char* info){
     op->head.cell_options = SIXP_PKT_CELL_OPTION_TX;
 
     int ok;
-    ok = msf_avoid_enum_cells(op, nrsfREQ_OPS_LIMIT-1, aoDROPED|aoMARK, t->nbr);
+    ok = msf_avoid_enum_cells(op, nrsfREQ_OPS_LIMIT-SIXPKT_CELLSHEAD_CELLS
+                                , aoDROPED|aoMARK, t->nbr);
     LOG_DBG("%s task from %x =%d\n", info, t->notify_use, ok);
 
     t->notify_use = -1;
@@ -1055,7 +1059,7 @@ int nrsf_task_notify_dels(nrsfTask* t, const char* info){
         return 0;
 
     sixp_pkt_cells_assign(&hpeer.h, op);
-    hpeer.h.body_len  = sizeof(sixp_cell_t)*(ok+1);
+    hpeer.h.body_len  = sizeof(sixp_cell_t)*(ok+SIXPKT_CELLSHEAD_CELLS);
     hpeer.h.code.cmd  = SIXP_PKT_CMD_DELETE;
     hpeer.addr        = tsch_queue_get_nbr_address(t->nbr);
     nrsf_sixp_single_send_request(&hpeer, info);
