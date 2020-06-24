@@ -363,33 +363,7 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);
       msf_reserved_cell_delete_all(peer_addr);
     } else {
-      tsch_link_t *reserved_cell;
-      uint16_t slot_offset, channel_offset;
-      msf_sixp_get_cell_params(cell_list, &slot_offset, &channel_offset);
-      reserved_cell = msf_reserved_cell_get(peer_addr,
-                                      slot_offset, channel_offset);
-      if(reserved_cell != NULL) {
-
-        /* this is a cell which we proposed in the request */
-        msf_negotiated_cell_type_t cell_type;
-        cell_type = (reserved_cell->link_options & LINK_OPTION_TX)
-                     ? MSF_NEGOTIATED_CELL_TYPE_TX
-                     : MSF_NEGOTIATED_CELL_TYPE_RX;
-        msf_reserved_cell_delete_all(peer_addr);
-        if(msf_negotiated_cell_add(peer_addr, cell_type,
-                                   slot_offset, channel_offset) < 0) {
-
-          msf_housekeeping_resolve_inconsistency(peer_addr);
-        } else {
-          /* delete an autonomous cell if it exists */
-          msf_autonomous_cell_delete_tx(peer_addr);
-        }
-      } else {
-        LOG_ERR("received a cell which we didn't propose\n");
-        LOG_ERR("SCHEDULE INCONSISTENCY is likely to happen; ");
-        msf_reserved_cell_delete_all(peer_addr);
-        msf_housekeeping_resolve_inconsistency(peer_addr);
-      }
+      msf_sixp_reserved_cell_negotiate(peer_addr, sixp_pkt_get_cell(cell_list, 0) );
     }
   } else {
     LOG_ERR("ADD transaction failed\n");
