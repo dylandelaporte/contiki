@@ -184,7 +184,7 @@ int  msf_is_avoid_slot(uint16_t slot_offset){
     return -1;
 }
 
-int msf_is_avoid_local_slot(uint16_t slot_offset){
+AvoidOptionsResult msf_is_avoid_local_slot(uint16_t slot_offset){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
         if (cell->field.slot == slot_offset){
@@ -193,6 +193,32 @@ int msf_is_avoid_local_slot(uint16_t slot_offset){
         }
     }
     return -1;
+}
+
+// check for RX cells in slots
+AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t * n){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (avoids_nbrs[idx] == n)
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+                return avoids_ops[idx];
+        }
+    }
+    return -1;
+}
+
+// check for RX cells in slot
+const tsch_neighbor_t*  msf_is_avoid_local_slot_rx(uint16_t slot_offset){
+    msf_cell_t* cell = avoids_list;
+    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (cell->field.slot == slot_offset){
+            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+            if ((avoids_ops[idx] & aoTX) == 0)
+                return avoids_nbrs[idx];
+        }
+    }
+    return NULL;
 }
 
 /* @brief check that cell is used by 1hop nbr, not local
@@ -309,7 +335,11 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
 }
 
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x){
-    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), get_addr_nbr(&x->addr)
+    return msf_avoid_nbr_link_cell( x, get_addr_nbr(&x->addr) );
+}
+
+AvoidResult msf_avoid_nbr_link_cell(const tsch_link_t* x, const tsch_neighbor_t *n){
+    return msf_avoid_mark_nbr_cell(msf_cell_of_link(x), n
                                 , aoUSE_LOCAL
                                     | msf_avoid_link_option_xx(x->link_options)
                                 );
@@ -574,10 +604,14 @@ int msf_avoid_enum_cells(SIXPCellsPkt* pkt, unsigned limit
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
         if (cell->raw == cellFREE) continue;
         if ( avoids_nbrs[idx] == nbr_skip) continue;
-        if ( (avoids_ops[idx] & skip_mark) != 0 ) continue;
+        unsigned ops = avoids_ops[idx];
+        if ( (ops & skip_mark) != 0 ) continue;
 
-        if ( (avoids_ops[idx] & aoUSE)  != range )
+        if ( (ops & aoUSE)  != range )
             continue;
+
+        if ( (range_ops & aoTX) && !(ops & aoTX)  ) continue;
+        if ( (range_ops & aoFIXED) && !(ops & aoFIXED) ) continue;
 
         ++res;
         if (pkt)
@@ -784,7 +818,7 @@ void msf_avoid_dump_local_cells(void){
 void msf_avoid_dump_slot(unsigned slot){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
-        if (cell->field.slot != slot)
+        if (cell->field.slot == slot)
         if ( (avoids_ops[idx] & aoUSE_LOCAL) != 0 )
             msf_avoid_dump_idx_cell(idx);
     }

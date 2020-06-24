@@ -154,6 +154,7 @@ void msf_unvoid_all_cells();
 //------------------------------------------------------------------------------
 // locals avoid
 AvoidResult msf_avoid_link_cell(const tsch_link_t* x);
+AvoidResult msf_avoid_nbr_link_cell(const tsch_link_t* x, const tsch_neighbor_t *n);
 
 // avoids cell, that can't move - autonomous calls are.
 AvoidResult msf_avoid_fixed_link_cell(const tsch_link_t* x);
@@ -175,7 +176,11 @@ int  msf_is_avoid_slot(uint16_t slot_offset);
  *         >= 0 - have some cell
 */
 int  msf_is_avoid_local_cell(msf_cell_t x);
-int  msf_is_avoid_local_slot(uint16_t slot_offset);
+AvoidOptionsResult  msf_is_avoid_local_slot(uint16_t slot_offset);
+// check for nbr cells in slot
+AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t* n);
+// check for RX cells in slot
+const tsch_neighbor_t*  msf_is_avoid_local_slot_rx(uint16_t slot_offset);
 
 /* @brief check that cell is used by 1hop nbr, not local
  * @return < 0 - no cell found
@@ -224,6 +229,8 @@ int msf_avoid_num_local_cells();
 // @arg calls - NULL, not collect cells, just calculates cells amount.
 // @arg range - AvoidOption set of aoUSE_xxx.
 //                  | aoMARK - denotes not skip marked cells
+//                  | aoFIXED - demands fixed cells
+//                  | aoTX - demands TX cells
 // @result - cells->head.num_cells= amount of filled cells
 // @return - >0 - amount of cells append
 // @return - =0 - no cells to enumerate

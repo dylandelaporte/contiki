@@ -107,7 +107,7 @@ sent_callback_initiator(void *arg, uint16_t arg_len,
     LOG_ERR("ADD transaction failed\n");
     msf_reserved_cell_delete_all(dest_addr);
     /* retry later */
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_request_wait_timer(dest_addr);
   } else {
     /* do nothing; SIXP_OUTPUT_STATUS_ABORTED included */
   }
@@ -190,7 +190,7 @@ send_response(const linkaddr_t *peer_addr,
           LOG_ERR("busy by concurent to send an ADD %s ->", msf_negotiated_cell_type_str(cell_type) );
           LOG_ERR_LLADDR(peer_addr);
           LOG_ERR_("\n");
-          msf_sixp_start_retry_wait_timer();
+          msf_sixp_start_retry_wait_timer(peer_addr);
           rc = SIXP_PKT_RC_ERR_BUSY;
           reserved_cell = NULL;
     }
@@ -199,10 +199,20 @@ send_response(const linkaddr_t *peer_addr,
     rc = SIXP_PKT_RC_SUCCESS;
     reserved_cell = msf_sixp_reserve_one_cell(peer_addr, cell_type,
                                               cell_list, cell_list_len);
-    if(reserved_cell == NULL) {
-      LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
+    if(reserved_cell != NULL) {
+        msf_sixp_set_cell_params((uint8_t *)&cell_to_return, reserved_cell);
     } else {
-      msf_sixp_set_cell_params((uint8_t *)&cell_to_return, reserved_cell);
+        if (cell_type == MSF_NEGOTIATED_CELL_TYPE_TX) {
+            const tsch_neighbor_t * n = tsch_queue_get_nbr(peer_addr);
+        // if have no any TX cells to peer, try to allocate at least one. This
+        //      helps establish good no-conflict connection to it.
+            if ( !msf_negotiated_nbr_is_scheduled_tx(n) ) {
+                LOG_WARN("Try to allocate TX in busy slot\n");
+                reserved_cell = msf_sixp_reserve_tx_over(n, cell_list, cell_list_len);
+            }
+        }
+        if(reserved_cell == NULL)
+            LOG_ERR("cannot reserve a cell; going to send an empty CellList\n");
     }
 
     }// else if ( msf_is_reserved_for_peer(parent_addr)
@@ -247,12 +257,14 @@ void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
   // amount of cells to add
   const sixp_pkt_num_cells_t num_cells = 1;
 
+  LOG_DBG("ADD requestTO %d\n" , msf_sixp_request_timer_remain(parent_addr) );
+
   assert(parent_addr != NULL);
   if ( msf_is_reserved_for_peer(parent_addr) ){
       LOG_ERR("busy by concurent to send an ADD %s ->", msf_negotiated_cell_type_str(cell_type));
       LOG_ERR_LLADDR(parent_addr);
       LOG_ERR_("\n");
-      msf_sixp_start_retry_wait_timer();
+      msf_sixp_start_retry_wait_timer(parent_addr);
       return;
   }
 
@@ -275,7 +287,7 @@ void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
 
   if(cell_list_len <= 0) {
     LOG_ERR("add_send_request: no cell is available\n");
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_request_wait_timer(parent_addr);
     return;
   } else if(sixp_output(type, code, MSF_SFID, msg.body, body_len,
                         parent_addr, sent_callback_initiator, NULL, 0) < 0) {
@@ -283,7 +295,7 @@ void msf_sixp_add_send_request_to(msf_negotiated_cell_type_t cell_type
     LOG_ERR_LLADDR(parent_addr);
     LOG_ERR_("\n");
     msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_retry_wait_timer();
+    msf_sixp_start_retry_wait_timer(parent_addr);
   } else {
     LOG_INFO("sent an ADD %s request to the parent: ", msf_negotiated_cell_type_str(cell_type) );
     LOG_INFO_LLADDR(parent_addr);
@@ -345,39 +357,13 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       LOG_INFO("received an empty CellList; try another ADD request later\n");
       msf_reserved_cell_delete_all(peer_addr);
       //next attempt try after some time
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_request_wait_timer(peer_addr);
     } else if(cell_list_len != sizeof(sixp_pkt_cell_t)) {
       /* invalid length since MSF always requests one cell per ADD request */
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);
       msf_reserved_cell_delete_all(peer_addr);
     } else {
-      tsch_link_t *reserved_cell;
-      uint16_t slot_offset, channel_offset;
-      msf_sixp_get_cell_params(cell_list, &slot_offset, &channel_offset);
-      reserved_cell = msf_reserved_cell_get(peer_addr,
-                                      slot_offset, channel_offset);
-      if(reserved_cell != NULL) {
-
-        /* this is a cell which we proposed in the request */
-        msf_negotiated_cell_type_t cell_type;
-        cell_type = (reserved_cell->link_options & LINK_OPTION_TX)
-                     ? MSF_NEGOTIATED_CELL_TYPE_TX
-                     : MSF_NEGOTIATED_CELL_TYPE_RX;
-        msf_reserved_cell_delete_all(peer_addr);
-        if(msf_negotiated_cell_add(peer_addr, cell_type,
-                                   slot_offset, channel_offset) < 0) {
-
-          msf_housekeeping_resolve_inconsistency(peer_addr);
-        } else {
-          /* delete an autonomous cell if it exists */
-          msf_autonomous_cell_delete_tx(peer_addr);
-        }
-      } else {
-        LOG_ERR("received a cell which we didn't propose\n");
-        LOG_ERR("SCHEDULE INCONSISTENCY is likely to happen; ");
-        msf_reserved_cell_delete_all(peer_addr);
-        msf_housekeeping_resolve_inconsistency(peer_addr);
-      }
+      msf_sixp_reserved_cell_negotiate(peer_addr, sixp_pkt_get_cell(cell_list, 0) );
     }
   } else {
     LOG_ERR("ADD transaction failed\n");
@@ -385,7 +371,7 @@ msf_sixp_add_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
     if(rc == SIXP_PKT_RC_ERR_SEQNUM) {
       msf_housekeeping_resolve_inconsistency(peer_addr);
     } else if(rc == SIXP_PKT_RC_ERR_BUSY) {
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_request_wait_timer(peer_addr);
     } else {
       /* do nothing */
     }

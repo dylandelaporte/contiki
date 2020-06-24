@@ -79,39 +79,54 @@ void msf_sixp_get_cell_params(const uint8_t *buf,
                               uint16_t *slot_offset, uint16_t *channel_offset);
 
 //=============================================================================
+/* TODO: now only nominated timeout for parent query. for other nbr - used common
+ *      timeout. This can be a factor of downgrade - when some of nbr genearates
+ *      BUSY - stops all nbrs! need solution to perform individual nbr timeouts.
+ *      Possible attempt - use 6Ptransaction as timeout.
+ * */
+
 /**
  * \brief Return whether the waiting timer is expired or not
           this timer used by 6P transactons, that ocupy resources (ADD/REL), if fail.
  * \return true if it's expired, otherwise false
  */
-bool msf_sixp_is_request_wait_timer_expired(void);
+enum MSFTimerID{    MSF_TIMER_PARENT,
+                    MSF_TIMER_NBR ,
+                    MSF_TIMER_TOTAL
+            };
+typedef enum MSFTimerID MSFTimerID;
+
+bool msf_sixp_is_request_wait_timer_expired(MSFTimerID tid);
+bool msf_sixp_is_request_peer_timer_expired(const linkaddr_t *peer_addr);
+
+int  msf_sixp_request_timer_remain(const linkaddr_t *peer_addr);
 
 /**
  * \brief Stop the waiting timer
  */
-void msf_sixp_stop_request_wait_timer(void);
+void msf_sixp_stop_request_wait_timer(const linkaddr_t *peer_addr);
 
 /**
  * \brief Start the waiting timer
  */
-void msf_sixp_start_request_wait_timer(void);
+void msf_sixp_start_request_wait_timer(const linkaddr_t *peer_addr);
 
 /**
  * \brief Return whether the waiting retry timer is expired or not.
  *          this timer used by 6P transactons, that not takes resources (DEL), if fail.
  * \return true if it's expired, otherwise false
  */
-bool msf_sixp_is_retry_wait_timer_expired(void);
+bool msf_sixp_is_retry_wait_timer_expired();
 
 /**
  * \brief Stop the waiting timer
  */
-void msf_sixp_stop_retry_wait_timer(void);
+void msf_sixp_stop_retry_wait_timer();
 
 /**
  * \brief Start the waiting timer
  */
-void msf_sixp_start_retry_wait_timer(void);
+void msf_sixp_start_retry_wait_timer(const linkaddr_t *peer_addr);
 
 //=============================================================================
 /**
@@ -183,6 +198,20 @@ tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
                                        const void* cell_list, size_t cell_list_len);
 
 /**
+ * \brief Reserve one of TX cells found in a given CellList, mixing with existing TX
+ *          slots. This is last-chance allocation, when no any slots availiable. Used
+ *        for establish least-chance negotiated connection no-conflict with peer.
+ *        Allow provide multiple TX links in same slot to different peers.
+ * \param peer_addr MAC address of the peer
+ * \param cell_type Type of a cell to reserve
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+tsch_link_t* msf_sixp_reserve_tx_over(const tsch_neighbor_t* n,
+                                       const void* cell_src, size_t cell_list_len);
+
+/**
  * \brief Return a scheduled cell from a given CellList
  * \param peer_addr MAC address of the peer
  * \param link_options Link options of interest
@@ -194,6 +223,15 @@ tsch_link_t *msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,
                                           uint8_t link_options,
                                           const uint8_t *cell_list,
                                           size_t cell_list_len);
+
+/**
+ * \brief Moves reserved cell for peer to negotiated one.
+ * \param peer_addr MAC address of the peer
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return 0 on success, -1 on failure
+ */
+int msf_sixp_reserved_cell_negotiate(const linkaddr_t *peer_addr, sixp_cell_t cell);
 
 
 

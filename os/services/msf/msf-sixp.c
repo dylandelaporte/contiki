@@ -45,6 +45,7 @@
 #include "msf.h"
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
+#include "msf-housekeeping.h"
 #include "msf-sixp.h"
 
 #include "sys/log.h"
@@ -52,7 +53,7 @@
 #define LOG_LEVEL LOG_LEVEL_MSF
 
 /* variables */
-static struct timer request_wait_timer;
+static struct timer request_wait_timer[MSF_TIMER_TOTAL];
 static struct timer retry_wait_timer;
 
 /*---------------------------------------------------------------------------*/
@@ -107,22 +108,47 @@ msf_sixp_get_cell_params(const uint8_t *buf,
     *channel_offset = buf[2] + (buf[3] << 8);
 }
 //==============================================================================
+static
+MSFTimerID peer_timerid(const linkaddr_t *peer_addr){
+    const linkaddr_t* parent =  msf_housekeeping_get_parent_addr();
+    if (parent == NULL)
+        return MSF_TIMER_NBR;
+    if (linkaddr_cmp(peer_addr, parent))
+        return MSF_TIMER_PARENT;
+    else
+        return MSF_TIMER_NBR;
+}
 /*---------------------------------------------------------------------------*/
 bool
-msf_sixp_is_request_wait_timer_expired(void)
+msf_sixp_is_request_wait_timer_expired(MSFTimerID tid)
 {
-  return timer_expired(&request_wait_timer);
+  return timer_expired(&request_wait_timer[tid]);
+}
+
+bool msf_sixp_is_request_peer_timer_expired(const linkaddr_t *peer_addr){
+    MSFTimerID tid = peer_timerid(peer_addr);
+    return timer_expired(&request_wait_timer[tid]);
+}
+
+int  msf_sixp_request_timer_remain(const linkaddr_t *peer_addr){
+    MSFTimerID tid = peer_timerid(peer_addr);
+    return timer_remaining(&request_wait_timer[tid]);
+}
+
+/*---------------------------------------------------------------------------*/
+void
+msf_sixp_stop_request_wait_timer(const linkaddr_t *peer_addr)
+{
+  MSFTimerID tid = peer_timerid(peer_addr);
+  timer_set(&request_wait_timer[tid], 0);
+  LOG_DBG("delay%d request off\n", tid);
 }
 /*---------------------------------------------------------------------------*/
 void
-msf_sixp_stop_request_wait_timer(void)
+msf_sixp_start_request_wait_timer(const linkaddr_t *peer_addr)
 {
-  timer_set(&request_wait_timer, 0);
-}
-/*---------------------------------------------------------------------------*/
-void
-msf_sixp_start_request_wait_timer(void)
-{
+  MSFTimerID tid = peer_timerid(peer_addr);
+
   clock_time_t wait_duration_seconds;
   unsigned short random_value = random_rand();
 
@@ -133,23 +159,26 @@ msf_sixp_start_request_wait_timer(void)
                             random_value /
                             RANDOM_RAND_MAX));
 
-  assert(timer_expired(&request_wait_timer) != 0);
-  timer_set(&request_wait_timer, wait_duration_seconds * CLOCK_SECOND);
-  LOG_DBG("delay the next request for %lu seconds\n", wait_duration_seconds);
+  assert(timer_expired(&request_wait_timer[tid]) != 0);
+  timer_set(&request_wait_timer[tid], wait_duration_seconds * CLOCK_SECOND);
+  LOG_DBG("delay%d the next request for %u seconds\n", tid, (unsigned)wait_duration_seconds );
 }
 /*---------------------------------------------------------------------------*/
-bool msf_sixp_is_retry_wait_timer_expired(void)
+bool msf_sixp_is_retry_wait_timer_expired()
 {
   return timer_expired(&retry_wait_timer);
 }
 /*---------------------------------------------------------------------------*/
-void msf_sixp_stop_retry_wait_timer(void)
+void msf_sixp_stop_retry_wait_timer()
 {
   timer_set(&retry_wait_timer, 0);
 }
 /*---------------------------------------------------------------------------*/
-void msf_sixp_start_retry_wait_timer(void)
+void msf_sixp_start_retry_wait_timer(const linkaddr_t *peer_addr)
 {
+  if (peer_timerid(peer_addr) != MSF_TIMER_PARENT)
+      return;
+
   clock_time_t wait_duration_seconds;
   unsigned short random_value = random_rand();
 
@@ -226,7 +255,7 @@ size_t msf_sixp_reserve_cells_pkt(const linkaddr_t *peer_addr,
     cnt += msf_sixp_reserve_cell_pkt(peer_addr, RESERVE_NEW_CELL, pkt, cells_limit);
 
     if (cnt < cells_limit)
-    if (LOG_LEVEL >= LOG_LEVEL_DBG){
+    if (LOG_LEVEL > LOG_LEVEL_DBG){
           msf_negotiated_cell_type_t cell_type
                       = (msf_negotiated_cell_type_t)pkt->head.cell_options;
           LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
@@ -271,9 +300,10 @@ tsch_link_t * msf_sixp_reserve_one_cell_of_list(const linkaddr_t *peer_addr,
          * cannot reserve a cell (most probably, this slot_offset is
          * occupied; try the next one
          */
-        if (LOG_LEVEL >= LOG_LEVEL_DBG){
-            LOG_DBG_("cell busy:");
-            msf_avoid_dump_cell( msf_cell_at(slot_offset, channel_offset) );
+        if (LOG_LEVEL > LOG_LEVEL_DBG){
+            LOG_DBG_("slot[%u] busy:", slot_offset);
+            msf_avoid_dump_slot( slot_offset );
+            //msf_avoid_dump_cell( msf_cell_at(slot_offset, channel_offset) );
         }
       }
     }
@@ -282,7 +312,7 @@ tsch_link_t * msf_sixp_reserve_one_cell_of_list(const linkaddr_t *peer_addr,
    * cannot reserve a cell (most probably, this slot_offset is
    * occupied; try the next one
    */
-  if (LOG_LEVEL >= LOG_LEVEL_DBG){
+  if (LOG_LEVEL > LOG_LEVEL_DBG){
       LOG_DBG("cells busy for %s:\n", msf_negotiated_cell_type_str(cell_type));
       msf_avoid_dump_local_cells();
   }
@@ -305,6 +335,55 @@ tsch_link_t *msf_sixp_reserve_cell_over(tsch_link_t * cell_to_override,
                         , cell_to_override->timeslot
                         , msf_negotiated_link_cell_type(cell_to_override)
                         , cell_list, cell_list_len);
+}
+
+/**
+ * \brief Reserve one of TX cells found in a given CellList, mixing with existing TX
+ *          slots. This is last-chance allocation, when no any slots availiable. Used
+ *        for establish least-chance negotiated connection no-conflict with peer.
+ *        Allow provide multiple TX links in same slot to different peers.
+ * \param peer_addr MAC address of the peer
+ * \param cell_type Type of a cell to reserve
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+tsch_link_t* msf_sixp_reserve_tx_over(const tsch_neighbor_t* n,
+                                       const void* cell_src, size_t cell_list_len)
+{
+    size_t offset;
+    uint16_t slot_offset, channel_offset;
+    tsch_link_t *reserved_cell;
+    const uint8_t* cell_list = (const uint8_t *)cell_src;
+    const linkaddr_t *peer_addr = tsch_queue_get_nbr_address(n);
+
+    // select apropriate slot for override cell:
+    //  have no RX connects
+    //  have no any peer_addr connects
+    for(offset = 0, reserved_cell = NULL;
+        offset < cell_list_len;
+        offset += sizeof(sixp_pkt_cell_t))
+    {
+      msf_sixp_get_cell_params(cell_list + offset,
+                               &slot_offset, &channel_offset);
+      const tsch_neighbor_t* rxnbr = msf_is_avoid_local_slot_rx(slot_offset);
+      if ( rxnbr != 0 )
+          // do not allow mix with rx
+          continue;
+      AvoidOptions ops = msf_is_avoid_local_slot_nbr(slot_offset, n);
+      if ( ops >= 0 )
+          // do not allow mix to same peer
+          continue;
+
+      // found good slot?
+      reserved_cell = msf_reserved_cell_over(peer_addr, MSF_NEGOTIATED_CELL_TYPE_TX,
+                              msf_cell_at(slot_offset, channel_offset) );
+
+      if (reserved_cell != NULL)
+          return reserved_cell;
+
+    }
+    return NULL;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -330,7 +409,7 @@ size_t msf_sixp_reserve_migrate_chanels_pkt(const tsch_link_t *cell_to_relocate,
 
     for (int i = len; i < pkt_limit; ++i){
         int new_ch = msf_find_unused_slot_chanel(new_cell.field.slot, ocupied_ch);
-        if (new_ch <= 0)
+        if (new_ch < 0)
             break;
 
         tsch_link_t *reserved;
@@ -386,6 +465,51 @@ msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,
 
   return cell;
 }
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Moves reserved cell for peer to negotiated one.
+ * \param peer_addr MAC address of the peer
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+int msf_sixp_reserved_cell_negotiate(const linkaddr_t *peer_addr, sixp_cell_t cell)
+{
+    tsch_link_t* cell_to_relocate = msf_reserved_cell_get(peer_addr
+                                        , cell.field.slot, cell.field.chanel);
+    if( cell_to_relocate != NULL) {
+
+        msf_negotiated_cell_type_t cell_type;
+        if(cell_to_relocate->link_options & LINK_OPTION_TX) {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+        } else {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+        }
+
+      /* this is a cell which we proposed in the request */
+      msf_reserved_cell_delete_all(peer_addr);
+
+      int ok = msf_negotiated_cell_add(peer_addr, cell_type,
+                                          cell.field.slot, cell.field.chanel);
+      if( ok >= 0)
+      {
+          msf_housekeeping_delete_cell_to_relocate();
+          /* all good */
+      } else {
+          msf_housekeeping_resolve_inconsistency(peer_addr);
+      }
+      return ok;
+    }
+    else {
+        LOG_ERR("received a cell which we didn't propose\n");
+        LOG_ERR("SCHEDULE INCONSISTENCY is likely to happen; ");
+        msf_reserved_cell_delete_all(peer_addr);
+        msf_housekeeping_resolve_inconsistency(peer_addr);
+        return irNOCELL;
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 bool msf_sixp_is_valid_rxtx(sixp_pkt_cell_options_t cell_options){
     if(cell_options == SIXP_PKT_CELL_OPTION_TX
