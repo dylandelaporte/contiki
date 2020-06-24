@@ -163,8 +163,15 @@ void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     }
 
     // start DPC flush new avoids
-    if (rel > 0)
+    if (rel > 0){
         nrsf_tasks_poll_del();
+
+        /* TODO: need to selects somehos 1hop deleted cell, from far cells,
+         *      to prevent unnesasary rises.
+         *      Only close cells affects ADD requests.
+         * */
+        msf_housekeeping_on_free_close_cells(hpeer->addr);
+    }
 
 }
 
@@ -1027,6 +1034,11 @@ int nrsf_task_notify_cells(nrsfTask* t, const char* info){
     return 1;
 }
 
+/* TODO: need to selects somehow 1hop deleted cell, from far cells,
+ *      to prevent unnesasary rises MSF ADDs.
+ *      Only close cells affects ADD requests.
+ *      Possible solution - use aoFIXED or aoRELOCATE to mark deleted local cells.
+ * */
 int nrsf_task_notify_dels(nrsfTask* t, const char* info){
     SIXPeerHandle hpeer;
     sixp_cell_t ops[nrsfREQ_OPS_LIMIT];
