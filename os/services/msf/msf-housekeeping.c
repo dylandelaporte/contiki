@@ -198,7 +198,7 @@ PROCESS_THREAD(msf_housekeeping_process, ev, data)
     }
 
     /* start an ADD or a DELETE transaction if necessary and possible */
-    if (! msf_sixp_is_request_wait_timer_expired())
+    if ( !msf_sixp_is_request_wait_timer_expired(MSF_TIMER_PARENT) )
         continue;
 
     if( sixp_trans_find(parent_addr) != NULL ) //sixp_trans_find_for_sfid(parent_addr, MSF_SFID)
@@ -277,8 +277,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
 
   /* start allocating negotiated cells with new_parent */
   /* reset the timer so as to send a request immediately */
-  msf_sixp_stop_request_wait_timer();
-  assert(msf_sixp_is_request_wait_timer_expired());
+  msf_sixp_stop_request_wait_timer(parent_addr);
 
   if(new_parent == NULL) {
     parent_addr = NULL;
@@ -295,7 +294,7 @@ msf_housekeeping_set_parent_addr(const linkaddr_t *new_parent)
       msf_sixp_add_send_request(MSF_NEGOTIATED_CELL_TYPE_TX);
     } else {
       /* we may have a transaction with the new parent */
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_request_wait_timer(parent_addr);
     }
   }
 }
@@ -364,7 +363,14 @@ void msf_housekeeping_negotiate_for_nbr_tx(const linkaddr_t *peer_addr){
 static
 void establish_nbr_tx_cell(tsch_neighbor_t* n){
     const linkaddr_t *peer_addr = tsch_queue_get_nbr_address(n);
-    if(sixp_trans_find_for_sfid(peer_addr, MSF_SFID) == NULL) {
+    /* start an ADD or a DELETE transaction if necessary and possible */
+
+    bool ok = !msf_sixp_is_request_peer_timer_expired(peer_addr);
+    if (ok)
+        ok = (sixp_trans_find_for_sfid(peer_addr, MSF_SFID) == NULL);
+
+    if (ok) {
+        LOG_DBG("establish_nbr_tx\n");
         msf_sixp_add_send_request_to(MSF_NEGOTIATED_CELL_TYPE_TX, peer_addr);
     } else {
         LOG_WARN("busy open new link ->");

@@ -79,39 +79,54 @@ void msf_sixp_get_cell_params(const uint8_t *buf,
                               uint16_t *slot_offset, uint16_t *channel_offset);
 
 //=============================================================================
+/* TODO: now only nominated timeout for parent query. for other nbr - used common
+ *      timeout. This can be a factor of downgrade - when some of nbr genearates
+ *      BUSY - stops all nbrs! need solution to perform individual nbr timeouts.
+ *      Possible attempt - use 6Ptransaction as timeout.
+ * */
+
 /**
  * \brief Return whether the waiting timer is expired or not
           this timer used by 6P transactons, that ocupy resources (ADD/REL), if fail.
  * \return true if it's expired, otherwise false
  */
-bool msf_sixp_is_request_wait_timer_expired(void);
+enum MSFTimerID{    MSF_TIMER_PARENT,
+                    MSF_TIMER_NBR ,
+                    MSF_TIMER_TOTAL
+            };
+typedef enum MSFTimerID MSFTimerID;
+
+bool msf_sixp_is_request_wait_timer_expired(MSFTimerID tid);
+bool msf_sixp_is_request_peer_timer_expired(const linkaddr_t *peer_addr);
+
+int  msf_sixp_request_timer_remain(const linkaddr_t *peer_addr);
 
 /**
  * \brief Stop the waiting timer
  */
-void msf_sixp_stop_request_wait_timer(void);
+void msf_sixp_stop_request_wait_timer(const linkaddr_t *peer_addr);
 
 /**
  * \brief Start the waiting timer
  */
-void msf_sixp_start_request_wait_timer(void);
+void msf_sixp_start_request_wait_timer(const linkaddr_t *peer_addr);
 
 /**
  * \brief Return whether the waiting retry timer is expired or not.
  *          this timer used by 6P transactons, that not takes resources (DEL), if fail.
  * \return true if it's expired, otherwise false
  */
-bool msf_sixp_is_retry_wait_timer_expired(void);
+bool msf_sixp_is_retry_wait_timer_expired();
 
 /**
  * \brief Stop the waiting timer
  */
-void msf_sixp_stop_retry_wait_timer(void);
+void msf_sixp_stop_retry_wait_timer();
 
 /**
  * \brief Start the waiting timer
  */
-void msf_sixp_start_retry_wait_timer(void);
+void msf_sixp_start_retry_wait_timer(const linkaddr_t *peer_addr);
 
 //=============================================================================
 /**

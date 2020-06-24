@@ -45,6 +45,7 @@
 #include "msf.h"
 #include "msf-negotiated-cell.h"
 #include "msf-reserved-cell.h"
+#include "msf-housekeeping.h"
 #include "msf-sixp.h"
 
 #include "sys/log.h"
@@ -52,7 +53,7 @@
 #define LOG_LEVEL LOG_LEVEL_MSF
 
 /* variables */
-static struct timer request_wait_timer;
+static struct timer request_wait_timer[MSF_TIMER_TOTAL];
 static struct timer retry_wait_timer;
 
 /*---------------------------------------------------------------------------*/
@@ -107,22 +108,47 @@ msf_sixp_get_cell_params(const uint8_t *buf,
     *channel_offset = buf[2] + (buf[3] << 8);
 }
 //==============================================================================
+static
+MSFTimerID peer_timerid(const linkaddr_t *peer_addr){
+    const linkaddr_t* parent =  msf_housekeeping_get_parent_addr();
+    if (parent == NULL)
+        return MSF_TIMER_NBR;
+    if (linkaddr_cmp(peer_addr, parent))
+        return MSF_TIMER_PARENT;
+    else
+        return MSF_TIMER_NBR;
+}
 /*---------------------------------------------------------------------------*/
 bool
-msf_sixp_is_request_wait_timer_expired(void)
+msf_sixp_is_request_wait_timer_expired(MSFTimerID tid)
 {
-  return timer_expired(&request_wait_timer);
+  return timer_expired(&request_wait_timer[tid]);
+}
+
+bool msf_sixp_is_request_peer_timer_expired(const linkaddr_t *peer_addr){
+    MSFTimerID tid = peer_timerid(peer_addr);
+    return timer_expired(&request_wait_timer[tid]);
+}
+
+int  msf_sixp_request_timer_remain(const linkaddr_t *peer_addr){
+    MSFTimerID tid = peer_timerid(peer_addr);
+    return timer_remaining(&request_wait_timer[tid]);
+}
+
+/*---------------------------------------------------------------------------*/
+void
+msf_sixp_stop_request_wait_timer(const linkaddr_t *peer_addr)
+{
+  MSFTimerID tid = peer_timerid(peer_addr);
+  timer_set(&request_wait_timer[tid], 0);
+  LOG_DBG("delay%d request off\n", tid);
 }
 /*---------------------------------------------------------------------------*/
 void
-msf_sixp_stop_request_wait_timer(void)
+msf_sixp_start_request_wait_timer(const linkaddr_t *peer_addr)
 {
-  timer_set(&request_wait_timer, 0);
-}
-/*---------------------------------------------------------------------------*/
-void
-msf_sixp_start_request_wait_timer(void)
-{
+  MSFTimerID tid = peer_timerid(peer_addr);
+
   clock_time_t wait_duration_seconds;
   unsigned short random_value = random_rand();
 
@@ -133,23 +159,26 @@ msf_sixp_start_request_wait_timer(void)
                             random_value /
                             RANDOM_RAND_MAX));
 
-  assert(timer_expired(&request_wait_timer) != 0);
-  timer_set(&request_wait_timer, wait_duration_seconds * CLOCK_SECOND);
-  LOG_DBG("delay the next request for %lu seconds\n", wait_duration_seconds);
+  assert(timer_expired(&request_wait_timer[tid]) != 0);
+  timer_set(&request_wait_timer[tid], wait_duration_seconds * CLOCK_SECOND);
+  LOG_DBG("delay%d the next request for %u seconds\n", tid, (unsigned)wait_duration_seconds );
 }
 /*---------------------------------------------------------------------------*/
-bool msf_sixp_is_retry_wait_timer_expired(void)
+bool msf_sixp_is_retry_wait_timer_expired()
 {
   return timer_expired(&retry_wait_timer);
 }
 /*---------------------------------------------------------------------------*/
-void msf_sixp_stop_retry_wait_timer(void)
+void msf_sixp_stop_retry_wait_timer()
 {
   timer_set(&retry_wait_timer, 0);
 }
 /*---------------------------------------------------------------------------*/
-void msf_sixp_start_retry_wait_timer(void)
+void msf_sixp_start_retry_wait_timer(const linkaddr_t *peer_addr)
 {
+  if (peer_timerid(peer_addr) != MSF_TIMER_PARENT)
+      return;
+
   clock_time_t wait_duration_seconds;
   unsigned short random_value = random_rand();
 
