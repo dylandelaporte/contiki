@@ -212,7 +212,7 @@ bool msf_is_marked_as_relocate(const tsch_link_t *cell){
 }
 
 tsch_link_t* msf_negotiated_get_cell_to_relocate(void){
-    sixp_cell_t ops[2];
+    sixp_cell_t ops[1+SIXPKT_CELLSHEAD_CELLS];
     SIXPCellsPkt* op = (SIXPCellsPkt*)ops;
 
     tsch_neighbor_t *n = tsch_queue_get_nbr( msf_housekeeping_get_parent_addr() );
@@ -222,14 +222,15 @@ tsch_link_t* msf_negotiated_get_cell_to_relocate(void){
         return NULL;
 
     tsch_link_t *cell;
-    cell = tsch_schedule_get_link_by_timeslot(slotframe, ops[1].field.slot, ops[1].field.chanel);
+    cell = tsch_schedule_get_link_by_timeslot(slotframe
+                , op->cells[0].field.slot, op->cells[0].field.chanel);
     if (cell != NULL){
         LOG_DBG("found relocate cell [%u+%u]\n"
                         , cell->timeslot, cell->channel_offset);
         return cell;
     }
     //mark it to set it processed
-    msf_avoid_expose_nbr_cell(ops[1], n);
+    msf_avoid_expose_nbr_cell(op->cells[0], n);
     return NULL;
 }
 
