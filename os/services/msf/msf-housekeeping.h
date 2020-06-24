@@ -122,5 +122,17 @@ void msf_housekeeping_resolve_inconsistency(const linkaddr_t *peer_addr);
  * \param cell A pointer to a negotiated cell to delete
  */
 void msf_housekeeping_delete_cell_later(tsch_link_t *cell);
+
+/**
+ * \brief When some close nbr free cells, msf can retry add cells
+ *
+ * \details Here start implementing blocking ADD requests on sequental failures.
+ *      For second failure, ADD request blocks until close nbr free some cells.
+        This helps save traffic from unnesesary requests
+
+ * \param cell A pointer to a negotiated cell to delete
+ */
+void msf_housekeeping_on_free_close_cells( const linkaddr_t *peer_addr);
+
 #endif /* !_MSF_HOUSEKEEPING_H_ */
 /** @} */

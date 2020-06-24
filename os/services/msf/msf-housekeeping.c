@@ -398,3 +398,13 @@ msf_housekeeping_delete_cell_later(tsch_link_t *cell)
   }
 }
 /*---------------------------------------------------------------------------*/
+void msf_housekeeping_on_free_close_cells( const linkaddr_t *peer_addr){
+    if (msf_housekeeping_parent_addr == NULL)
+        return;
+
+    if ( !linkaddr_cmp(peer_addr, msf_housekeeping_parent_addr) )
+        return;
+
+    msf_sixp_stop_request_wait_timer(peer_addr);
+    process_poll(&msf_housekeeping_process);
+}
