@@ -119,7 +119,7 @@ void msf_rel_sent_callback_initiator(void *arg, uint16_t arg_len,
     LOG_ERR("RELOCATE transaction failed\n");
     msf_reserved_cell_delete_all(dest_addr);
     /* retry later */
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_request_wait_timer(dest_addr);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -211,7 +211,7 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
       LOG_ERR("busy by concurent to send an RELOCATE %s ->", msf_negotiated_cell_type_str(cell_type));
       LOG_ERR_LLADDR(peer_addr);
       LOG_ERR_("\n");
-      msf_sixp_start_retry_wait_timer();
+      msf_sixp_start_retry_wait_timer(peer_addr);
       rc = SIXP_PKT_RC_ERR_BUSY;
       reserved_cell = NULL;
   }
@@ -264,7 +264,7 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
       LOG_ERR("busy by concurent to send an RELOCATE ->");
       LOG_ERR_LLADDR(parent_addr);
       LOG_ERR_("\n");
-      msf_sixp_start_retry_wait_timer();
+      msf_sixp_start_retry_wait_timer(parent_addr);
       return;
   }
 
@@ -289,7 +289,9 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
   sixp_pkt_cells_reset(&msg.as_pkt);
   msg.as_pkt.head.cell_options  = cell_options;
 
-  LOG_INFO("send a RELOCATE [%u+%u] ->"
+  msf_negotiated_cell_type_t cell_type = (msf_negotiated_cell_type_t)cell_options;
+  (void)cell_type;
+  LOG_INFO("send a RELOCATE %s [%u+%u] ->", msf_negotiated_cell_type_str(cell_type)
           , cell_to_relocate->timeslot, cell_to_relocate->channel_offset);
   LOG_INFO_LLADDR(parent_addr);
   LOG_INFO_("\n");
@@ -312,12 +314,12 @@ msf_sixp_relocate_send_request(const tsch_link_t *cell_to_relocate)
 
   if(candidate_cell_list_len <= 0) {
     LOG_ERR("relocate_send_request: no cell is available\n");
-    msf_sixp_start_request_wait_timer();
+    msf_sixp_start_request_wait_timer(parent_addr);
   } else if(sixp_output(type, code, MSF_SFID, msg.body, body_len, parent_addr,
                         msf_rel_sent_callback_initiator, NULL, 0) < 0) {
     LOG_ERR("failed to send a RELOCATE request \n");
     msf_reserved_cell_delete_all(parent_addr);
-    msf_sixp_start_retry_wait_timer();
+    msf_sixp_start_retry_wait_timer(parent_addr);
     //this will mark that relocate starts, so not take it for relocation
     msf_avoid_expose_link_cell(cell_to_relocate);
   }
@@ -388,7 +390,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       LOG_INFO("received an empty CellList; "
                "try another RELOCATE request later\n");
       msf_reserved_cell_delete_all(peer_addr);
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_request_wait_timer(peer_addr);
     } else if(cell_list_len != sizeof(sixp_pkt_cell_t)) {
       /* invalid length; MSF always requests one cell per RELOCATE request */
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);
@@ -428,7 +430,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       sixp_trans_abort(sixp_trans_find_for_sfid(peer_addr, MSF_SFID));
       msf_sixp_clear_send_request(peer_addr);
     } else if(rc == SIXP_PKT_RC_ERR_BUSY) {
-      msf_sixp_start_request_wait_timer();
+      msf_sixp_start_request_wait_timer(peer_addr);
     } else {
       /* do nothing */
     }

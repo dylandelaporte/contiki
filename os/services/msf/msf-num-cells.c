@@ -198,6 +198,14 @@ msf_num_cells_reset(bool clear_num_cells_required)
   } else {
     /* keep them */
   }
+
+  const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
+  if (parent_addr != NULL){
+       tx_num_cells.scheduled = msf_negotiated_cell_get_num_cells(MSF_NEGOTIATED_CELL_TYPE_TX
+                                                                   , parent_addr);
+       rx_num_cells.scheduled = msf_negotiated_cell_get_num_cells(MSF_NEGOTIATED_CELL_TYPE_RX
+                                                                   , parent_addr);
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
