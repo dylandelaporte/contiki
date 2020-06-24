@@ -71,6 +71,10 @@
 #define trace_backoff_on()
 #define trace_backoff_off()
 #endif
+#ifndef trace_tx_prio_on
+#define trace_tx_prio_on()
+#define trace_tx_prio_off()
+#endif
 
 /* Check if TSCH_QUEUE_NUM_PER_NEIGHBOR is power of two */
 #if (TSCH_QUEUE_NUM_PER_NEIGHBOR & (TSCH_QUEUE_NUM_PER_NEIGHBOR - 1)) != 0
@@ -504,6 +508,7 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
 
       if(n->tx_priority != NULL) {
         packet = n->tx_priority;
+        trace_tx_prio_on();
       } else if((get_index = ringbufindex_peek_get(&n->tx_ringbuf)) != -1) {
         packet = n->tx_array[get_index];
       } else {

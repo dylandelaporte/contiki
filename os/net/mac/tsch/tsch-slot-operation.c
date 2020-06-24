@@ -1317,6 +1317,10 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 #define trace_droplink_on()
 #define trace_droplink_off()
 #endif
+#ifndef trace_tx_prio_on
+#define trace_tx_prio_on()
+#define trace_tx_prio_off()
+#endif
 
 
 
@@ -1369,6 +1373,7 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
       }
 #endif
       //trace_backoff_off();
+      trace_tx_prio_off();
 
       /* Get a packet ready to be sent */
       current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
