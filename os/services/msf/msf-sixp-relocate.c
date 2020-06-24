@@ -403,36 +403,7 @@ msf_sixp_relocate_recv_response(const linkaddr_t *peer_addr, sixp_pkt_rc_t rc,
       LOG_ERR("received an invalid CellList (%u octets)\n", cell_list_len);
       msf_reserved_cell_delete_all(peer_addr);
     } else {
-      uint16_t slot_offset, channel_offset;
-      msf_sixp_get_cell_params(cell_list, &slot_offset, &channel_offset);
-      tsch_link_t* cell_to_relocate = msf_reserved_cell_get(peer_addr, slot_offset, channel_offset);
-      if( cell_to_relocate != NULL) {
-
-          msf_negotiated_cell_type_t cell_type;
-          if(cell_to_relocate->link_options & LINK_OPTION_TX) {
-            cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
-          } else {
-            cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
-          }
-
-        /* this is a cell which we proposed in the request */
-        msf_reserved_cell_delete_all(peer_addr);
-
-        if(msf_negotiated_cell_add(peer_addr, cell_type,
-                                   slot_offset, channel_offset) >= 0)
-        {
-            msf_housekeeping_delete_cell_to_relocate();
-            /* all good */
-        } else {
-            msf_housekeeping_resolve_inconsistency(peer_addr);
-        }
-      }
-      else {
-          LOG_ERR("received a cell which we didn't propose\n");
-          LOG_ERR("SCHEDULE INCONSISTENCY is likely to happen; ");
-          msf_reserved_cell_delete_all(peer_addr);
-          msf_housekeeping_resolve_inconsistency(peer_addr);
-      }
+      msf_sixp_reserved_cell_negotiate(peer_addr, sixp_pkt_get_cell(cell_list, 0) );
     }
   } else {
     LOG_ERR("REL transaction failed\n");

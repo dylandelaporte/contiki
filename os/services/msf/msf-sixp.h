@@ -224,6 +224,15 @@ tsch_link_t *msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,
                                           const uint8_t *cell_list,
                                           size_t cell_list_len);
 
+/**
+ * \brief Moves reserved cell for peer to negotiated one.
+ * \param peer_addr MAC address of the peer
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return 0 on success, -1 on failure
+ */
+int msf_sixp_reserved_cell_negotiate(const linkaddr_t *peer_addr, sixp_cell_t cell);
+
 
 
 //=============================================================================

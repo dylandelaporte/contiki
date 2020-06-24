@@ -465,6 +465,51 @@ msf_sixp_find_scheduled_cell(const linkaddr_t *peer_addr,
 
   return cell;
 }
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Moves reserved cell for peer to negotiated one.
+ * \param peer_addr MAC address of the peer
+ * \param cell_list A pointer to a CellList buffer
+ * \param cell_list_len The length of the CellList buffer
+ * \return A pointer to a reserved cell on success, otherwise NULL
+ */
+int msf_sixp_reserved_cell_negotiate(const linkaddr_t *peer_addr, sixp_cell_t cell)
+{
+    tsch_link_t* cell_to_relocate = msf_reserved_cell_get(peer_addr
+                                        , cell.field.slot, cell.field.chanel);
+    if( cell_to_relocate != NULL) {
+
+        msf_negotiated_cell_type_t cell_type;
+        if(cell_to_relocate->link_options & LINK_OPTION_TX) {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_TX;
+        } else {
+          cell_type = MSF_NEGOTIATED_CELL_TYPE_RX;
+        }
+
+      /* this is a cell which we proposed in the request */
+      msf_reserved_cell_delete_all(peer_addr);
+
+      int ok = msf_negotiated_cell_add(peer_addr, cell_type,
+                                          cell.field.slot, cell.field.chanel);
+      if( ok >= 0)
+      {
+          msf_housekeeping_delete_cell_to_relocate();
+          /* all good */
+      } else {
+          msf_housekeeping_resolve_inconsistency(peer_addr);
+      }
+      return ok;
+    }
+    else {
+        LOG_ERR("received a cell which we didn't propose\n");
+        LOG_ERR("SCHEDULE INCONSISTENCY is likely to happen; ");
+        msf_reserved_cell_delete_all(peer_addr);
+        msf_housekeeping_resolve_inconsistency(peer_addr);
+        return irNOCELL;
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 bool msf_sixp_is_valid_rxtx(sixp_pkt_cell_options_t cell_options){
     if(cell_options == SIXP_PKT_CELL_OPTION_TX
