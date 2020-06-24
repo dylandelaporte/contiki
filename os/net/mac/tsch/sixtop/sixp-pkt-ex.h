@@ -104,6 +104,12 @@ struct __attribute__((aligned (4))) SIXPCellsPkt {
 };
 typedef struct SIXPCellsPkt SIXPCellsPkt;
 
+enum {
+    //< size of SIXPCellsPkt.head by cells == zmount of cells ocupied by head
+    //      this is need when, cellspkts couples together in ope Pkt
+    SIXPKT_CELLSHEAD_CELLS = sizeof(SIXPCellsPkt)/sizeof(sixp_cell_t),
+};
+
 static inline
 void sixp_pkt_cells_init(SIXPCellsPkt* pkt, unsigned size){
     pkt->head.num_cells = (size-sizeof(pkt->head))/sizeof(sixp_pkt_cell_t);
@@ -148,8 +154,9 @@ bool sixp_pkt_is_single_cell(SIXPHandle* h, SIXPCellsPkt* pkt){
 static inline
 void sixp_pkt_cells_append(SIXPHandle* h, SIXPCellsPkt* pkt){
     const uint8_t* body =(const uint8_t*)pkt;
+    // ensure that pkt lay right after h.body
     assert( (h->body + h->body_len) == body);
-    h->body_len         += sizeof(pkt->head)+(pkt->head.num_cells * sizeof(sixp_pkt_cell_t));
+    h->body_len         += sixp_pkt_cells_total(pkt);
 }
 
 static inline
