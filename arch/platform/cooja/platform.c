@@ -294,7 +294,7 @@ Java_org_contikios_cooja_corecomm_CLASSNAME_setMemory(JNIEnv *env, jobject obj, 
   memcpy((char*) (((long)rel_addr) + referenceVar),
          mem,
          length);
-  (*env)->ReleaseByteArrayElements(env, mem_arr, mem, 0);
+  (*env)->ReleaseByteArrayElements(env, mem_arr, mem, JNI_ABORT);
 }
 /*---------------------------------------------------------------------------*/
 /**
