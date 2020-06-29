@@ -82,8 +82,6 @@ tsch_slotframe_t * msf_negotiate_slotframe;
 static const bool is_used = true;
 static const bool is_unused = true;
 static const bool is_kept = true;
-static const bool is_used_relocate = true;
-static const bool is_unused_relocate = true;
 
 MEMB(msf_negotiated_cell_data_memb,
      msf_negotiated_cell_data_t,
@@ -174,25 +172,15 @@ mark_as_kept(tsch_link_t *cell)
 static bool
 is_marked_as_used(const tsch_link_t *cell)
 {
-    if (cell != NULL){
-        if (cell->data == (void *)&is_used)
-            return true;
-        if (cell->data == (void *)&is_used_relocate)
-            return true;
-    }
-    return false;
+    assert(cell != NULL);
+    return (cell->data == (void *)&is_used);
 }
 /*---------------------------------------------------------------------------*/
 static bool
 is_marked_as_unused(const tsch_link_t *cell)
 {
-    if (cell != NULL){
-        if (cell->data == (void *)&is_unused)
-            return true;
-        if (cell->data == (void *)&is_unused_relocate)
-            return true;
-    }
-    return false;
+    assert(cell != NULL);
+    return (cell->data == (void *)&is_unused);
 }
 /*---------------------------------------------------------------------------*/
 static bool
