@@ -40,7 +40,7 @@
 
 #ifdef HAVE_NETADDR
 #include "net/linkaddr.h"
-#include "net/ip/uiplib.h"
+#include "net/ipv6/uiplib.h"
 #endif
 
 #ifndef LARGEST_SIGNED
