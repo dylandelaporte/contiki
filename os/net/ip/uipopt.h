@@ -71,7 +71,7 @@
 #define UIP_BIG_ENDIAN     1234
 #endif /* UIP_BIG_ENDIAN */
 
-#include "contiki-conf.h"
+#include "contiki.h"
 
 /*------------------------------------------------------------------------------*/
 
@@ -103,25 +103,6 @@
 #define UIP_FIXEDADDR    0
 
 /**
- * Ping IP address assignment.
- *
- * uIP uses a "ping" packets for setting its own IP address if this
- * option is set. If so, uIP will start with an empty IP address and
- * the destination IP address of the first incoming "ping" (ICMP echo)
- * packet will be used for setting the hosts IP address.
- *
- * \note This works only if UIP_FIXEDADDR is 0.
- *
- * \hideinitializer
- */
-#ifdef UIP_CONF_PINGADDRCONF
-#define UIP_PINGADDRCONF (UIP_CONF_PINGADDRCONF)
-#else /* UIP_CONF_PINGADDRCONF */
-#define UIP_PINGADDRCONF 0
-#endif /* UIP_CONF_PINGADDRCONF */
-
-
-/**
  * Specifies if the uIP ARP module should be compiled with a fixed
  * Ethernet MAC address or not.
  *
@@ -141,26 +122,6 @@
  */
 
 /**
- * The link level header length.
- *
- * This is the offset into the uip_buf where the IP header can be
- * found. For Ethernet, this should be set to 14. For SLIP, this
- * should be set to 0.
- *
- * \note we probably won't use this constant for other link layers than
- * ethernet as they have variable header length (this is due to variable
- * number and type of address fields and to optional security features)
- * E.g.: 802.15.4 -> 2 + (1/2*4/8) + 0/5/6/10/14
- *       802.11 -> 4 + (6*3/4) + 2
- * \hideinitializer
- */
-#ifdef UIP_CONF_LLH_LEN
-#define UIP_LLH_LEN (UIP_CONF_LLH_LEN)
-#else /* UIP_LLH_LEN */
-#define UIP_LLH_LEN     0
-#endif /* UIP_CONF_LLH_LEN */
-
-/**
  * The size of the uIP packet buffer.
  *
  * The uIP packet buffer should not be smaller than 60 bytes, and does
@@ -170,11 +131,10 @@
  * \hideinitializer
  */
 #ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_BUFSIZE (UIP_LINK_MTU + UIP_LLH_LEN)
+#define UIP_BUFSIZE (UIP_LINK_MTU)
 #else /* UIP_CONF_BUFFER_SIZE */
 #define UIP_BUFSIZE (UIP_CONF_BUFFER_SIZE)
 #endif /* UIP_CONF_BUFFER_SIZE */
-
 
 /**
  * Determines if statistics support should be compiled in.
@@ -190,21 +150,6 @@
 #endif /* UIP_CONF_STATISTICS */
 
 /**
- * Determines if logging of certain events should be compiled in.
- *
- * This is useful mostly for debugging. The function uip_log()
- * must be implemented to suit the architecture of the project, if
- * logging is turned on.
- *
- * \hideinitializer
- */
-#ifndef UIP_CONF_LOGGING
-#define UIP_LOGGING     0
-#else /* UIP_CONF_LOGGING */
-#define UIP_LOGGING     (UIP_CONF_LOGGING)
-#endif /* UIP_CONF_LOGGING */
-
-/**
  * Broadcast support.
  *
  * This flag configures IP broadcast support. This is useful only
@@ -214,7 +159,7 @@
  *
  */
 #ifndef UIP_CONF_BROADCAST
-#define UIP_BROADCAST 0
+#define UIP_BROADCAST 1
 #else /* UIP_CONF_BROADCAST */
 #define UIP_BROADCAST (UIP_CONF_BROADCAST)
 #endif /* UIP_CONF_BROADCAST */
@@ -282,11 +227,6 @@ void uip_log(char *msg);
 /** The maximum transmission unit at the IP Layer*/
 #define UIP_LINK_MTU 1280
 
-#ifndef NETSTACK_CONF_WITH_IPV6
-/** Do we use IPv6 or not (default: no) */
-#define NETSTACK_CONF_WITH_IPV6                 0
-#endif
-
 #ifndef UIP_CONF_IPV6_QUEUE_PKT
 /** Do we do per %neighbor queuing during address resolution (default: no) */
 #define UIP_CONF_IPV6_QUEUE_PKT       0
@@ -351,7 +291,7 @@ void uip_log(char *msg);
 #ifdef UIP_CONF_UDP_CHECKSUMS
 #define UIP_UDP_CHECKSUMS (UIP_CONF_UDP_CHECKSUMS)
 #else
-#define UIP_UDP_CHECKSUMS (NETSTACK_CONF_WITH_IPV6)
+#define UIP_UDP_CHECKSUMS 1
 #endif
 
 /**
@@ -415,11 +355,11 @@ void uip_log(char *msg);
  *
  * \hideinitializer
  */
-#ifndef UIP_CONF_MAX_CONNECTIONS
-#define UIP_CONNS       10
-#else /* UIP_CONF_MAX_CONNECTIONS */
-#define UIP_CONNS (UIP_CONF_MAX_CONNECTIONS)
-#endif /* UIP_CONF_MAX_CONNECTIONS */
+#ifndef UIP_CONF_TCP_CONNS
+#define UIP_TCP_CONNS       10
+#else /* UIP_CONF_TCP_CONNS */
+#define UIP_TCP_CONNS (UIP_CONF_TCP_CONNS)
+#endif /* UIP_CONF_TCP_CONNS */
 
 
 /**
@@ -474,15 +414,15 @@ void uip_log(char *msg);
  * The TCP maximum segment size.
  *
  * This is should not be to set to more than
- * UIP_BUFSIZE - UIP_LLH_LEN - UIP_TCPIP_HLEN.
+ * UIP_BUFSIZE - UIP_IPTCPH_LEN.
  */
 #ifdef UIP_CONF_TCP_MSS
-#if UIP_CONF_TCP_MSS > (UIP_BUFSIZE - UIP_LLH_LEN - UIP_TCPIP_HLEN)
+#if UIP_CONF_TCP_MSS > (UIP_BUFSIZE - UIP_IPTCPH_LEN)
 #error UIP_CONF_TCP_MSS is too large for the current UIP_BUFSIZE
-#endif /* UIP_CONF_TCP_MSS > (UIP_BUFSIZE - UIP_LLH_LEN - UIP_TCPIP_HLEN) */
+#endif /* UIP_CONF_TCP_MSS > (UIP_BUFSIZE - UIP_IPTCPH_LEN) */
 #define UIP_TCP_MSS     (UIP_CONF_TCP_MSS)
 #else /* UIP_CONF_TCP_MSS */
-#define UIP_TCP_MSS     (UIP_BUFSIZE - UIP_LLH_LEN - UIP_TCPIP_HLEN)
+#define UIP_TCP_MSS     (UIP_BUFSIZE - UIP_IPTCPH_LEN)
 #endif /* UIP_CONF_TCP_MSS */
 
 /**
@@ -552,6 +492,32 @@ void uip_log(char *msg);
 
 #define UIP_DEFAULT_PREFIX_LEN 64
 
+/**
+ * The MAC-layer transmissons limit is encapslated in "Traffic Class" field
+ *
+ * In Contiki, if the Traffic Class field in the IPv6 header has this bit set,
+ * the low-order bits are used as the MAC-layer transmissons limit.
+ */
+#define UIP_TC_MAC_TRANSMISSION_COUNTER_BIT  0x40
+
+/**
+ * The bits in the "Traffic Class" field that describe the MAC transmission limit
+ */
+#define UIP_TC_MAC_TRANSMISSION_COUNTER_MASK 0x3F
+
+#ifdef UIP_CONF_TAG_TC_WITH_VARIABLE_RETRANSMISSIONS
+#define UIP_TAG_TC_WITH_VARIABLE_RETRANSMISSIONS UIP_CONF_TAG_TC_WITH_VARIABLE_RETRANSMISSIONS
+#else
+#define UIP_TAG_TC_WITH_VARIABLE_RETRANSMISSIONS 0
+#endif
+
+/**
+ * This is the default value of MAC-layer transmissons for uIPv6
+ *
+ * It means that the limit is selected by the MAC protocol instead of uIPv6.
+ */
+#define UIP_MAX_MAC_TRANSMISSIONS_UNDEFINED 0
+
 /** @} */
 
 /*------------------------------------------------------------------------------*/
@@ -567,28 +533,30 @@ void uip_log(char *msg);
 #ifdef SICSLOWPAN_CONF_MAXAGE
 #define SICSLOWPAN_REASS_MAXAGE (SICSLOWPAN_CONF_MAXAGE)
 #else
-#define SICSLOWPAN_REASS_MAXAGE 20
+#define SICSLOWPAN_REASS_MAXAGE 8
 #endif
 
 /**
- * Do we compress the IP header or not (default: no)
+ * Do we compress the IP header or not
  */
 #ifndef SICSLOWPAN_CONF_COMPRESSION
-#define SICSLOWPAN_CONF_COMPRESSION 0
-#endif
+#define SICSLOWPAN_COMPRESSION SICSLOWPAN_COMPRESSION_IPHC
+#else
+#define SICSLOWPAN_COMPRESSION SICSLOWPAN_CONF_COMPRESSION
+#endif /* SICSLOWPAN_CONF_COMPRESSION */
 
 /**
  * If we use IPHC compression, how many address contexts do we support
  */
-#ifndef SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS 
+#ifndef SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS
 #define SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS 1
 #endif
 
 /**
  * Do we support 6lowpan fragmentation
  */
-#ifndef SICSLOWPAN_CONF_FRAG  
-#define SICSLOWPAN_CONF_FRAG  0
+#ifndef SICSLOWPAN_CONF_FRAG
+#define SICSLOWPAN_CONF_FRAG  1
 #endif
 
 /** @} */

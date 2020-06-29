@@ -70,13 +70,13 @@
 #ifdef CC1200_CONF_MAX_PAYLOAD_LEN
 #define CC1200_MAX_PAYLOAD_LEN           CC1200_CONF_MAX_PAYLOAD_LEN
 #else
-#define CC1200_MAX_PAYLOAD_LEN           127
+#define CC1200_MAX_PAYLOAD_LEN           125
 #endif
 /*---------------------------------------------------------------------------*/
 /*
  * The RX watchdog is used to check whether the radio is in RX mode at regular
  * intervals (once per second). Can be used to improve reliability especially
- * if NullRDC is used. Turned of by default.
+ * if CSMA is used. Turned of by default.
  */
 #ifdef CC1200_CONF_USE_RX_WATCHDOG
 #define CC1200_USE_RX_WATCHDOG          CC1200_CONF_USE_RX_WATCHDOG

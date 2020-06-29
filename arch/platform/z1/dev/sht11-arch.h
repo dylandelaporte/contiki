@@ -42,14 +42,16 @@
 #ifndef SHT11_ARCH_H
 #define SHT11_ARCH_H
 
-// Architecture-specific definitions for the SHT11 sensor on Zolertia Z1
-// when connected to the Ziglet port. 
-// CAUTION: I2C needs to be disabled to use the bitbang protocol of SHT11
+/* Architecture-specific definitions for the SHT11 sensor on Zolertia Z1
+ * when connected to the Ziglet port. 
+ * CAUTION: I2C needs to be disabled to use the bitbang protocol of SHT11
+ */
 
 #define SHT11_ARCH_SDA	1	/* P5.1 */
 #define SHT11_ARCH_SCL	2	/* P5.2 */
-// SHT11_ARCH_PWR is not needed, but until and *-arch abstraction exists, this
-// should fix it 
+/* SHT11_ARCH_PWR is not needed, but until and *-arch abstraction exists, this
+ * should fix it 
+ */
 #define SHT11_ARCH_PWR	3	/* P5.3 -- unused pin */ 
 
 #define	SHT11_PxDIR	P5DIR

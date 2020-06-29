@@ -1,11 +1,15 @@
-CONTIKI = ../../../
+CONTIKI = ../../..
 
-APPS += antelope unit-test
+include $(CONTIKI)/Makefile.dir-variables
 
-CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
-SMALL = 1
+MODULES += $(CONTIKI_NG_STORAGE_DIR)/antelope $(CONTIKI_NG_SERVICES_DIR)/unit-test
 
-all: shell-db
+# does not fit on Sky
+PLATFORMS_ONLY= cc2538dk zoul
+
+CONTIKI_PROJECT = shell-db
+all: $(CONTIKI_PROJECT)
 
 CONTIKI_WITH_RIME = 1
+
 include $(CONTIKI)/Makefile.include

@@ -64,17 +64,16 @@
  */
 
 #include "sys/cc.h"
-#include "net/mac/frame802154.h"
-#include "net/llsec/llsec802154.h"
+#include "net/mac/framer/frame802154.h"
+#include "net/mac/llsec802154.h"
 #include "net/linkaddr.h"
 #include <string.h>
-#include <stdbool.h>
 
 /**  \brief The 16-bit identifier of the PAN on which the device is
  *   operating.  If this value is 0xffff, the device is not
  *   associated.
  */
-static uint16_t mac_pan_id = IEEE802154_PANID;
+uint16_t mac_pan_id = IEEE802154_PANID;
 
 /**
  *  \brief Structure that contains the lengths of the various addressing and security fields
@@ -120,20 +119,6 @@ get_key_id_len(uint8_t key_id_mode)
 }
 #endif /* LLSEC802154_USES_AUX_HEADER && LLSEC802154_USES_EXPLICIT_KEYS */
 /*---------------------------------------------------------------------------*/
-/* Get current PAN ID */
-uint16_t
-frame802154_get_pan_id(void)
-{
-  return mac_pan_id;
-}
-/*---------------------------------------------------------------------------*/
-/* Set current PAN ID */
-void
-frame802154_set_pan_id(uint16_t pan_id)
-{
-  mac_pan_id = pan_id;
-}
-/*----------------------------------------------------------------------------*/
 /* Tells whether a given Frame Control Field indicates a frame with
  * source PANID and/or destination PANID */
 void
@@ -143,7 +128,7 @@ frame802154_has_panid(frame802154_fcf_t *fcf, int *has_src_pan_id, int *has_dest
     return;
   }
 
-  if(fcf->frame_version == FRAME802154_IEEE802154E_2012) {
+  if(fcf->frame_version == FRAME802154_IEEE802154_2015) {
     /*
      * IEEE 802.15.4-2015
      * Table 7-2, PAN ID Compression value for frame version 0b10
@@ -215,9 +200,9 @@ frame802154_check_dest_panid(frame802154_t *frame)
     return 0;
   }
   frame802154_has_panid(&frame->fcf, NULL, &has_dest_panid);
-  if(has_dest_panid
-     && frame->dest_pid != frame802154_get_pan_id()
-     && frame->dest_pid != FRAME802154_BROADCASTPANDID) {
+  if(!has_dest_panid ||
+     (frame->dest_pid != frame802154_get_pan_id()
+     && frame->dest_pid != FRAME802154_BROADCASTPANDID)) {
     /* Packet to another PAN */
     return 0;
   }
@@ -271,7 +256,9 @@ frame802154_extract_linkaddr(frame802154_t *frame,
     ((frame->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) ? 2 : 8) : 0;
   if(dest_addr_len == 0 || frame802154_is_broadcast_addr(frame->fcf.dest_addr_mode, frame->dest_addr)) {
     /* Broadcast address */
+    if(dest_address != NULL) {
       linkaddr_copy(dest_address, &linkaddr_null);
+    }
   } else {
     /* Unicast address */
     if(dest_addr_len >= LINKADDR_SIZE)
@@ -302,7 +289,7 @@ field_len(frame802154_t *p, field_length_t *flen)
   /* IEEE802.15.4e changes the meaning of PAN ID Compression (see Table 2a).
    * In this case, we leave the decision whether to compress PAN ID or not
    * up to the caller. */
-  if(p->fcf.frame_version < FRAME802154_IEEE802154E_2012) {
+  if(p->fcf.frame_version < FRAME802154_IEEE802154_2015) {
     /* Set PAN ID compression bit if src pan id matches dest pan id. */
     if((p->fcf.dest_addr_mode & 3) && (p->fcf.src_addr_mode & 3) &&
        p->src_pid == p->dest_pid) {

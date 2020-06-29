@@ -32,7 +32,7 @@
 #ifndef IP64_H
 #define IP64_H
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 
 void ip64_init(void);
 int ip64_6to4(const uint8_t *ipv6packet, const uint16_t ipv6len,

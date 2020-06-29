@@ -37,44 +37,35 @@
  */
 
 #include "net/netstack.h"
-#include "net/ip/uip.h"
-#include "net/ip/tcpip.h"
+#include "net/ipv6/uip.h"
+#include "net/ipv6/tcpip.h"
 #include "net/packetbuf.h"
 #include "net/uip-driver.h"
+#include "net/linkaddr.h"
 #include <string.h>
 
 /*--------------------------------------------------------------------*/
-uint8_t
-#if NETSTACK_CONF_WITH_IPV6
-uip_driver_send(const uip_lladdr_t *addr)
-#else
-uip_driver_send(void)
-#endif
+static uint8_t
+uip_driver_send(const linkaddr_t *addr)
 {
-  packetbuf_copyfrom(&uip_buf[UIP_LLH_LEN], uip_len);
+  packetbuf_copyfrom(uip_buf, uip_len);
 
   /* XXX we should provide a callback function that is called when the
      packet is sent. For now, we just supply a NULL pointer. */
-  NETSTACK_LLSEC.send(NULL, NULL);
+  NETSTACK_MAC.send(NULL, NULL);
   return 1;
 }
 /*--------------------------------------------------------------------*/
 static void
 init(void)
 {
-  /*
-   * Set out output function as the function to be called from uIP to
-   * send a packet.
-   */
-  tcpip_set_outputfunc(uip_driver_send);
 }
 /*--------------------------------------------------------------------*/
 static void
 input(void)
 {
-  if(packetbuf_datalen() > 0 &&
-     packetbuf_datalen() <= UIP_BUFSIZE - UIP_LLH_LEN) {
-    memcpy(&uip_buf[UIP_LLH_LEN], packetbuf_dataptr(), packetbuf_datalen());
+  if(packetbuf_datalen() > 0 && packetbuf_datalen() <= UIP_BUFSIZE) {
+    memcpy(uip_buf, packetbuf_dataptr(), packetbuf_datalen());
     uip_len = packetbuf_datalen();
     tcpip_input();
   }
@@ -83,6 +74,7 @@ input(void)
 const struct network_driver uip_driver = {
   "uip",
   init,
-  input
+  input,
+  uip_driver_send
 };
 /*--------------------------------------------------------------------*/

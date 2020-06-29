@@ -29,7 +29,7 @@
  */
 /*---------------------------------------------------------------------------*/
 /**
- * \addtogroup remote
+ * \addtogroup remote-revb
  * @{
  *
  * \defgroup remote-power-mgmt-revb RE-Mote power management driver
@@ -131,6 +131,12 @@ typedef enum {
   PM_USBEXT,         /* USB set by external resistor to ILIM (1K) */
   PM_USBSUSPEND      /* USB in suspend mode */
 } pm_charge_current_states;
+
+/*
+ *  VBAT Curve compensation
+ */
+#define PM_VBAT_MULT    (float)-181.9
+#define PM_VBAT_OFF     (float)1294.72
 
 /** @} */
 /* -------------------------------------------------------------------------- */

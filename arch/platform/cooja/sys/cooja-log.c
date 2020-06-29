@@ -31,23 +31,13 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include "sys/log.h"
 #include "lib/simEnvChange.h"
 
 #define IMPLEMENT_PRINTF 1
 
-#if NETSTACK_CONF_WITH_IPV4
-/* uIP packets via SLIP */
-#include "uip.h"
-#define MAX_LOG_LENGTH (2*UIP_BUFSIZE)
-#else /* NETSTACK_CONF_WITH_IPV4 */
-#define MAX_LOG_LENGTH 1024
-#endif /* NETSTACK_CONF_WITH_IPV4 */
-
-#if MAX_LOG_LENGTH < 1024
-#undef MAX_LOG_LENGTH
-#define MAX_LOG_LENGTH 1024
-#endif /* MAX_LOG_LENGTH < 1024 */
+#ifndef MAX_LOG_LENGTH
+#define MAX_LOG_LENGTH 8192
+#endif /* MAX_LOG_LENGTH */
 
 
 const struct simInterface simlog_interface;
@@ -101,45 +91,12 @@ doInterfaceActionsAfterTick(void)
 {
 }
 /*-----------------------------------------------------------------------------------*/
-static int log_putchar_with_slip;
-void
-log_set_putchar_with_slip(int with)
-{
-  log_putchar_with_slip = with;
-}
-/*-----------------------------------------------------------------------------------*/
 #if IMPLEMENT_PRINTF
 int
 putchar(int c)
 {
-#define SLIP_END 0300
-  static char debug_frame = 0;
-
-  if(log_putchar_with_slip) {
-    simlog_char(SLIP_END);
-
-    if(!debug_frame) {		/* Start of debug output */
-      simlog_char(SLIP_END);
-      simlog_char('\r');	/* Type debug line == '\r' */
-      debug_frame = 1;
-    }
-
-    simlog_char((char)c);
-
-    /*
-     * Line buffered output, a newline marks the end of debug output and
-     * implicitly flushes debug output.
-     */
-    if(c == '\n') {
-      simlog_char(SLIP_END);
-      debug_frame = 0;
-    }
-
-    return c;
-  } else {
     simlog_char(c);
     return c;
-  }
 }
 /*-----------------------------------------------------------------------------------*/
 int
@@ -154,18 +111,16 @@ int
 printf(const char *fmt, ...)
 {
   int res;
-  static char buf[MAX_LOG_LENGTH];
+  char* buf= simLoggedData + simLoggedLength;
   va_list ap;
-  int i;
 
   va_start(ap, fmt);
-  res = vsnprintf(buf, MAX_LOG_LENGTH, fmt, ap);
+  res = vsnprintf(buf, (MAX_LOG_LENGTH - simLoggedLength), fmt, ap);
   va_end(ap);
 
-  //    simlog(buf);
-  for(i = 0; i < res; i++) {
-    putchar(buf[i]);
-  }
+  simLoggedLength += res;
+  simLoggedFlag = 1;
+
   return res;
 }
 #endif /* IMPLEMENT_PRINTF */

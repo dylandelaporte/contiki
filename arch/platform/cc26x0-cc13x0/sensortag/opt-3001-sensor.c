@@ -36,20 +36,19 @@
  *  Driver for the Sensortag Opt3001 light sensor
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/opt-3001-sensor.h"
-
+#include "contiki.h"
 #include "lib/sensors.h"
+#include "opt-3001-sensor.h"
 #include "sys/ctimer.h"
 #include "ti-lib.h"
+#include "board-i2c.h"
+#include "sensor-common.h"
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-#include "../../cc26x0-cc13x0/sensortag/sensor-common.h"
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
 #if DEBUG

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  */
 /**
- * \addtogroup cc26xx-web-demo
+ * \addtogroup cc26x0-web-demo
  * @{
  *
  * \file
@@ -35,14 +35,20 @@
 #include "contiki.h"
 #include "contiki-lib.h"
 #include "contiki-net.h"
-#include "net/rpl/rpl.h"
-#include "net/ip/uip.h"
+#include "net/routing/routing.h"
+#include "net/ipv6/uip.h"
+#if ROUTING_CONF_RPL_CLASSIC
+#include "net/routing/rpl-classic/rpl.h"
+#include "net/routing/rpl-classic/rpl-private.h"
+#else
+#error The 6LBR client is only meant for RPL Classic. Set MAKE_ROUTING accordingly.
+#endif
 
 #include <string.h>
 #include <stdio.h>
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 /*---------------------------------------------------------------------------*/
 #ifndef CETIC_6LBR_NODE_INFO_PORT
 #define CETIC_6LBR_NODE_INFO_PORT 3000
@@ -104,6 +110,7 @@ timeout_handler(void)
   uip_ip6addr_t *globaladdr = NULL;
   uint16_t dest_port = CETIC_6LBR_NODE_INFO_PORT;
   int has_dest = 0;
+  rpl_instance_t *instance;
   rpl_dag_t *dag;
 
   uip_ds6_addr_t *addr_desc = uip_ds6_get_global(ADDR_PREFERRED);
@@ -153,9 +160,9 @@ timeout_handler(void)
       PRINTF("Client sending to: ");
       PRINT6ADDR(&client_conn->ripaddr);
       i = sprintf(buf, "%d | ", ++seq_id);
-      dag = rpl_get_any_dag();
-      if(dag && dag->instance->def_route) {
-        add_ipaddr(buf + i, &dag->instance->def_route->ipaddr);
+      instance = rpl_get_default_instance();
+      if(instance && instance->current_dag->preferred_parent) {
+        add_ipaddr(buf + i, rpl_parent_get_ipaddr(instance->current_dag->preferred_parent));
       } else {
         sprintf(buf + i, "(null)");
       }

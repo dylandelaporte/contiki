@@ -32,7 +32,14 @@
  */
 /* -------------------------------------------------------------------------- */
 /**
- * \addtogroup openmote-cc2538
+ * \addtogroup openmote-boards
+ * @{
+ *
+ * \defgroup openmote-cc2538 OpenMote-CC2538
+ * The OpenMote-CC2538 board was designed at UC Berkeley in 2013 and
+ * is comercialized by OpenMote Technologies since 2014. It is the first
+ * commercial platform based on the powerful TI CC2538 SoC. It uses a
+ * XBee form-factor to ease prototyping.
  * @{
  *
  * \file
@@ -63,21 +70,21 @@
  * @{
  */
 /*---------------------------------------------------------------------------*/
-/* Some files include leds.h before us, so we need to get rid of defaults in
- * leds.h before we provide correct definitions */
-#undef LEDS_GREEN
-#undef LEDS_YELLOW
-#undef LEDS_RED
-#undef LEDS_CONF_ALL
+#define LEDS_ARCH_L1_PORT GPIO_C_NUM
+#define LEDS_ARCH_L1_PIN  4
+#define LEDS_ARCH_L2_PORT GPIO_C_NUM
+#define LEDS_ARCH_L2_PIN  6
+#define LEDS_ARCH_L3_PORT GPIO_C_NUM
+#define LEDS_ARCH_L3_PIN  7
+#define LEDS_ARCH_L4_PORT GPIO_C_NUM
+#define LEDS_ARCH_L4_PIN  5
 
-#define LEDS_RED       16  /**< LED1 (Red)    -> PC4 */
-#define LEDS_YELLOW    64  /**< LED2 (Yellow) -> PC6 */
-#define LEDS_GREEN     128 /**< LED3 (Green)  -> PC7 */
-#define LEDS_ORANGE    32  /**< LED4 (Orange) -> PC5 */
-#define LEDS_CONF_ALL  240
+#define LEDS_CONF_RED     1
+#define LEDS_CONF_YELLOW  2
+#define LEDS_CONF_GREEN   4
+#define LEDS_CONF_ORANGE  8
 
-/* Notify various examples that we have LEDs */
-#define PLATFORM_HAS_LEDS        1
+#define LEDS_CONF_COUNT   4
 /** @} */
 /*---------------------------------------------------------------------------*/
 /** \name USB configuration
@@ -128,6 +135,7 @@
 #define BUTTON_USER_VECTOR     GPIO_C_IRQn
 /* Notify various examples that we have Buttons */
 #define PLATFORM_HAS_BUTTON    1
+#define PLATFORM_SUPPORTS_BUTTON_HAL 1
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
@@ -174,6 +182,28 @@
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
+ * \name OpenMote-CC2538 antenna switch configuration
+ *
+ * @{
+ */
+#define ANTENNA_BSP_RADIO_BASE   GPIO_PORT_TO_BASE(GPIO_D_NUM)
+#define ANTENNA_BSP_RADIO_INT    GPIO_PIN_MASK(5)
+#define ANTENNA_BSP_RADIO_EXT    GPIO_PIN_MASK(4)
+/** @} */
+/*---------------------------------------------------------------------------*/
+/**
+ * \name CC2538 TSCH configuration
+ *
+ * @{
+ */
+#define RADIO_PHY_OVERHEAD        CC2538_PHY_OVERHEAD
+#define RADIO_BYTE_AIR_TIME       CC2538_BYTE_AIR_TIME
+#define RADIO_DELAY_BEFORE_TX     CC2538_DELAY_BEFORE_TX
+#define RADIO_DELAY_BEFORE_RX     CC2538_DELAY_BEFORE_RX
+#define RADIO_DELAY_BEFORE_DETECT CC2538_DELAY_BEFORE_DETECT
+/** @} */
+/*---------------------------------------------------------------------------*/
+/**
  * \name Device string used on startup
  * @{
  */
@@ -183,5 +213,6 @@
 #endif /* BOARD_H_ */
 /*---------------------------------------------------------------------------*/
 /**
+ * @}
  * @}
  */

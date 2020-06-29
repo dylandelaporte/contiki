@@ -30,10 +30,13 @@
  * 1 (Default): fully implements RAT timestamps at RTTimer domain
  * Not Defined: same
  */
+#define RF_CORE_RAT_STYLE_BASIC      0
+#define RF_CORE_RAT_STYLE_STAMPED    1
+
 #ifdef RF_RAT_CONF_STYLE
 #define RF_RAT_STYLE RF_RAT_CONF_STYLE
 #else
-#define RF_RAT_STYLE 1
+#define RF_RAT_STYLE RF_CORE_RAT_STYLE_STAMPED
 #endif
 /*---------------------------------------------------------------------------*/
 struct rf_rat_controler{

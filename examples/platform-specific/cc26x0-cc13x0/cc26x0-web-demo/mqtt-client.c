@@ -28,25 +28,24 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /**
- * \addtogroup cc26xx-web-demo
+ * \addtogroup cc26x0-web-demo
  * @{
  *
  * \file
  *   MQTT/IBM cloud service client for the CC26XX web demo.
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki-conf.h"
-#include "rpl/rpl-private.h"
+#include "contiki.h"
+#include "net/routing/routing.h"
 #include "mqtt.h"
-#include "net/rpl/rpl.h"
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 #include "net/ipv6/uip-icmp6.h"
 #include "sys/etimer.h"
 #include "sys/ctimer.h"
 #include "lib/sensors.h"
-#include "button-sensor.h"
+#include "dev/button-hal.h"
 #include "board-peripherals.h"
-#include "cc26xx-web-demo.h"
+#include "cc26x0-web-demo.h"
 #include "dev/leds.h"
 #include "mqtt-client.h"
 #include "httpd-simple.h"
@@ -63,9 +62,6 @@
  * get ignored
  */
 static const char *broker_ip = "0064:ff9b:0000:0000:0000:0000:b8ac:7cbd";
-/*---------------------------------------------------------------------------*/
-#define ADDRESS_CONVERSION_OK       1
-#define ADDRESS_CONVERSION_ERROR    0
 /*---------------------------------------------------------------------------*/
 /*
  * A timeout used when waiting for something to happen (e.g. to connect or to
@@ -353,20 +349,13 @@ ip_addr_post_handler(char *key, int key_len, char *val, int val_len)
 {
   int rv = HTTPD_SIMPLE_POST_HANDLER_UNKNOWN;
 
-  /*
-   * uiplib_ip6addrconv will immediately start writing into the supplied buffer
-   * even if it subsequently fails. Thus, pass an intermediate buffer
-   */
-  uip_ip6addr_t tmp_addr;
-
   if(key_len != strlen("broker_ip") ||
      strncasecmp(key, "broker_ip", strlen("broker_ip")) != 0) {
     /* Not ours */
     return HTTPD_SIMPLE_POST_HANDLER_UNKNOWN;
   }
 
-  if(val_len > MQTT_CLIENT_CONFIG_IP_ADDR_STR_LEN
-          || uiplib_ip6addrconv(val, &tmp_addr) != ADDRESS_CONVERSION_OK) {
+  if(val_len > MQTT_CLIENT_CONFIG_IP_ADDR_STR_LEN) {
     /* Ours but bad value */
     rv = HTTPD_SIMPLE_POST_HANDLER_ERROR;
   } else {
@@ -480,7 +469,17 @@ mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data)
     break;
   }
   case MQTT_EVENT_SUBACK: {
+#if MQTT_311
+    mqtt_suback_event_t *suback_event = (mqtt_suback_event_t *)data;
+
+    if(suback_event->success) {
+      DBG("APP - Application is subscribed to topic successfully\n");
+    } else {
+      DBG("APP - Application failed to subscribe to topic (ret code %x)\n", suback_event->return_code);
+    }
+#else
     DBG("APP - Application is subscribed to topic successfully\n");
+#endif
     break;
   }
   case MQTT_EVENT_UNSUBACK: {
@@ -710,7 +709,8 @@ connect_to_broker(void)
   /* Connect to MQTT server */
   mqtt_status_t conn_attempt_result = mqtt_connect(&conn, conf->broker_ip,
                                                    conf->broker_port,
-                                                   conf->pub_interval * 3);
+                                                   conf->pub_interval * 3,
+                                                   MQTT_CLEAN_SESSION_ON);
 
   if(conn_attempt_result == MQTT_STATUS_OK) {
     state = MQTT_CLIENT_STATE_CONNECTING;
@@ -893,10 +893,14 @@ PROCESS_THREAD(mqtt_client_process, ev, data)
 
     PROCESS_YIELD();
 
-    if(ev == sensors_event && data == CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER) {
-      if(state == MQTT_CLIENT_STATE_ERROR) {
-        connect_attempt = 1;
-        state = MQTT_CLIENT_STATE_REGISTERED;
+    if(ev == button_hal_release_event) {
+      button_hal_button_t *btn = (button_hal_button_t *)data;
+
+      if(btn->unique_id == CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER) {
+        if(state == MQTT_CLIENT_STATE_ERROR) {
+          connect_attempt = 1;
+          state = MQTT_CLIENT_STATE_REGISTERED;
+        }
       }
     }
 
@@ -912,7 +916,9 @@ PROCESS_THREAD(mqtt_client_process, ev, data)
     if((ev == PROCESS_EVENT_TIMER && data == &publish_periodic_timer) ||
        ev == PROCESS_EVENT_POLL ||
        ev == cc26xx_web_demo_publish_event ||
-       (ev == sensors_event && data == CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER)) {
+       (ev == button_hal_release_event &&
+        ((button_hal_button_t *)data)->unique_id ==
+        CC26XX_WEB_DEMO_MQTT_PUBLISH_TRIGGER)) {
       state_machine();
     }
 

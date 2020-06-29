@@ -40,10 +40,30 @@
 #ifndef RTIMER_ARCH_H_
 #define RTIMER_ARCH_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 
+#ifndef RTIMER_ARCH_SECOND
+#ifdef RTIMER_CONF_ARCH_SECOND
+#define RTIMER_ARCH_SECOND RTIMER_CONF_ARCH_SECOND
+#else
 #define RTIMER_ARCH_SECOND CLOCK_CONF_SECOND
+#endif
+#endif
+
 
 #define rtimer_arch_now() clock_time()
+
+#define US_TO_RTIMERTICKS(US)  (((US) >= 0 ?                        \
+                               (((int32_t)(US) * (RTIMER_ARCH_SECOND) + 500000) / 1000000L) :      \
+                                ((int32_t)(US) * (RTIMER_ARCH_SECOND) - 500000) / 1000000L))
+
+#define RTIMERTICKS_TO_US(T)   ((T) >= 0 ?                     \
+                               (((int32_t)(T) * 1000000L + (RTIMER_ARCH_SECOND)) / (RTIMER_ARCH_SECOND)) : \
+                               ((int32_t)(T) * 1000000L - (RTIMER_ARCH_SECOND)) / (RTIMER_ARCH_SECOND))
+
+/* A 64-bit version because the 32-bit one cannot handle T >= 4295 ticks.
+   Intended only for positive values of T. */
+#define RTIMERTICKS_TO_US_64(T)  ((uint32_t)(((uint64_t)(T) * 1000000 + (RTIMER_ARCH_SECOND)) / (RTIMER_ARCH_SECOND)))
+
 
 #endif /* RTIMER_ARCH_H_ */

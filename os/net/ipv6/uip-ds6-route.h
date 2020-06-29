@@ -30,7 +30,7 @@
  *
  */
 /**
- * \addtogroup uip6
+ * \addtogroup uip
  * @{
  */
 /**
@@ -40,17 +40,38 @@
 #ifndef UIP_DS6_ROUTE_H
 #define UIP_DS6_ROUTE_H
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 #include "net/nbr-table.h"
 #include "sys/stimer.h"
 #include "lib/list.h"
 
-NBR_TABLE_DECLARE(nbr_routes);
+#ifdef UIP_CONF_MAX_ROUTES
+
+#define UIP_MAX_ROUTES UIP_CONF_MAX_ROUTES
+
+#else /* UIP_CONF_MAX_ROUTES */
+
+#if ROUTING_CONF_RPL_LITE
+#define UIP_MAX_ROUTES 0 /* RPL Lite only supports non-storing, no routes */
+#elif ROUTING_CONF_RPL_CLASSIC
+
+#include "net/routing/rpl-classic/rpl-conf.h"
+#if RPL_WITH_STORING
+#define UIP_MAX_ROUTES NETSTACK_MAX_ROUTE_ENTRIES
+#else /* RPL_WITH_STORING */
+#define UIP_MAX_ROUTES 0 /* No storing mode, no need for routes */
+#endif /* RPL_WITH_STORING */
+
+#else /* Not RPL Lite nor RPL Classic */
+#define UIP_MAX_ROUTES NETSTACK_MAX_ROUTE_ENTRIES
+#endif
+
+#endif /* UIP_CONF_MAX_ROUTES */
 
 void uip_ds6_route_init(void);
 
 #ifndef UIP_CONF_UIP_DS6_NOTIFICATIONS
-#define UIP_DS6_NOTIFICATIONS (UIP_CONF_MAX_ROUTES != 0)
+#define UIP_DS6_NOTIFICATIONS (UIP_MAX_ROUTES != 0)
 #else
 #define UIP_DS6_NOTIFICATIONS UIP_CONF_UIP_DS6_NOTIFICATIONS
 #endif
@@ -66,8 +87,8 @@ void uip_ds6_route_init(void);
 #define UIP_DS6_NOTIFICATION_ROUTE_RM  3
 
 typedef void (* uip_ds6_notification_callback)(int event,
-					       uip_ipaddr_t *route,
-					       uip_ipaddr_t *nexthop,
+					       const uip_ipaddr_t *route,
+					       const uip_ipaddr_t *nexthop,
 					       int num_routes);
 struct uip_ds6_notification {
   struct uip_ds6_notification *next;
@@ -82,11 +103,11 @@ void uip_ds6_notification_rm(struct uip_ds6_notification *n);
 #endif
 
 /* Routing table */
-#ifdef UIP_CONF_MAX_ROUTES
-#define UIP_DS6_ROUTE_NB UIP_CONF_MAX_ROUTES
-#else /* UIP_CONF_MAX_ROUTES */
+#ifdef UIP_MAX_ROUTES
+#define UIP_DS6_ROUTE_NB UIP_MAX_ROUTES
+#else /* UIP_MAX_ROUTES */
 #define UIP_DS6_ROUTE_NB 4
-#endif /* UIP_CONF_MAX_ROUTES */
+#endif /* UIP_MAX_ROUTES */
 
 /** \brief define some additional RPL related route state and
  *  neighbor callback for RPL - if not a DS6_ROUTE_STATE is already set */
@@ -175,14 +196,18 @@ typedef struct uip_ds6_defrt {
   uint8_t isinfinite;
 } uip_ds6_defrt_t;
 
+
+
+NBR_TABLE_DECLARE(struct uip_ds6_route_neighbor_routes, nbr_routes);
+
 /** \name Default router list basic routines */
 /** @{ */
 uip_ds6_defrt_t *uip_ds6_defrt_head(void);
-uip_ds6_defrt_t *uip_ds6_defrt_add(uip_ipaddr_t *ipaddr,
+uip_ds6_defrt_t *uip_ds6_defrt_add(const uip_ipaddr_t *ipaddr,
                                    unsigned long interval);
 void uip_ds6_defrt_rm(uip_ds6_defrt_t *defrt);
-uip_ds6_defrt_t *uip_ds6_defrt_lookup(uip_ipaddr_t *ipaddr);
-uip_ipaddr_t *uip_ds6_defrt_choose(void);
+uip_ds6_defrt_t *uip_ds6_defrt_lookup(const uip_ipaddr_t *ipaddr);
+const uip_ipaddr_t *uip_ds6_defrt_choose(void);
 
 void uip_ds6_defrt_periodic(void);
 /** @} */
@@ -190,13 +215,13 @@ void uip_ds6_defrt_periodic(void);
 
 /** \name Routing Table basic routines */
 /** @{ */
-uip_ds6_route_t *uip_ds6_route_lookup(uip_ipaddr_t *destipaddr);
-uip_ds6_route_t *uip_ds6_route_add(uip_ipaddr_t *ipaddr, uint8_t length,
-                                   uip_ipaddr_t *next_hop);
+uip_ds6_route_t *uip_ds6_route_lookup(const uip_ipaddr_t *destipaddr);
+uip_ds6_route_t *uip_ds6_route_add(const uip_ipaddr_t *ipaddr, uint8_t length,
+                                   const uip_ipaddr_t *next_hop);
 void uip_ds6_route_rm(uip_ds6_route_t *route);
-void uip_ds6_route_rm_by_nexthop(uip_ipaddr_t *nexthop);
+void uip_ds6_route_rm_by_nexthop(const uip_ipaddr_t *nexthop);
 
-uip_ipaddr_t *uip_ds6_route_nexthop(uip_ds6_route_t *);
+const uip_ipaddr_t *uip_ds6_route_nexthop(uip_ds6_route_t *);
 int uip_ds6_route_num_routes(void);
 uip_ds6_route_t *uip_ds6_route_head(void);
 uip_ds6_route_t *uip_ds6_route_next(uip_ds6_route_t *);

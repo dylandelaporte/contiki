@@ -39,13 +39,13 @@
  */
 
 /**
- * \addtogroup llsec802154
+ * \addtogroup csma
  * @{
  */
 
-#include "net/llsec/anti-replay.h"
+#include "net/mac/csma/anti-replay.h"
 #include "net/packetbuf.h"
-#include "net/llsec/llsec802154.h"
+#include "net/mac/llsec802154.h"
 
 #if LLSEC802154_USES_FRAME_COUNTER
 
@@ -57,7 +57,7 @@ void
 anti_replay_set_counter(void)
 {
   frame802154_frame_counter_t reordered_counter;
-  
+
   ++counter;
   reordered_counter.u32 = LLSEC802154_HTONL(counter);
   

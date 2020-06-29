@@ -36,6 +36,7 @@
  * CC1350 LP RF switch driver
  */
 /*---------------------------------------------------------------------------*/
+#include "contiki.h"
 #include "lpm.h"
 #include "rf-core/rf-switch.h"
 #include "ti-lib.h"
@@ -43,8 +44,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-
-#include "../../../cc26x0-cc13x0/contiki-conf.h"
 /*---------------------------------------------------------------------------*/
 #define POWER_PIN  IOID_30
 #define SELECT_PIN IOID_1
@@ -64,9 +63,9 @@ LPM_MODULE(rf_switch_module, NULL, shutdown_handler, NULL, LPM_DOMAIN_NONE);
 void
 rf_switch_init()
 {
-  ti_lib_rom_ioc_pin_type_gpio_output(POWER_PIN);
+  ti_lib_ioc_pin_type_gpio_output(POWER_PIN);
   ti_lib_gpio_clear_dio(POWER_PIN);
-  ti_lib_rom_ioc_pin_type_gpio_output(SELECT_PIN);
+  ti_lib_ioc_pin_type_gpio_output(SELECT_PIN);
   ti_lib_gpio_clear_dio(SELECT_PIN);
 
   lpm_register_module(&rf_switch_module);

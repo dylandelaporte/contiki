@@ -58,22 +58,16 @@
 #include "ioc.h"
 /*---------------------------------------------------------------------------*/
 /**
- * \name LED configurations
+ * \name LED HAL configuration
  *
  * Those values are not meant to be modified by the user
  * @{
  */
-/* Some files include leds.h before us, so we need to get rid of defaults in
- * leds.h before we provide correct definitions */
-#undef LEDS_GREEN
-#undef LEDS_YELLOW
-#undef LEDS_RED
-#undef LEDS_CONF_ALL
-
-#define LEDS_RED       1 /**< LED1 (Red)    */
-#define LEDS_YELLOW    2 /**< LED2 (Yellow) */
-#define LEDS_GREEN     4 /**< LED3 (Green)  */
-#define LEDS_ORANGE    8 /**< LED4 (Orange) */
+#define LEDS_CONF_COUNT                 4
+#define LEDS_CONF_RED                   1
+#define LEDS_CONF_YELLOW                2
+#define LEDS_CONF_GREEN                 4
+#define LEDS_CONF_ORANGE                8
 
 #define LEDS_CONF_ALL 15
 
@@ -91,10 +85,6 @@
 #define BOARD_IOID_LED_2          IOID_27
 #define BOARD_IOID_LED_3          IOID_7
 #define BOARD_IOID_LED_4          IOID_6
-#define BOARD_LED_1               (1 << BOARD_IOID_LED_1)
-#define BOARD_LED_2               (1 << BOARD_IOID_LED_2)
-#define BOARD_LED_3               (1 << BOARD_IOID_LED_3)
-#define BOARD_LED_4               (1 << BOARD_IOID_LED_4)
 #define BOARD_LED_ALL             (BOARD_LED_1 | BOARD_LED_2 | BOARD_LED_3 | \
                                    BOARD_LED_4)
 /** @} */
@@ -230,23 +220,27 @@
 /**
  * \brief ROM bootloader configuration
  *
- * Change SET_CCFG_BL_CONFIG_BL_PIN_NUMBER to BOARD_IOID_KEY_xyz to select
- * which button triggers the bootloader on reset.
- *
- * The remaining values are not meant to be modified by the user
+ * Change CCXXWARE_CONF_BL_PIN_NUMBER to BOARD_IOID_KEY_xyz to select which
+ * button triggers the bootloader on reset. Use CCXXWARE_CONF_BL_LEVEL to
+ * control the pin level that enables the bootloader (0: low, 1: high). It is
+ * also possible to use any other externally-controlled DIO.
  * @{
  */
-#if ROM_BOOTLOADER_ENABLE
-#define SET_CCFG_BL_CONFIG_BOOTLOADER_ENABLE            0xC5
-#define SET_CCFG_BL_CONFIG_BL_LEVEL                     0x00
-#define SET_CCFG_BL_CONFIG_BL_PIN_NUMBER                BOARD_IOID_KEY_SELECT
-#define SET_CCFG_BL_CONFIG_BL_ENABLE                    0xC5
-#else
-#define SET_CCFG_BL_CONFIG_BOOTLOADER_ENABLE            0x00
-#define SET_CCFG_BL_CONFIG_BL_LEVEL                     0x01
-#define SET_CCFG_BL_CONFIG_BL_PIN_NUMBER                0xFF
-#define SET_CCFG_BL_CONFIG_BL_ENABLE                    0xFF
-#endif
+#define CCXXWARE_CONF_BL_PIN_NUMBER   BOARD_IOID_KEY_SELECT
+#define CCXXWARE_CONF_BL_LEVEL        0
+/** @} */
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Board indices for the button HAL
+ *
+ * Those values are not meant to be modified by the user
+ * @{
+ */
+#define BOARD_BUTTON_HAL_INDEX_KEY_LEFT   0x00
+#define BOARD_BUTTON_HAL_INDEX_KEY_RIGHT  0x01
+#define BOARD_BUTTON_HAL_INDEX_KEY_UP     0x02
+#define BOARD_BUTTON_HAL_INDEX_KEY_DOWN   0x03
+#define BOARD_BUTTON_HAL_INDEX_KEY_SELECT 0x04
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**

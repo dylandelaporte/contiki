@@ -43,10 +43,32 @@
 #define CC2420_H_
 
 #include "contiki.h"
-#include "dev/spi.h"
+#include "dev/spi-legacy.h"
 #include "dev/radio.h"
 #include "cc2420_const.h"
 #include "lib/aes-128.h"
+
+#define WITH_SEND_CCA 1
+
+#ifndef CC2420_CONF_CCA_THRESH
+#define CC2420_CONF_CCA_THRESH -45
+#endif /* CC2420_CONF_CCA_THRESH */
+
+#ifndef CC2420_CONF_AUTOACK
+#define CC2420_CONF_AUTOACK 1
+#endif /* CC2420_CONF_AUTOACK */
+
+#define CHECKSUM_LEN        2
+#define FOOTER_LEN          2
+#define FOOTER1_CRC_OK      0x80
+#define FOOTER1_CORRELATION 0x7f
+
+#ifdef CC2420_CONF_RSSI_OFFSET
+#define RSSI_OFFSET CC2420_CONF_RSSI_OFFSET
+#else /* CC2420_CONF_RSSI_OFFSET */
+/* The RSSI_OFFSET is approximate -45 (see CC2420 specification) */
+#define RSSI_OFFSET -45
+#endif /* CC2420_CONF_RSSI_OFFSET */
 
 int cc2420_init(void);
 
@@ -80,9 +102,6 @@ int cc2420_get_txpower(void);
  */
 int cc2420_interrupt(void);
 
-/* XXX hack: these will be made as Chameleon packet attributes */
-extern rtimer_clock_t cc2420_time_of_arrival,
-  cc2420_time_of_departure;
 extern int cc2420_authority_level_of_sender;
 
 int cc2420_on(void);

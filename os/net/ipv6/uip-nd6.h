@@ -31,7 +31,7 @@
  */
 
 /**
- * \addtogroup uip6
+ * \addtogroup uip
  * @{
  */
 
@@ -45,7 +45,7 @@
 #ifndef UIP_ND6_H_
 #define UIP_ND6_H_
 
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 #include "sys/stimer.h"
 /**
  *  \name General
@@ -96,6 +96,17 @@
 #else
 #define UIP_ND6_SEND_NA UIP_CONF_ND6_SEND_NA
 #endif
+#ifndef UIP_CONF_ND6_AUTOFILL_NBR_CACHE
+/* Neighbor not found in cache? Derive its link-layer address from it's
+link-local IPv6, assuming it used autoconfiguration. This is not
+standard-compliant but this is a convenient way to keep the
+neighbor cache out of the way in cases ND is not used.
+Note that this is not standard-compliant (RFC 4861), as neighbors will
+be added regardless of their reachability and liveness.  */
+#define UIP_ND6_AUTOFILL_NBR_CACHE          0
+#else
+#define UIP_ND6_AUTOFILL_NBR_CACHE UIP_CONF_ND6_AUTOFILL_NBR_CACHE
+#endif
 #ifndef UIP_CONF_ND6_MAX_RA_INTERVAL
 #define UIP_ND6_MAX_RA_INTERVAL             600
 #else
@@ -107,7 +118,7 @@
 #define UIP_ND6_MIN_RA_INTERVAL             UIP_CONF_ND6_MIN_RA_INTERVAL
 #endif
 #define UIP_ND6_M_FLAG                      0
-#define UIP_ND6_O_FLAG                      (UIP_ND6_RA_RDNSS || UIP_ND6_RA_DNSSL)
+#define UIP_ND6_O_FLAG                      0
 #ifndef UIP_CONF_ROUTER_LIFETIME
 #define UIP_ND6_ROUTER_LIFETIME             3 * UIP_ND6_MAX_RA_INTERVAL
 #else
@@ -148,7 +159,7 @@
 #ifdef UIP_CONF_ND6_REACHABLE_TIME
 #define UIP_ND6_REACHABLE_TIME         UIP_CONF_ND6_REACHABLE_TIME
 #else
-#define UIP_ND6_REACHABLE_TIME         30000
+#define UIP_ND6_REACHABLE_TIME         60000
 #endif
 
 #ifdef UIP_CONF_ND6_RETRANS_TIMER

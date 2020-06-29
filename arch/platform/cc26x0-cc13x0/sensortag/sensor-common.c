@@ -36,9 +36,8 @@
  * Utilities common among SensorTag sensors
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/sensor-common.h"
-
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
+#include "sensor-common.h"
+#include "board-i2c.h"
 /*---------------------------------------------------------------------------*/
 /* Data to use when an error occurs */
 #define ERROR_DATA                         0xCC

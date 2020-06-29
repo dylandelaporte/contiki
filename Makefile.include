@@ -4,15 +4,18 @@ ifndef CONTIKI
   ${error CONTIKI not defined! You must specify where Contiki resides}
 endif
 
-ifeq ($(TARGET),)
-  -include Makefile.target
-  ifeq ($(TARGET),)
-    ${info TARGET not defined, using target 'native'}
-    TARGET=native
-  else
-    ${info using saved target '$(TARGET)'}
-  endif
-endif
+### Include a helper Makefile that creates variables for all Contiki-NG path
+### locations.
+include $(CONTIKI)/Makefile.dir-variables
+
+# Enable Werror by default. To disable from command line, use make WERROR=0.
+# Setting this option is also important for tests on Cooja motes to check for warnings.
+WERROR ?= 1
+
+include $(CONTIKI)/Makefile.identify-target
+
+### Include Makefile.tools to pull in targets that allow us to build tools dir
+include $(CONTIKI)/Makefile.tools
 
 ifeq ($(DEFINES),)
   -include Makefile.$(TARGET).defines
@@ -38,31 +41,133 @@ ifdef CI
   endif
 endif
 
-usage:
-	@echo "make MAKETARGETS... [TARGET=(TARGET)] [savetarget] [targets]"
+BUILD_DIR = build
+BUILD_DIR_TARGET = $(BUILD_DIR)/$(TARGET)
+BUILD_DIR_TARGET_BOARD = $(BUILD_DIR_TARGET)/$(BOARD)
+# If BOARD was empty, make sure we don't end up with a sequence of slashes
+BUILD_DIR_FULL = $(BUILD_DIR_TARGET_BOARD:/=)/$(BUILD_DIR_CONFIG)
+# Ditto if BUILD_DIR_CONFIG was empty
+BUILD_DIR_BOARD = $(BUILD_DIR_FULL:/=)
+OBJECTDIR = $(BUILD_DIR_BOARD)/obj
 
-targets:
-	@ls -1 $(CONTIKI)/platform $(TARGETDIRS) | grep -v CVS
+CONTIKI_NG_TARGET_LIB = $(BUILD_DIR_BOARD)/contiki-ng-$(TARGET).a
 
-savetarget:
-	-@rm -f Makefile.target
-	@echo "saving Makefile.target"
-	@echo >Makefile.target "TARGET = $(TARGET)"
-
-savedefines:
-	-@rm -f Makefile.$(TARGET).defines
-	@echo "saving Makefile.$(TARGET).defines"
-	@echo >Makefile.$(TARGET).defines "DEFINES = $(DEFINES)"
-
-BUILDDIR  = .
-OBJECTDIR = $(BUILDDIR)/obj_$(TARGET)
-
-LOWERCASE = -abcdefghijklmnopqrstuvwxyz
-UPPERCASE = _ABCDEFGHIJKLMNOPQRSTUVWXYZ
+LOWERCASE = -abcdefghijklmnopqrstuvwxyz/
+UPPERCASE = _ABCDEFGHIJKLMNOPQRSTUVWXYZ_
 TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
 CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
+CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
-MODULES += core/sys core/dev core/lib
+#CFLAGS += -Wno-unused-const-variable
+
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+endif
+
+# try it for cleanup unused code
+ifneq ("$(RELEASE)","")
+CFLAGS += -ffunction-sections
+CFLAGS += -fdata-sections
+LDFLAGS+= --gc-sections,--cref
+# turn off asserts
+CFLAGS += -DNDEBUG
+endif
+
+LDFLAGS_WERROR ?= -Wl,--fatal-warnings
+
+ifeq ($(WERROR),1)
+ LDFLAGS += $(LDFLAGS_WERROR)
+endif
+
+MODULES += $(CONTIKI_NG_OS_DIR) $(CONTIKI_NG_ARCH_DIR)
+MODULES += $(CONTIKI_NG_SYS_DIR) $(CONTIKI_NG_LIB_DIR) $(CONTIKI_NG_DEV_DIR)
+MODULES += $(CONTIKI_NG_NET_DIR) $(CONTIKI_NG_ROUTING_DIR)
+MODULES += $(CONTIKI_NG_MAC_DIR) $(CONTIKI_NG_MAC_DIR)/framer
+MODULES += $(CONTIKI_NG_STORAGE_DIR) $(CONTIKI_NG_SERVICES_DIR)
+
+# Automatically include project-conf.h if found
+ifneq ("$(wildcard project-conf.h)","")
+CFLAGS += -DPROJECT_CONF_PATH=\"project-conf.h\"
+endif
+
+define oname
+${patsubst %.c,%.o, \
+${patsubst %.cpp,%.o, \
+${patsubst %.S,%.o, \
+${patsubst %.s,%.o, \
+$(1) \
+}}}}
+endef
+
+uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
+
+### Include target makefile (TODO Unsafe?)
+
+target_makefile := $(wildcard $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.$(TARGET) \
+                   $(foreach TDIR, $(TARGETDIRS), $(TDIR)/$(TARGET)/Makefile.$(TARGET)))
+
+# Check if the target makefile exists, and create the object directory if necessary.
+ifeq ($(strip $(target_makefile)),)
+  ${error The target platform "$(TARGET)" does not exist (maybe it was misspelled?)}
+else
+  ifneq (1, ${words $(target_makefile)})
+    ${error More than one TARGET Makefile found: $(target_makefile)}
+  endif
+  $(info target make by $(target_makefile) )
+  include $(target_makefile)
+endif
+
+# Decide whether to build or to skip this target for this platform
+ifneq ("", "$(PLATFORMS_ONLY)")
+  ifeq ("","$(filter $(TARGET), $(PLATFORMS_ONLY))")
+    PLATFORM_ACTION = skip
+  endif
+endif
+
+ifneq ("", "$(PLATFORMS_EXCLUDE)")
+  ifneq ("","$(filter $(TARGET), $(PLATFORMS_EXCLUDE))")
+    PLATFORM_ACTION = skip
+  endif
+endif
+
+ifneq ($(BOARD),)
+ifneq ("", "$(BOARDS_ONLY)")
+  ifeq ("","$(filter $(BOARD), $(BOARDS_ONLY))")
+    PLATFORM_ACTION = skip
+  endif
+endif
+
+ifneq ("", "$(BOARDS_EXCLUDE)")
+  ifneq ("","$(filter $(BOARD), $(BOARDS_EXCLUDE))")
+    PLATFORM_ACTION = skip
+  endif
+endif
+endif # $(BOARD) not empty
+
+PLATFORM_ACTION ?= build
+
+$(BUILD_DIR):
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
+
+# Provide path for *.map file
+$(BUILD_DIR_BOARD): | $(BUILD_DIR)
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
+
+# Provide way to create $(OBJECTDIR) if it has been removed by make clean
+$(OBJECTDIR): | $(BUILD_DIR)
+	$(TRACE_MKDIR)
+	$(Q)mkdir -p $@
+
+ifneq ($(BOARD),)
+  TARGET_BOARD_UPPERCASE := ${strip ${shell echo $(BOARD) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
+  CFLAGS += -DCONTIKI_BOARD_$(TARGET_BOARD_UPPERCASE)=1
+  CFLAGS += -DCONTIKI_BOARD_STRING=\"$(BOARD)\"
+endif
 
 # Include IPv6, IPv4, and/or Rime
 
@@ -75,81 +180,141 @@ endif
 
 ifeq ($(CONTIKI_WITH_IPV4),1)
   HAS_STACK = 1
-  CFLAGS += -DNETSTACK_CONF_WITH_IPV4=1
-  MODULES += core/net/ipv4 core/net/ip
+  MAKE_NET ?= MAKE_NET_IPV4
 endif
 
 ifeq ($(CONTIKI_WITH_RIME),1)
   HAS_STACK = 1
-  CFLAGS += -DNETSTACK_CONF_WITH_RIME=1 
-  MODULES += core/net/rime
+  MAKE_NET ?= MAKE_NET_RIME
 endif
 
 # Make IPv6 the default stack
 ifeq ($(HAS_STACK),0)
 ifneq ($(CONTIKI_WITH_IPV6),0)
 $(info enable IPV6 by default)
-CONTIKI_WITH_IPV6 = 1
+CONTIKI_WITH_IPV6 ?= 1
 endif
 endif
 
 ifeq ($(CONTIKI_WITH_IPV6),1)
-  CFLAGS += -DNETSTACK_CONF_WITH_IPV6=1
+  MAKE_NET ?= MAKE_NET_IPV6
   ifneq ($(CONTIKI_WITH_RPL),0)
-  	CONTIKI_WITH_RPL = 1
+  	CONTIKI_WITH_RPL ?= 1
   endif
-  MODULES += core/net/ipv6 core/net/ip
 endif
 
 ifeq ($(CONTIKI_WITH_RPL),1)
     CFLAGS += -DUIP_CONF_IPV6_RPL=1
-    MODULES += core/net/rpl
+    MAKE_ROUTING ?= MAKE_ROUTING_RPL_LITE
 else
     CFLAGS += -DUIP_CONF_IPV6_RPL=0
 endif
 
-CONTIKI_SOURCEFILES += $(CONTIKIFILES)
+# Configure MAC layer
 
-CONTIKIDIRS += ${addprefix $(CONTIKI)/core/,dev lib net net/llsec net/mac net/rime \
-                 net/rpl sys cfs ctk lib/ctk loader . }
+# The different options
+MAKE_MAC_NULLMAC = 0
+MAKE_MAC_CSMA = 1
+MAKE_MAC_TSCH = 2
+MAKE_MAC_BLE = 3
+MAKE_MAC_OTHER = 4
 
-CONTIKI_LIB = $(BUILDDIR)/contiki-$(TARGET).a
+# Make CSMA the default MAC
+MAKE_MAC ?= MAKE_MAC_CSMA
 
-$(BUILDDIR):
-	mkdir -p $@
+ifeq ($(MAKE_MAC),MAKE_MAC_NULLMAC)
+  MODULES += $(CONTIKI_NG_MAC_DIR)/nullmac
+  CFLAGS += -DMAC_CONF_WITH_NULLMAC=1
+endif
 
-# Provide way to create $(OBJECTDIR) if it has been removed by make clean
-$(OBJECTDIR): | $(BUILDDIR)
-	mkdir $@
+ifeq ($(MAKE_MAC),MAKE_MAC_CSMA)
+  MODULES += $(CONTIKI_NG_MAC_DIR)/csma
+  CFLAGS += -DMAC_CONF_WITH_CSMA=1
+endif
 
-oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
+ifeq ($(MAKE_MAC),MAKE_MAC_TSCH)
+  MODULES += $(CONTIKI_NG_MAC_DIR)/tsch
+  CFLAGS += -DMAC_CONF_WITH_TSCH=1
+endif
 
-#	CONTIKI_OBJECTFILES used by target makefiles custom rules
-CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
-PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
+ifeq ($(MAKE_MAC),MAKE_MAC_BLE)
+  MODULES += $(CONTIKI_NG_MAC_DIR)/ble
+  CFLAGS += -DMAC_CONF_WITH_BLE=1
+endif
 
-uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
+ifeq ($(MAKE_MAC),MAKE_MAC_OTHER)
+  CFLAGS += -DMAC_CONF_WITH_OTHER=1
+endif
 
-### Include target makefile (TODO Unsafe?)
+# Configure Network layer
 
-target_makefile := $(wildcard $(CONTIKI)/platform/$(TARGET)/Makefile.$(TARGET) ${foreach TDIR, $(TARGETDIRS), $(TDIR)/$(TARGET)/Makefile.$(TARGET)})
+MAKE_NET_NULLNET = 0
+MAKE_NET_IPV6 = 1
+MAKE_NET_OTHER = 2
+MAKE_NET_IPV4 = 3
+MAKE_NET_RIME = 4
 
-# Check if the target makefile exists, and create the object directory if necessary.
-ifeq ($(strip $(target_makefile)),)
-  ${error The target platform "$(TARGET)" does not exist (maybe it was misspelled?)}
+# Make IPv6 the default stack
+MAKE_NET ?= MAKE_NET_IPV6
+
+ifeq ($(MAKE_NET),MAKE_NET_NULLNET)
+  CFLAGS += -DNETSTACK_CONF_WITH_NULLNET=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/nullnet
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_IPV6)
+  CFLAGS += -DNETSTACK_CONF_WITH_IPV6=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/ipv6 $(CONTIKI_NG_NET_DIR)/ip
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_IPV4)
+  CFLAGS += -DNETSTACK_CONF_WITH_IPV4=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/ipv4 $(CONTIKI_NG_NET_DIR)/ip
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_RIME)
+  CFLAGS += -DNETSTACK_CONF_WITH_RIME=1
+  MODULES += $(CONTIKI_NG_NET_DIR)/rime
+endif
+
+ifeq ($(MAKE_NET),MAKE_NET_OTHER)
+  CFLAGS += -DNETSTACK_CONF_WITH_OTHER=1
+endif
+
+ifeq ($(WITH_IP64),1)
+  MODULES += $(CONTIKI_NG_SERVICES_DIR)/ip64
+endif
+
+# Configure Routing protocol
+MAKE_ROUTING_NULLROUTING = 0
+MAKE_ROUTING_RPL_CLASSIC = 1
+MAKE_ROUTING_RPL_LITE = 2
+
+# Default routing protocol: RPL for IPv6, None otherwise
+ifeq ($(MAKE_NET),MAKE_NET_IPV6)
+MAKE_ROUTING ?= MAKE_ROUTING_RPL_LITE
 else
-  ifneq (1, ${words $(target_makefile)})
-    ${error More than one TARGET Makefile found: $(target_makefile)}
-  endif
-  include $(target_makefile)
+MAKE_ROUTING ?= MAKE_ROUTING_NULLROUTING
+endif
+
+ifeq ($(MAKE_ROUTING),MAKE_ROUTING_RPL_CLASSIC)
+  CFLAGS += -DROUTING_CONF_RPL_CLASSIC=1
+  MODULES += $(CONTIKI_NG_ROUTING_DIR)/rpl-classic
+else ifeq ($(MAKE_ROUTING),MAKE_ROUTING_RPL_LITE)
+  CFLAGS += -DROUTING_CONF_RPL_LITE=1
+  MODULES += $(CONTIKI_NG_ROUTING_DIR)/rpl-lite
+else ifeq ($(MAKE_ROUTING),MAKE_ROUTING_NULLROUTING)
+  CFLAGS += -DROUTING_CONF_NULLROUTING=1
+  MODULES += $(CONTIKI_NG_ROUTING_DIR)/nullrouting
 endif
 
 ### Include application makefiles
 
 ifdef APPS
+  $(info apps: $(APPDS))
   APPDS = ${wildcard ${foreach DIR, $(APPDIRS), ${addprefix $(DIR)/, $(APPS)}}} \
              ${wildcard ${addprefix $(CONTIKI)/apps/, $(APPS)} \
-             ${addprefix $(CONTIKI)/platform/$(TARGET)/apps/, $(APPS)} \
+             ${addprefix $(OBJECTDIR)/apps/, $(APPS)} \
              $(APPS)}
   APPINCLUDES = ${foreach APP, $(APPS), ${wildcard ${foreach DIR, $(APPDS), $(DIR)/Makefile.$(APP)}}}
   -include $(APPINCLUDES)
@@ -158,31 +323,71 @@ ifdef APPS
   CONTIKI_SOURCEFILES += $(APP_SOURCES) $(DSC_SOURCES)
 endif
 
-
 ifdef MODULES
-  UNIQUEMODULES = $(call uniq,$(MODULES))
-  MODULEDIRS = ${wildcard ${addprefix $(CONTIKI)/, $(UNIQUEMODULES)}}
-  MODULES_SOURCES = ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.c}}}
-  MODULES_SOURCES += ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
+  $(info modules: $(MODULES))
+  MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(MODULES)}}
+  UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
+  MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
+  MODULES_SOURCES += ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
   CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
-  APPDS += $(MODULEDIRS)
+
+# Include module-specific makefiles
+MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${notdir $(d)}}}
+
+### Perform an immediate expansion of MODULES_INCLUDES and store it in a
+### variable. This will allow us to subsequently filter-out module Makefiles
+### that were included in the first pass, such that we don't end up including
+### them twice.
+MODULES_INCLUDED_FIRST_PASS := $(MODULES_INCLUDES)
+include $(MODULES_INCLUDED_FIRST_PASS)
+$(info modules 1st pass $(MODULES_INCLUDED_FIRST_PASS) )
+
+# Iterate once more: include the modules added from the previous include.
+# Only works with one level of nested module inclusion.
+MODULES_INCLUDED_SECOND_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             , $(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_SECOND_PASS)
+$(info modules 2nd pass  $(MODULES_INCLUDED_SECOND_PASS) )
+
+# Iterate once more: include the modules added from the previous include.
+# Only works with one level of nested module inclusion.
+MODULES_INCLUDED_3_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
+                                             $(MODULES_INCLUDED_SECOND_PASS) \
+                                             ,$(MODULES_INCLUDES) )
+include $(MODULES_INCLUDED_3_PASS)
+$(info modules 3rd pass $(MODULES_INCLUDED_3_PASS) )
+
+# C-include module-specific macros using -imacros
+MODULES_IMACROS = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/module-macros.h}}
+ifneq ($(MODULES_IMACROS),)
+  CFLAGS += ${foreach d, $(MODULES_IMACROS), -imacros $(d)}
+endif
+
 endif
 
 ### Verbosity control. Use  make V=1  to get verbose builds.
 
 ifeq ($(V),1)
-  TRACE_CC =
-  TRACE_CCX=
-  TRACE_LD =
-  TRACE_AR =
-  TRACE_AS =
+  TRACE_CC = @echo "  CC       " $< "-->" $@
+  TRACE_CCX= @echo "  C++      " $< "-->" $@
+  TRACE_LD = @echo "  LD       " "-->" $@
+  TRACE_AR = @echo "  AR       " "-->" $@
+  TRACE_AS = @echo "  AS       " $< "-->" $@
+  TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
+  TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
+  TRACE_MKDIR = @echo "  MKDIR    " $@
+  TRACE_CP       = @echo "  CP       " $< "-->" $@
   Q=
 else
-  TRACE_CC = @echo "  CC       " $<
-  TRACE_CCX= @echo "  C++      " $<
+  TRACE_CC = @echo "  CC       " $< "-->" $@
+  TRACE_CCX= @echo "  C++      " $< "-->" $@
   TRACE_LD = @echo "  LD       " $@
   TRACE_AR = @echo "  AR       " $@
-  TRACE_AS = @echo "  AS       " $<
+  TRACE_AS = @echo "  AS       " $< "-->" $@
+  TRACE_OBJCOPY  = @echo "  OBJCOPY  " $< "-->" $@
+  TRACE_OBJDUMP  = @echo "  OBJDUMP  " $< "-->" $@
+  TRACE_MKDIR = @echo "  MKDIR    " $@
+  TRACE_CP       = @echo "  CP       " $< "-->" $@
   Q=@
 endif
 
@@ -198,31 +403,51 @@ CONTIKI_TARGET_DIRS_CONCAT = ${addprefix ${dir $(target_makefile)}, \
 CONTIKI_CPU_DIRS_CONCAT    = ${addprefix $(CONTIKI_CPU)/, \
                                $(CONTIKI_CPU_DIRS)}
 
+$(info terget dirs:$(CONTIKI_TARGET_DIRS) -> $(CONTIKI_TARGET_DIRS_CONCAT) )
+$(info cpu dirs:$(CONTIKI_CPU_DIRS) -> $(CONTIKI_CPU_DIRS_CONCAT) )
+$(info external dirs:$(EXTERNALDIRS) )
 
-SOURCEDIRS = ${if ${findstring ., $(PROJECTDIRS) }, , . } \
-             $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
-             $(CONTIKI_CPU_DIRS_CONCAT) $(CONTIKIDIRS) $(APPDS) $(EXTERNALDIRS) ${dir $(target_makefile)}
+SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
+             $(CONTIKI_CPU_DIRS_CONCAT) $(MODULEDIRS) $(EXTERNALDIRS) $(APPDS)
+
+
 
 vpath %.c $(SOURCEDIRS)
 vpath %.cpp $(SOURCEDIRS)
 vpath %.S $(SOURCEDIRS)
+vpath %.s $(SOURCEDIRS)
 vpath %.o $(OBJECTDIR)
 
-CFLAGS += ${addprefix -I,$(SOURCEDIRS) $(CONTIKI)}
+CFLAGS += ${addprefix -I, $(call uniq,$(SOURCEDIRS) $(CONTIKI)) }
 
 ### Check for a git repo and pass version if found
 ### git.exe in Windows cmd shells may require no stderr redirection
 ifndef RELSTR
-RELSTR:=${shell git --git-dir ${CONTIKI}/.git describe --tags --always}
+RELSTR:=${shell git --git-dir ${CONTIKI}/.git --work-tree ${CONTIKI} describe \
+          --tags --always --dirty}
 endif
 
 ifneq ($(RELSTR),)
-CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-$(RELSTR)\"
+CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-NG-$(RELSTR)\"
+else
+CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-NG\"
 endif
 
 CFLAGS_CPU ?=
 CPPFLAGS := ${CPPFLAGS} ${CFLAGS}
 CFLAGS := ${CFLAGS_CPU} ${CFLAGS}
+
+
+### drop excluded objects
+
+ifneq ("$(SOURCE_EXCLUDE)","")
+CONTIKI_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(CONTIKI_SOURCEFILES))
+PROJECT_SOURCEFILES := $(filter-out $(SOURCE_EXCLUDE), $(PROJECT_SOURCEFILES))
+endif
+
+
+CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
+PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFILES)}}
 
 ### Automatic dependency generation
 
@@ -258,28 +483,26 @@ rm -f $(@:.o=.$$$$)
 endef
 endif
 
+### Harmonize filename of a .map file, if the platform's build system wants
+### to create one
+CONTIKI_NG_PROJECT_MAP = $(BUILD_DIR_BOARD)/$(basename $(notdir $@)).map
+
+.PHONY: clean distclean usage help targets boards savetarget savedefines viewconf
+
 clean:
-	-rm -f *~ *core core $(BUILDDIR)/*.srec \
-	$(BUILDDIR)/*.lst $(BUILDDIR)/*.map \
-	$(BUILDDIR)/*.cprg $(BUILDDIR)/*.bin $(BUILDDIR)/*.data $(CONTIKI_LIB) \
-	$(BUILDDIR)/*.firmware core-labels.S $(BUILDDIR)/*.ihex \
-	$(BUILDDIR)/*.ini $(BUILDDIR)/*.ce $(BUILDDIR)/*.co \
-	$(BUILDDIR)/*.elf $(BUILDDIR)/*.hex $(BUILDDIR)/*.$(TARGET)
-	rm -rf $(CLEAN)
-	-rm -rf $(OBJECTDIR)
+	-$(Q)rm -f *.d *.e *.o $(CLEAN)
+	-$(Q)rm -rf $(BUILD_DIR_TARGET)
+	-$(Q)rm -f $(addsuffix .$(TARGET), $(CONTIKI_PROJECT))
+	@echo Target $(TARGET) cleaned
 
-distclean: clean
-	-rm -f ${addsuffix .$(TARGET),$(CONTIKI_PROJECT)}
+distclean:
+	@for TARG in `ls $(CONTIKI_NG_RELOC_PLATFORM_DIR) $(TARGETDIRS)`; do \
+		echo Running: $(MAKE) TARGET=$$TARG clean; \
+		$(MAKE) TARGET=$$TARG clean; \
+	done
+	-$(Q)rm -rf $(BUILD_DIR)
 
-target_customrules_makefile := $(wildcard $(CONTIKI)/platform/$(TARGET)/Makefile.customrules-$(TARGET) ${foreach TDIR, $(TARGETDIRS), $(TDIR)/$(TARGET)/Makefile.customrules-$(TARGET)})
--include $(target_customrules_makefile)
-
-ifndef CUSTOM_RULE_C_TO_CE
-$(BUILDDIR)/%.ce: %.c | $(BUILDDIR)
-	$(TRACE_CC)
-	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
-	$(STRIP) --strip-unneeded -g -x $@
-endif
+-include $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.customrules-$(TARGET)
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
 $(info custom object/rule to $(OBJECTDIR))
@@ -298,25 +521,45 @@ ifndef CUSTOM_RULE_S_TO_OBJECTDIR_O
 $(OBJECTDIR)/%.o: %.S | $(OBJECTDIR)
 	$(TRACE_AS)
 	$(Q)$(AS) $(ASFLAGS) -o $@ $<
+$(OBJECTDIR)/%.o: %.s | $(OBJECTDIR)
+	$(TRACE_AS)
+	$(Q)$(AS) $(ASFLAGS) -o $@ $<
+endif
+
+ifndef CUSTOM_RULE_C_TO_OBJECTDIR_S
+$(OBJECTDIR)/%.s: %.c | $(OBJECTDIR)
+	$(TRACE_CC)
+	$(Q)$(CC) $(CFLAGS) -S $< -o $@
+endif
+
+ifndef CUSTOM_RULE_C_TO_OBJECTDIR_E
+$(OBJECTDIR)/%.e: %.c | $(OBJECTDIR)
+	$(TRACE_CC)
+	$(Q)$(CC) $(CFLAGS) -E $< -o $@
 endif
 
 ifndef CUSTOM_RULE_C_TO_O
-%.o: %.c
+%.o: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.cpp
+%.o: %.cpp | $(BUILD_DIR_BOARD)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -c $< -o $@
 endif
 
-
-ifndef CUSTOM_RULE_C_TO_CO
-$(BUILDDIR)/%.co: %.c | $(BUILDDIR)
+ifndef CUSTOM_RULE_C_TO_S
+%.s: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
-	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -S $< -o $@
+endif
 
-$(BUILDDIR)/%.co: %.cpp | $(BUILDDIR)
+ifndef CUSTOM_RULE_C_TO_E
+%.e: %.c | $(BUILD_DIR_BOARD)
+	$(TRACE_CC)
+	$(Q)$(CC) $(CFLAGS) -E $< -o $@
+
+$(BUILD_DIR)/%.co: %.cpp | $(BUILD_DIR) $(BUILD_DIR_BOARD)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 endif
@@ -326,7 +569,7 @@ ifndef AROPTS
 endif
 
 ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
-$(CONTIKI_LIB): $(CONTIKI_OBJECTFILES) | $(BUILDDIR)
+$(CONTIKI_NG_TARGET_LIB): $(CONTIKI_OBJECTFILES) | $(BUILD_DIR_BOARD)
 	$(TRACE_AR)
 	$(Q)$(AR) $(AROPTS) $@ $^
 endif
@@ -336,11 +579,19 @@ ifndef LD
 endif
 
 ifndef CUSTOM_RULE_LINK
-%.$(TARGET): %.co $(PROJECT_OBJECTFILES) $(TARGET_STARTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_LIB)
+$(BUILD_DIR_BOARD)/%.$(TARGET): $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) $(PROJECT_LIBRARIES) $(CONTIKI_NG_TARGET_LIB)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(TARGET_LIBFILES) -o $@
+
+# this objects need for debuger, and need for quick rebuild
+.PRECIOUS: $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) 
+
 endif
+
+%.$(TARGET): $(BUILD_DIR_BOARD)/%.$(TARGET)
+	$(TRACE_CP)
+	$(Q)cp $< $@
 
 %.ramprof: %.$(TARGET)
 	$(NM) -S -td --size-sort $< | grep -i " [abdrw] " | cut -d' ' -f2,4
@@ -348,9 +599,63 @@ endif
 %.flashprof: %.$(TARGET)
 	$(NM) -S -td --size-sort $< | grep -i " [t] " | cut -d' ' -f2,4
 
-# Don't treat %.$(TARGET) as an intermediate file because it is
-# in fact the primary target.
-.PRECIOUS: %.$(TARGET)
+include $(CONTIKI)/Makefile.help
+
+targets:
+	@ls $(CONTIKI_NG_RELOC_PLATFORM_DIR) $(TARGETDIRS)
+
+boards:
+ifdef BOARD
+	@echo "$(BOARDS) (current: $(BOARD))"
+else
+	@echo "Platform has no boards"
+endif
+
+savetarget:
+	-@rm -f Makefile.target
+	@echo "saving Makefile.target"
+	@echo >Makefile.target "TARGET = $(TARGET)"
+ifneq ($(BOARD),)
+	@echo >>Makefile.target "BOARD = $(BOARD)"
+endif
+
+savedefines:
+	-@rm -f Makefile.$(TARGET).defines
+	@echo "saving Makefile.$(TARGET).defines"
+	@echo >Makefile.$(TARGET).defines "DEFINES = $(DEFINES)"
+
+VIEWCONF = $(CONTIKI_NG_TOOLS_DIR)/viewconf/viewconf.c
+viewconf:
+	@echo "----------------- Make variables: --------------"
+	@echo "##### \"TARGET\": ________________________________ $(TARGET)"
+	@echo "##### \"BOARD\": _________________________________ $(BOARD)"
+	@echo "##### \"MAKE_MAC\": ______________________________ $(MAKE_MAC)"
+	@echo "##### \"MAKE_NET\": ______________________________ $(MAKE_NET)"
+	@echo "##### \"MAKE_ROUTING\": __________________________ $(MAKE_ROUTING)"
+ifdef MAKE_COAP_DTLS_KEYSTORE
+	@echo "##### \"MAKE_COAP_DTLS_KEYSTORE\": _______________ $(MAKE_COAP_DTLS_KEYSTORE)"
+endif
+	@echo "----------------- C variables: -----------------"
+	$(Q)$(CC) $(CFLAGS) -E $(VIEWCONF) | grep \#\#\#\#\#
+	@echo "------------------------------------------------"
+	@echo "'==' Means the flag is set to a given a value"
+	@echo "'->' Means the flag is unset, but will default to a given value"
+	@echo "'><' Means the flag is unset and has no default value"
+	@echo "To view more Make variables, edit $(CONTIKI)/Makefile.include, rule 'viewconf'"
+	@echo "To view more C variables, edit $(VIEWCONF)"
+
+### Include Makefile.embedded for relevant platforms, in order to pull in
+### rules for login, serialview etc
+ifeq ($(findstring $(TARGET),native cooja),)
+  include $(CONTIKI)/Makefile.embedded
+endif
+
+### Include Makefile.gcc for GCC specific definitions and actions
+include $(CONTIKI)/Makefile.gcc
+
+# Don't treat $(BUILD_DIR_BOARD)/%.$(TARGET) and $(TARGET) as intermediate
+# files because for many platforms they are in fact the primary target.
+.PRECIOUS: $(BUILD_DIR_BOARD)/%.$(TARGET) %.$(TARGET)
 
 # Cancel the predefined implict rule for compiling and linking
 # a single C source into a binary to force GNU make to consider
@@ -359,8 +664,17 @@ endif
 
 %: %.cpp
 
+ifeq ($(PLATFORM_ACTION),skip)
+# Skip this target.
+$(CONTIKI_PROJECT):
+	@echo "Skipping $@: not for the '$(TARGET)/$(BOARD)' platform!"
+%.$(TARGET):
+	@echo "Skipping $@: not for the '$(TARGET)/$(BOARD)' platform!"
+else
+# Build this target.
 # Match-anything pattern rule to allow the project makefiles to
 # abstract from the actual binary name. It needs to contain some
 # command in order to be a rule, not just a prerequisite.
-%: $(BUILDDIR)/%.$(TARGET)
-	@
+%: %.$(TARGET)
+	@echo "prepared for $@ prerequesites $(BUILD_DIR)/%.$(TARGET) "
+endif

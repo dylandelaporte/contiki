@@ -36,20 +36,19 @@
  *  Driver for the Sensortag Invensense MPU9250 motion processing unit
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/mpu-9250-sensor.h"
-
+#include "contiki.h"
 #include "lib/sensors.h"
+#include "mpu-9250-sensor.h"
 #include "sys/rtimer.h"
+#include "sensor-common.h"
+#include "board-i2c.h"
+
 #include "ti-lib.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-#include "../../cc26x0-cc13x0/sensortag/sensor-common.h"
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
 #if DEBUG
@@ -602,11 +601,11 @@ configure(int type, int enable)
 {
   switch(type) {
   case SENSORS_HW_INIT:
-    ti_lib_rom_ioc_pin_type_gpio_input(BOARD_IOID_MPU_INT);
+    ti_lib_ioc_pin_type_gpio_input(BOARD_IOID_MPU_INT);
     ti_lib_ioc_io_port_pull_set(BOARD_IOID_MPU_INT, IOC_IOPULL_DOWN);
     ti_lib_ioc_io_hyst_set(BOARD_IOID_MPU_INT, IOC_HYST_ENABLE);
 
-    ti_lib_rom_ioc_pin_type_gpio_output(BOARD_IOID_MPU_POWER);
+    ti_lib_ioc_pin_type_gpio_output(BOARD_IOID_MPU_POWER);
     ti_lib_ioc_io_drv_strength_set(BOARD_IOID_MPU_POWER, IOC_CURRENT_4MA,
                                    IOC_STRENGTH_MAX);
     ti_lib_gpio_clear_dio(BOARD_IOID_MPU_POWER);

@@ -30,6 +30,13 @@
  *
  */
 
+/**
+ * \addtogroup tsch
+ * @{
+ * \file
+ *	TSCH runtime operation within timeslots
+*/
+
 #ifndef __TSCH_SLOT_OPERATION_H__
 #define __TSCH_SLOT_OPERATION_H__
 
@@ -39,42 +46,6 @@
 #include "contiki.h"
 #include <stdbool.h>
 #include "lib/ringbufindex.h"
-#include "net/mac/tsch/tsch-private.h"
-#include "net/mac/tsch/tsch-packet.h"
-
-/******** Configuration *******/
-
-/* Size of the ring buffer storing dequeued outgoing packets (only an array of pointers).
- * Must be power of two, and greater or equal to QUEUEBUF_NUM */
-#ifdef TSCH_CONF_DEQUEUED_ARRAY_SIZE
-#define TSCH_DEQUEUED_ARRAY_SIZE TSCH_CONF_DEQUEUED_ARRAY_SIZE
-#else
-/* By default, round QUEUEBUF_CONF_NUM to next power of two
- * (in the range [4;256]) */
-#if QUEUEBUF_CONF_NUM <= 4
-#define TSCH_DEQUEUED_ARRAY_SIZE 4
-#elif QUEUEBUF_CONF_NUM <= 8
-#define TSCH_DEQUEUED_ARRAY_SIZE 8
-#elif QUEUEBUF_CONF_NUM <= 16
-#define TSCH_DEQUEUED_ARRAY_SIZE 16
-#elif QUEUEBUF_CONF_NUM <= 32
-#define TSCH_DEQUEUED_ARRAY_SIZE 32
-#elif QUEUEBUF_CONF_NUM <= 64
-#define TSCH_DEQUEUED_ARRAY_SIZE 64
-#elif QUEUEBUF_CONF_NUM <= 128
-#define TSCH_DEQUEUED_ARRAY_SIZE 128
-#else
-#define TSCH_DEQUEUED_ARRAY_SIZE 256
-#endif
-#endif
-
-/* Size of the ring buffer storing incoming packets.
- * Must be power of two */
-#ifdef TSCH_CONF_MAX_INCOMING_PACKETS
-#define TSCH_MAX_INCOMING_PACKETS TSCH_CONF_MAX_INCOMING_PACKETS
-#else
-#define TSCH_MAX_INCOMING_PACKETS 4
-#endif
 
 /*********** Callbacks *********/
 
@@ -96,18 +67,38 @@ extern struct tsch_packet *dequeued_array[TSCH_DEQUEUED_ARRAY_SIZE];
  * Will be processed layer by tsch_rx_process_pending */
 extern struct ringbufindex input_ringbuf;
 extern struct input_packet input_array[TSCH_MAX_INCOMING_PACKETS];
+/* Last clock_time_t where synchronization happened */
+extern clock_time_t tsch_last_sync_time;
+/* Counts the length of the current burst */
+extern int tsch_current_burst_count;
 
 /********** Functions *********/
 
-/* Returns a 802.15.4 channel from an ASN and channel offset */
-uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, int_fast8_t channel_offset);
-/* Set global time before starting slot operation,
- * with a rtimer time and an ASN */
+/**
+ * Returns a 802.15.4 channel from an ASN and channel offset. Basically adds
+ * The offset to the ASN and performs a hopping sequence lookup.
+ *
+ * \param asn A given ASN
+ * \param channel_offset Given channel offset
+ * \return The resulting channel
+ */
+uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, tsch_ch_offset_t channel_offset);
+
+/**
+ * Set global time before starting slot operation, with a rtimer time and an ASN
+ *
+ * \param next_slot_start the time to the start of the next slot, in rtimer ticks
+ * \param next_slot_asn the ASN of the next slot
+ */
 void tsch_slot_operation_sync(rtimer_clock_t next_slot_start,
     struct tsch_asn_t *next_slot_asn);
-/* Start actual slot operation */
+/**
+ * Start actual slot operation
+ */
 void tsch_slot_operation_start(void);
+
 void tsch_slot_operation_stop(void);
+
 // \brief Break current slot operation correctrly - in sync state, valid for later
 //  tsch_slot_operation_start invoke.
 //  \arg timeout - time [rtc] to planed next slot, that not breaks.
@@ -118,6 +109,7 @@ void tsch_slot_operation_stop(void);
 //          tsch_slot_operation_start();
 //      }
 bool tsch_slot_operation_break_before(rtimer_clock_t timeout);
+
 // this is a kind of:
 //      if( tsch_slot_operation_break_before(timeout) ){
 //          tsch_slot_operation_start();
@@ -134,6 +126,8 @@ bool tsch_slot_operation_invalidate_before(rtimer_clock_t timeout);
 #endif
 #endif //LIB_INLINES
 
+
+
 #if LIB_INLINES
 extern
 volatile bool tsch_locked;
@@ -143,13 +137,28 @@ static inline
 void tsch_release_lock(void){tsch_locked = 0;};
 
 #else
-/* Is TSCH locked? */
+
+/**
+ * Takes the TSCH lock. When the lock is taken, slot operation will be skipped
+ * until release.
+ *
+ * \return 1 if the lock was successfully taken, 0 otherwise
+ */
 bool tsch_is_locked(void);
-/* Release TSCH lock */
+/**
+ * Releases the TSCH lock.
+ */
 void tsch_release_lock(void);
 #endif
-/* Lock TSCH (no link operation) */
+
+/**
+ * Checks if the TSCH lock is set. Accesses to global structures outside of
+ * interrupts must be done through the lock, unless the sturcutre has
+ * atomic read/write
+ *
+ * \return 1 if the lock is taken, 0 otherwise
+ */
 bool tsch_get_lock(void);
 
-
 #endif /* __TSCH_SLOT_OPERATION_H__ */
+/** @} */

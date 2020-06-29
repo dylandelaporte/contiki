@@ -60,36 +60,65 @@ typedef struct nbr_table {
   nbr_table_item_t *data;
 } nbr_table_t;
 
+/* index in nbr_tables */
+typedef int nbr_idx_t;
+
+/*this inlines give faster nbr tables index access */
+#define NBR_TABLE_INLINES(type, name) \
+    static inline type* name##_item_from_index(nbr_idx_t index) {\
+        if (index >= 0) \
+            return (type *)name->data + index; \
+        return NULL; } \
+    static inline nbr_idx_t name##_index_from_item(const type* item) {\
+        if (item != NULL)\
+            return (item - (const type *)(name->data));\
+        return -1;} \
+    static inline linkaddr_t* name##_lladr_item(const type* item) {\
+        if (item != NULL)\
+            return nbr_table_idx_lladdr( item - (const type *)(name->data) );\
+        return NULL;} \
+    static inline int name##_remove_item(nbr_table_item_t* item) {\
+        if (item != NULL)\
+            return nbr_table_idx_remove(name, (const type*)item - (const type *)(name->data) );\
+        return -1;}
+
 /** \brief A static neighbor table. To be initialized through nbr_table_register(name) */
 #define NBR_TABLE(type, name) \
   static type _##name##_mem[NBR_TABLE_MAX_NEIGHBORS]; \
   static nbr_table_t name##_struct = { 0, sizeof(type), NULL, (nbr_table_item_t *)_##name##_mem }; \
-  static nbr_table_t *name = &name##_struct \
+  static nbr_table_t *name = &name##_struct; \
+  NBR_TABLE_INLINES(type, name)
 
 /** \brief A non-static neighbor table. To be initialized through nbr_table_register(name) */
 #define NBR_TABLE_GLOBAL(type, name) \
   static type _##name##_mem[NBR_TABLE_MAX_NEIGHBORS]; \
   static nbr_table_t name##_struct = { 0, sizeof(type), NULL, (nbr_table_item_t *)_##name##_mem }; \
-  nbr_table_t *name = &name##_struct \
+  nbr_table_t *name = &name##_struct;
 
 /** \brief Declaration of non-static neighbor tables */
-#define NBR_TABLE_DECLARE(name) extern nbr_table_t *name
+#define NBR_TABLE_DECLARE(type, name) extern nbr_table_t *name;\
+                    NBR_TABLE_INLINES(type, name)
+
+
 
 typedef enum {
-	NBR_TABLE_REASON_UNDEFINED,
+        NBR_TABLE_REASON_UNDEFINED,
 	NBR_TABLE_REASON_RPL_DIO,
 	NBR_TABLE_REASON_RPL_DAO,
 	NBR_TABLE_REASON_RPL_DIS,
 	NBR_TABLE_REASON_ROUTE,
 	NBR_TABLE_REASON_IPV6_ND,
+  NBR_TABLE_REASON_IPV6_ND_AUTOFILL,
 	NBR_TABLE_REASON_MAC,
 	NBR_TABLE_REASON_LLSEC,
 	NBR_TABLE_REASON_LINK_STATS,
+  NBR_TABLE_REASON_SIXTOP,
 } nbr_table_reason_t;
 
 /** \name Neighbor tables: register and loop through table elements */
 /** @{ */
 int nbr_table_register(nbr_table_t *table, nbr_table_callback *callback);
+int nbr_table_is_registered(nbr_table_t *table);
 nbr_table_item_t *nbr_table_head(nbr_table_t *table);
 nbr_table_item_t *nbr_table_next(nbr_table_t *table, nbr_table_item_t *item);
 /** @} */
@@ -98,11 +127,13 @@ nbr_table_item_t *nbr_table_next(nbr_table_t *table, nbr_table_item_t *item);
 /** @{ */
 nbr_table_item_t *nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_reason_t reason, void *data);
 nbr_table_item_t *nbr_table_get_from_lladdr(nbr_table_t *table, const linkaddr_t *lladdr);
+nbr_table_item_t *nbr_table_get_from_idx(nbr_table_t *table, nbr_idx_t idx);
 /** @} */
 
 /** \name Neighbor tables: set flags (unused, locked, unlocked) */
 /** @{ */
 int nbr_table_remove(nbr_table_t *table, nbr_table_item_t *item);
+int nbr_table_idx_remove(nbr_table_t *table, nbr_idx_t idx);
 int nbr_table_lock(nbr_table_t *table, nbr_table_item_t *item);
 int nbr_table_unlock(nbr_table_t *table, nbr_table_item_t *item);
 /** @} */
@@ -110,7 +141,11 @@ int nbr_table_unlock(nbr_table_t *table, nbr_table_item_t *item);
 /** \name Neighbor tables: address manipulation */
 /** @{ */
 linkaddr_t *nbr_table_get_lladdr(nbr_table_t *table, const nbr_table_item_t *item);
-int nbr_table_update_lladdr(const linkaddr_t *old_addr, const linkaddr_t *new_addr, int remove_if_duplicate);
+/** @name take lladdr by nbr index.
+      NBR_TABLE_xxx provide index acces for declared table by routines
+      name##_index_from_item(const type* item) - use it for fast index on table item
+  */
+linkaddr_t *nbr_table_idx_lladdr(nbr_idx_t idx);
 /** @} */
 
 #endif /* NBR_TABLE_H_ */

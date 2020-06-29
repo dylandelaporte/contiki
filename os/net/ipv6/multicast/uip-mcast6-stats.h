@@ -28,7 +28,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /**
- * \addtogroup uip6-multicast
+ * \addtogroup uip-multicast
  * @{
  */
 /**
@@ -41,7 +41,7 @@
 #ifndef UIP_MCAST6_STATS_H_
 #define UIP_MCAST6_STATS_H_
 /*---------------------------------------------------------------------------*/
-#include "contiki-conf.h"
+#include "contiki.h"
 
 #include <stdint.h>
 /*---------------------------------------------------------------------------*/

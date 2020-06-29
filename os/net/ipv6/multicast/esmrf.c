@@ -31,7 +31,7 @@
 
 /**
  * \file
- *         This file shows the implementations of the Enhanced Stateless 
+ *         This file shows the implementations of the Enhanced Stateless
  *	       Multicast RPL Forwarding (ESMRF)
  *
  *         It will only work in RPL networks in MOP 3 "Storing with Multicast"
@@ -46,15 +46,22 @@
 #include "net/ipv6/multicast/uip-mcast6-route.h"
 #include "net/ipv6/multicast/uip-mcast6-stats.h"
 #include "net/ipv6/multicast/esmrf.h"
-#include "net/rpl/rpl.h"
-#include "net/ip/uip.h"
+#include "net/routing/routing.h"
+#include "net/ipv6/uip.h"
 #include "net/netstack.h"
+#include "net/packetbuf.h"
+#if ROUTING_CONF_RPL_LITE
+#include "net/routing/rpl-lite/rpl.h"
+#endif /* ROUTING_CONF_RPL_LITE */
+#if ROUTING_CONF_RPL_CLASSIC
+#include "net/routing/rpl-classic/rpl.h"
+#endif /* ROUTING_CONF_RPL_CLASSIC */
 #include <string.h>
 
 extern uint16_t uip_slen;
 
 #define DEBUG NONE
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 #define ESMRF_VERBOSE NONE
 
@@ -81,7 +88,7 @@ static struct esmrf_stats stats;
 /* Macros */
 /*---------------------------------------------------------------------------*/
 /* CCI */
-#define ESMRF_FWD_DELAY()  NETSTACK_RDC.channel_check_interval()
+#define ESMRF_FWD_DELAY()  (CLOCK_SECOND / 8)
 /* Number of slots in the next 500ms */
 #define ESMRF_INTERVAL_COUNT  ((CLOCK_SECOND >> 2) / fwd_delay)
 /*---------------------------------------------------------------------------*/
@@ -96,26 +103,18 @@ static struct uip_udp_conn *c;
 static uip_ipaddr_t src_ip;
 static uip_ipaddr_t des_ip;
 /*---------------------------------------------------------------------------*/
-/* uIPv6 Pointers */
-/*---------------------------------------------------------------------------*/
-#define UIP_IP_BUF        ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
-#define UIP_ICMP_BUF      ((struct uip_icmp_hdr *)&uip_buf[uip_l2_l3_hdr_len])
-#define UIP_ICMP_PAYLOAD  ((unsigned char *)&uip_buf[uip_l2_l3_icmp_hdr_len])
-#define UIP_UDP_BUF       ((struct uip_udp_hdr *)&uip_buf[UIP_LLH_LEN + UIP_IPH_LEN])
-/*---------------------------------------------------------------------------*/
 /* Local function prototypes */
 /*---------------------------------------------------------------------------*/
 static void icmp_input(void);
 static void icmp_output(void);
 static void mcast_fwd(void *p);
-int remove_ext_hdr(void);
 /*---------------------------------------------------------------------------*/
 /* Internal Data Structures */
 /*---------------------------------------------------------------------------*/
 struct multicast_on_behalf{   /*  ICMP message of multicast_on_behalf */
   uint16_t mcast_port;
   uip_ipaddr_t mcast_ip;
-  uint8_t mcast_payload[UIP_BUFSIZE - UIP_LLH_LEN - UIP_IPUDPH_LEN];
+  uint8_t mcast_payload[UIP_BUFSIZE - UIP_IPUDPH_LEN];
 };
 #define UIP_ICMP_MOB 18 /* Size of multicast_on_behalf ICMP header */
 /*---------------------------------------------------------------------------*/
@@ -136,7 +135,7 @@ icmp_output()
 
   struct multicast_on_behalf *mob;
   mob = (struct multicast_on_behalf *)UIP_ICMP_PAYLOAD;
-  memcpy(&mob->mcast_payload, &uip_buf[UIP_LLH_LEN + UIP_IPUDPH_LEN], uip_slen);
+  memcpy(&mob->mcast_payload, &uip_buf[UIP_IPUDPH_LEN], uip_slen);
 
   UIP_IP_BUF->vtc = 0x60;
   UIP_IP_BUF->tcflow = 0;
@@ -157,8 +156,7 @@ icmp_output()
   PRINT6ADDR(&UIP_IP_BUF->destipaddr);
   PRINTF("\n");
 
-  UIP_IP_BUF->len[0] = (UIP_ICMPH_LEN + payload_len) >> 8;
-  UIP_IP_BUF->len[1] = (UIP_ICMPH_LEN + payload_len) & 0xff;
+  uipbuf_set_len_field(UIP_IP_BUF, UIP_ICMPH_LEN + payload_len);
 
   UIP_ICMP_BUF->type = ICMP6_ESMRF;
   UIP_ICMP_BUF->icode = ESMRF_ICMP_CODE;
@@ -192,7 +190,7 @@ icmp_input()
   }
 #endif
 
-  remove_ext_hdr();
+  uip_remove_ext_hdr();
 
   PRINTF("ESMRF: ICMPv6 In from ");
   PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
@@ -203,11 +201,11 @@ icmp_input()
   VERBOSE_PRINTF("ESMRF: ICMPv6 In, parse from %p to %p\n",
                  UIP_ICMP_PAYLOAD,
                  (uint8_t *)UIP_ICMP_PAYLOAD + uip_len -
-                 uip_l2_l3_icmp_hdr_len);
+                 uip_l3_icmp_hdr_len);
 
 
   locmobptr = (struct multicast_on_behalf *) UIP_ICMP_PAYLOAD;
-  loclen = uip_len - (uip_l2_l3_icmp_hdr_len + UIP_ICMP_MOB);
+  loclen = uip_len - (uip_l3_icmp_hdr_len + UIP_ICMP_MOB);
 
   uip_ipaddr_copy(&src_ip, &UIP_IP_BUF->srcipaddr);
   uip_ipaddr_copy(&des_ip, &UIP_IP_BUF->destipaddr);
@@ -217,20 +215,20 @@ icmp_input()
   c->rport = locmobptr->mcast_port;
   uip_slen = loclen;
   uip_udp_conn=c;
-  memcpy(&uip_buf[UIP_LLH_LEN + UIP_IPUDPH_LEN], locmobptr->mcast_payload,
-         loclen > UIP_BUFSIZE - UIP_LLH_LEN - UIP_IPUDPH_LEN?
-         UIP_BUFSIZE - UIP_LLH_LEN - UIP_IPUDPH_LEN: loclen);
+  memcpy(&uip_buf[UIP_IPUDPH_LEN], locmobptr->mcast_payload,
+         loclen > UIP_BUFSIZE - UIP_IPUDPH_LEN?
+         UIP_BUFSIZE - UIP_IPUDPH_LEN: loclen);
 
   uip_process(UIP_UDP_SEND_CONN);
 
   memcpy(&mcast_buf, uip_buf, uip_len);
   mcast_len = uip_len;
-  /* pass the packet to our uip_process to check if it is allowed to 
+  /* pass the packet to our uip_process to check if it is allowed to
    * accept this packet or not */
   uip_ipaddr_copy(&UIP_IP_BUF->srcipaddr, &src_ip);
   uip_ipaddr_copy(&UIP_IP_BUF->destipaddr, &des_ip);
   UIP_UDP_BUF->udpchksum = 0;
-  
+
   uip_process(UIP_DATA);
 
   memcpy(uip_buf, &mcast_buf, mcast_len);
@@ -245,7 +243,7 @@ icmp_input()
     /* If we enter here, we will definitely forward */
     tcpip_ipv6_output();
   }
-  uip_clear_buf();
+  uipbuf_clear();
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -255,7 +253,7 @@ mcast_fwd(void *p)
   uip_len = mcast_len;
   UIP_IP_BUF->ttl--;
   tcpip_output(NULL);
-  uip_clear_buf();
+  uipbuf_clear();
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t
@@ -281,11 +279,11 @@ in()
   }
 
   /* Retrieve our preferred parent's LL address */
-  parent_ipaddr = rpl_get_parent_ipaddr(d->preferred_parent);
+  parent_ipaddr = rpl_parent_get_ipaddr(d->preferred_parent);
   parent_lladdr = uip_ds6_nbr_lladdr_from_ipaddr(parent_ipaddr);
 
   if(parent_lladdr == NULL) {
-    PRINTF("ESMRF: NO Parent exist \n");
+    PRINTF("ESMRF: No Parent found\n");
     UIP_MCAST6_STATS_ADD(mcast_dropped);
     return UIP_MCAST6_DROP;
   }
@@ -303,6 +301,7 @@ in()
 
   if(UIP_IP_BUF->ttl <= 1) {
     UIP_MCAST6_STATS_ADD(mcast_dropped);
+    PRINTF("ESMRF: TTL too low\n");
     return UIP_MCAST6_DROP;
   }
 
@@ -350,6 +349,8 @@ in()
     }
     PRINTF("ESMRF: %u bytes: fwd in %u [%u]\n",
            uip_len, fwd_delay, fwd_spread);
+  } else {
+    PRINTF("ESMRF: Group unknown, dropping\n");
   }
 
   /* Done with this packet unless we are a member of the mcast group */
@@ -366,7 +367,9 @@ in()
 static void
 init()
 {
-  UIP_MCAST6_STATS_INIT(NULL);
+  ESMRF_STATS_INIT();
+  UIP_MCAST6_STATS_INIT(&stats);
+
   uip_mcast6_route_init();
   /* Register the ICMPv6 input handler */
   uip_icmp6_register_input_handler(&esmrf_icmp_handler);

@@ -33,8 +33,10 @@
 #ifndef RTIMER_ARCH_H_
 #define RTIMER_ARCH_H_
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "sys/clock.h"
+#include "lib/simEnvChange.h"
+#include "sys/cooja_mt.h"
 
 #define RTIMER_ARCH_SECOND UINT64_C(1000000)
 
@@ -46,5 +48,20 @@ rtimer_clock_t rtimer_arch_now(void);
 int rtimer_arch_check(void);
 int rtimer_arch_pending(void);
 rtimer_clock_t rtimer_arch_next(void);
+
+/** \brief A platform-specific implementation that calls cooja_mt_yield()
+ * periodically. Without this, Cooja will get stuck in the busy-loop
+ * without ever updating the current rtimer time. */
+extern int64_t      simRtimerWaitTime;
+#define RTIMER_BUSYWAIT_UNTIL_ABS(cond, t0, max_time) \
+  ({                                                                \
+    bool c;                                                         \
+    simRtimerWaitTime = (t0) + (max_time)+1;                        \
+    while(!(c = cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), (t0) + (max_time))) { \
+      simProcessRunValue = 1;                                       \
+      cooja_mt_yield();                                             \
+    }                                                               \
+    c;                                                              \
+  })
 
 #endif /* RTIMER_ARCH_H_ */

@@ -32,9 +32,9 @@
 #ifndef IP64_ADDRMAP_H
 #define IP64_ADDRMAP_H
 
-
+#include "contiki.h"
 #include "sys/timer.h"
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 
 struct ip64_addrmap_entry {
   struct ip64_addrmap_entry *next;

@@ -66,92 +66,36 @@
 
 #define UIP_IPUDPH_LEN (UIP_UDPH_LEN + UIP_IPH_LEN)   /* Size of IP + UDP header */
 #define UIP_IPTCPH_LEN (UIP_TCPH_LEN + UIP_IPH_LEN)   /* Size of IP + TCP header */
-#define UIP_TCPIP_HLEN UIP_IPTCPH_LEN
-#define UIP_IPICMPH_LEN (UIP_IPH_LEN + UIP_ICMPH_LEN) /* Size of ICMP + IP header */
-#define UIP_LLIPH_LEN (UIP_LLH_LEN + UIP_IPH_LEN)     /* Size of L2 + IP header */
+
 #if NETSTACK_CONF_WITH_IPV6
-/**
- * The sums below are quite used in ND. When used for uip_buf, we
- * include link layer length when used for uip_len, we do not, hence
- * we need values with and without LLH_LEN we do not use capital
- * letters as these values are variable
- */
-#define uip_l2_l3_hdr_len (UIP_LLH_LEN + UIP_IPH_LEN + uip_ext_len)
-#define uip_l2_l3_icmp_hdr_len (UIP_LLH_LEN + UIP_IPH_LEN + uip_ext_len + UIP_ICMPH_LEN)
-#define uip_l3_hdr_len (UIP_IPH_LEN + uip_ext_len)
 #define uip_l3_icmp_hdr_len (UIP_IPH_LEN + uip_ext_len + UIP_ICMPH_LEN)
 #endif /*NETSTACK_CONF_WITH_IPV6*/
 
+/**
+ * Direct access to IPv6 header
+ */
+#define UIP_IP_BUF                             ((struct uip_ip_hdr *)uip_buf)
+#define UIP_IP_PAYLOAD(ext)                        ((unsigned char *)uip_buf + UIP_IPH_LEN + (ext))
+
+/**
+ * Direct access to ICMP, UDP, and TCP headers and payload, with implicit ext header offset (global uip_ext_len)
+ */
+#define UIP_ICMP_BUF                         ((struct uip_icmp_hdr *)UIP_IP_PAYLOAD(uip_ext_len))
+#define UIP_ICMP_PAYLOAD                           ((unsigned char *)UIP_IP_PAYLOAD(uip_ext_len) + UIP_ICMPH_LEN)
+#define UIP_UDP_BUF                           ((struct uip_udp_hdr *)UIP_IP_PAYLOAD(uip_ext_len))
+#define UIP_UDP_PAYLOAD                            ((unsigned char *)UIP_IP_PAYLOAD(uip_ext_len) + UIP_UDPH_LEN)
+#define UIP_TCP_BUF                           ((struct uip_tcp_hdr *)UIP_IP_PAYLOAD(uip_ext_len))
+#define UIP_TCP_PAYLOAD                            ((unsigned char *)UIP_IP_PAYLOAD(uip_ext_len) + UIP_TCPH_LEN)
 
 #include "net/ip/uipopt.h"
+#include "net/ip/uipbuf.h"
+#include "net/linkaddr.h"
+#include "uip-hton.h"
 
 /* For memcmp */
 #include <string.h>
 
-/**
- * Representation of an IP address.
- *
- */
-typedef union uip_ip4addr_t {
-  uint8_t  u8[4];                       /* Initializer, must come first. */
-  uint16_t u16[2];
-} uip_ip4addr_t;
-
-typedef union uip_ip6addr_t {
-  uint8_t  u8[16];                      /* Initializer, must come first. */
-  uint16_t u16[8];
-} uip_ip6addr_t;
-
-#if NETSTACK_CONF_WITH_IPV6
-typedef uip_ip6addr_t uip_ipaddr_t;
-#else /* NETSTACK_CONF_WITH_IPV6 */
-typedef uip_ip4addr_t uip_ipaddr_t;
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-
-
-/*---------------------------------------------------------------------------*/
-
-/** \brief 16 bit 802.15.4 address */
-typedef struct uip_802154_shortaddr {
-  uint8_t addr[2];
-} uip_802154_shortaddr;
-/** \brief 64 bit 802.15.4 address */
-typedef struct uip_802154_longaddr {
-  uint8_t addr[8];
-} uip_802154_longaddr;
-
-/** \brief 802.11 address */
-typedef struct uip_80211_addr {
-  uint8_t addr[6];
-} uip_80211_addr;
-
-/** \brief 802.3 address */
-typedef struct uip_eth_addr {
-  uint8_t addr[6];
-} uip_eth_addr;
-
-
-#if UIP_CONF_LL_802154
-/** \brief 802.15.4 address */
-typedef uip_802154_longaddr uip_lladdr_t;
-#define UIP_802154_SHORTADDR_LEN 2
-#define UIP_802154_LONGADDR_LEN  8
-/** \brief Link layer address length */
-#define UIP_LLADDR_LEN UIP_802154_LONGADDR_LEN
-#else /*UIP_CONF_LL_802154*/
-#if UIP_CONF_LL_80211
-/** \brief 802.11 address */
-typedef uip_80211_addr uip_lladdr_t;
-/** \brief Link layer address length */
-#define UIP_LLADDR_LEN 6
-#else /*UIP_CONF_LL_80211*/
-/** \brief Ethernet address */
-typedef uip_eth_addr uip_lladdr_t;
-/** \brief Link layer address length */
-#define UIP_LLADDR_LEN 6
-#endif /*UIP_CONF_LL_80211*/
-#endif /*UIP_CONF_LL_802154*/
-
+#include "net/ip/uipaddr.h"
 #include "net/ip/tcpip.h"
 
 /*---------------------------------------------------------------------------*/
@@ -359,7 +303,7 @@ void uip_setipid(uint16_t id);
  * The usual way of calling the function is through a for() loop like
  * this:
  \code
- for(i = 0; i < UIP_CONNS; ++i) {
+ for(i = 0; i < UIP_TCP_CONNS; ++i) {
  uip_periodic(i);
  if(uip_len > 0) {
  devicedriver_send();
@@ -372,7 +316,7 @@ void uip_setipid(uint16_t id);
  * Ethernet, you will need to call the uip_arp_out() function before
  * calling the device driver:
  \code
- for(i = 0; i < UIP_CONNS; ++i) {
+ for(i = 0; i < UIP_TCP_CONNS; ++i) {
  uip_periodic(i);
  if(uip_len > 0) {
  uip_arp_out();
@@ -499,7 +443,7 @@ typedef union {
   uint8_t u8[UIP_BUFSIZE];
 } uip_buf_t;
 
-CCIF extern uip_buf_t uip_aligned_buf;
+extern uip_buf_t uip_aligned_buf;
 
 /** Macro to access uip_aligned_buf as an array of bytes */
 #define uip_buf (uip_aligned_buf.u8)
@@ -619,7 +563,7 @@ struct uip_conn *uip_connect(const uip_ipaddr_t *ripaddr, uint16_t port);
  *
  * \hideinitializer
  */
-CCIF void uip_send(const void *data, int len);
+void uip_send(const void *data, int len);
 
 /**
  * The length of any incoming data that is currently available (if available)
@@ -883,372 +827,13 @@ struct uip_udp_conn *uip_udp_new(const uip_ipaddr_t *ripaddr, uint16_t rport);
  */
 #define uip_udp_send(len) uip_send((char *)uip_appdata, len)
 
+
 /** @} */
 
-/* uIP convenience and converting functions. */
-
-/**
- * \defgroup uipconvfunc uIP conversion functions
- * @{
- *
- * These functions can be used for converting between different data
- * formats used by uIP.
- */
-
-/**
- * Convert an IP address to four bytes separated by commas.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr;
- printf("ipaddr=%d.%d.%d.%d\n", uip_ipaddr_to_quad(&ipaddr));
- \endcode
- *
- * \param a A pointer to a uip_ipaddr_t.
- * \hideinitializer
- */
-#define uip_ipaddr_to_quad(a) (a)->u8[0],(a)->u8[1],(a)->u8[2],(a)->u8[3]
-
-/**
- * Construct an IP address from four bytes.
- *
- * This function constructs an IP address of the type that uIP handles
- * internally from four bytes. The function is handy for specifying IP
- * addresses to use with e.g. the uip_connect() function.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr;
- struct uip_conn *c;
-
- uip_ipaddr(&ipaddr, 192,168,1,2);
- c = uip_connect(&ipaddr, UIP_HTONS(80));
- \endcode
- *
- * \param addr A pointer to a uip_ipaddr_t variable that will be
- * filled in with the IP address.
- *
- * \param addr0 The first octet of the IP address.
- * \param addr1 The second octet of the IP address.
- * \param addr2 The third octet of the IP address.
- * \param addr3 The forth octet of the IP address.
- *
- * \hideinitializer
- */
-#define uip_ipaddr(addr, addr0,addr1,addr2,addr3) do {  \
-    (addr)->u8[0] = addr0;                              \
-    (addr)->u8[1] = addr1;                              \
-    (addr)->u8[2] = addr2;                              \
-    (addr)->u8[3] = addr3;                              \
-  } while(0)
-
-/**
- * Construct an IPv6 address from eight 16-bit words.
- *
- * This function constructs an IPv6 address.
- *
- * \hideinitializer
- */
-#define uip_ip6addr(addr, addr0,addr1,addr2,addr3,addr4,addr5,addr6,addr7) do { \
-    (addr)->u16[0] = UIP_HTONS(addr0);                                      \
-    (addr)->u16[1] = UIP_HTONS(addr1);                                      \
-    (addr)->u16[2] = UIP_HTONS(addr2);                                      \
-    (addr)->u16[3] = UIP_HTONS(addr3);                                      \
-    (addr)->u16[4] = UIP_HTONS(addr4);                                      \
-    (addr)->u16[5] = UIP_HTONS(addr5);                                      \
-    (addr)->u16[6] = UIP_HTONS(addr6);                                      \
-    (addr)->u16[7] = UIP_HTONS(addr7);                                      \
-  } while(0)
-
-/**
- * Construct an IPv6 address from sixteen 8-bit words.
- *
- * This function constructs an IPv6 address.
- *
- * \hideinitializer
- */
-#define uip_ip6addr_u8(addr, addr0,addr1,addr2,addr3,addr4,addr5,addr6,addr7,addr8,addr9,addr10,addr11,addr12,addr13,addr14,addr15) do { \
-    (addr)->u8[0] = addr0;                                       \
-    (addr)->u8[1] = addr1;                                       \
-    (addr)->u8[2] = addr2;                                       \
-    (addr)->u8[3] = addr3;                                       \
-    (addr)->u8[4] = addr4;                                       \
-    (addr)->u8[5] = addr5;                                       \
-    (addr)->u8[6] = addr6;                                       \
-    (addr)->u8[7] = addr7;                                       \
-    (addr)->u8[8] = addr8;                                       \
-    (addr)->u8[9] = addr9;                                       \
-    (addr)->u8[10] = addr10;                                     \
-    (addr)->u8[11] = addr11;                                     \
-    (addr)->u8[12] = addr12;                                     \
-    (addr)->u8[13] = addr13;                                     \
-    (addr)->u8[14] = addr14;                                     \
-    (addr)->u8[15] = addr15;                                     \
-  } while(0)
-
-
-/**
- * Copy an IP address from one place to another.
- *
- * Copies an IP address from one place to another.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr1, ipaddr2;
-
- uip_ipaddr(&ipaddr1, 192,16,1,2);
- uip_ipaddr_copy(&ipaddr2, &ipaddr1);
- \endcode
- *
- * \param dest The destination for the copy.
- * \param src The source from where to copy.
- *
- * \hideinitializer
- */
-#ifndef uip_ipaddr_copy
-#define uip_ipaddr_copy(dest, src) (*(dest) = *(src))
-#endif
-#ifndef uip_ip4addr_copy
-#define uip_ip4addr_copy(dest, src) (*((uip_ip4addr_t *)dest) = *((uip_ip4addr_t *)src))
-#endif
-#ifndef uip_ip6addr_copy
-#define uip_ip6addr_copy(dest, src) (*((uip_ip6addr_t *)dest) = *((uip_ip6addr_t *)src))
-#endif
-
-/**
- * Compare two IP addresses
- *
- * Compares two IP addresses.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr1, ipaddr2;
-
- uip_ipaddr(&ipaddr1, 192,16,1,2);
- if(uip_ipaddr_cmp(&ipaddr2, &ipaddr1)) {
-  printf("They are the same");
- }
- \endcode
- *
- * \param addr1 The first IP address.
- * \param addr2 The second IP address.
- *
- * \hideinitializer
- */
-#define uip_ip4addr_cmp(addr1, addr2) ((addr1)->u16[0] == (addr2)->u16[0] && \
-                                       (addr1)->u16[1] == (addr2)->u16[1])
-#define uip_ip6addr_cmp(addr1, addr2) (memcmp(addr1, addr2, sizeof(uip_ip6addr_t)) == 0)
-
 #if NETSTACK_CONF_WITH_IPV6
-#define uip_ipaddr_cmp(addr1, addr2) uip_ip6addr_cmp(addr1, addr2)
 #else /* NETSTACK_CONF_WITH_IPV6 */
 #define uip_ipaddr_cmp(addr1, addr2) uip_ip4addr_cmp(addr1, addr2)
 #endif /* NETSTACK_CONF_WITH_IPV6 */
-
-/**
- * Compare two IP addresses with netmasks
- *
- * Compares two IP addresses with netmasks. The masks are used to mask
- * out the bits that are to be compared.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr1, ipaddr2, mask;
-
- uip_ipaddr(&mask, 255,255,255,0);
- uip_ipaddr(&ipaddr1, 192,16,1,2);
- uip_ipaddr(&ipaddr2, 192,16,1,3);
- if(uip_ipaddr_maskcmp(&ipaddr1, &ipaddr2, &mask)) {
- printf("They are the same");
- }
- \endcode
- *
- * \param addr1 The first IP address.
- * \param addr2 The second IP address.
- * \param mask The netmask.
- *
- * \hideinitializer
- */
-
-#define uip_ipaddr_maskcmp(addr1, addr2, mask)          \
-  (((((uint16_t *)addr1)[0] & ((uint16_t *)mask)[0]) ==       \
-    (((uint16_t *)addr2)[0] & ((uint16_t *)mask)[0])) &&      \
-   ((((uint16_t *)addr1)[1] & ((uint16_t *)mask)[1]) ==       \
-    (((uint16_t *)addr2)[1] & ((uint16_t *)mask)[1])))
-
-#define uip_ipaddr_prefixcmp(addr1, addr2, length) (memcmp(addr1, addr2, length>>3) == 0)
-
-
-
-/*
- * Check if an address is a broadcast address for a network.
- *
- * Checks if an address is the broadcast address for a network. The
- * network is defined by an IP address that is on the network and the
- * network's netmask.
- *
- * \param addr The IP address.
- * \param netaddr The network's IP address.
- * \param netmask The network's netmask.
- *
- * \hideinitializer
- */
-/*#define uip_ipaddr_isbroadcast(addr, netaddr, netmask)
-  ((uip_ipaddr_t *)(addr)).u16 & ((uip_ipaddr_t *)(addr)).u16*/
-
-
-
-/**
- * Mask out the network part of an IP address.
- *
- * Masks out the network part of an IP address, given the address and
- * the netmask.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr1, ipaddr2, netmask;
-
- uip_ipaddr(&ipaddr1, 192,16,1,2);
- uip_ipaddr(&netmask, 255,255,255,0);
- uip_ipaddr_mask(&ipaddr2, &ipaddr1, &netmask);
- \endcode
- *
- * In the example above, the variable "ipaddr2" will contain the IP
- * address 192.168.1.0.
- *
- * \param dest Where the result is to be placed.
- * \param src The IP address.
- * \param mask The netmask.
- *
- * \hideinitializer
- */
-#define uip_ipaddr_mask(dest, src, mask) do {                           \
-    ((uint16_t *)dest)[0] = ((uint16_t *)src)[0] & ((uint16_t *)mask)[0];        \
-    ((uint16_t *)dest)[1] = ((uint16_t *)src)[1] & ((uint16_t *)mask)[1];        \
-  } while(0)
-
-/**
- * Pick the first octet of an IP address.
- *
- * Picks out the first octet of an IP address.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr;
- uint8_t octet;
-
- uip_ipaddr(&ipaddr, 1,2,3,4);
- octet = uip_ipaddr1(&ipaddr);
- \endcode
- *
- * In the example above, the variable "octet" will contain the value 1.
- *
- * \hideinitializer
- */
-#define uip_ipaddr1(addr) ((addr)->u8[0])
-
-/**
- * Pick the second octet of an IP address.
- *
- * Picks out the second octet of an IP address.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr;
- uint8_t octet;
-
- uip_ipaddr(&ipaddr, 1,2,3,4);
- octet = uip_ipaddr2(&ipaddr);
- \endcode
- *
- * In the example above, the variable "octet" will contain the value 2.
- *
- * \hideinitializer
- */
-#define uip_ipaddr2(addr) ((addr)->u8[1])
-
-/**
- * Pick the third octet of an IP address.
- *
- * Picks out the third octet of an IP address.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr;
- uint8_t octet;
-
- uip_ipaddr(&ipaddr, 1,2,3,4);
- octet = uip_ipaddr3(&ipaddr);
- \endcode
- *
- * In the example above, the variable "octet" will contain the value 3.
- *
- * \hideinitializer
- */
-#define uip_ipaddr3(addr) ((addr)->u8[2])
-
-/**
- * Pick the fourth octet of an IP address.
- *
- * Picks out the fourth octet of an IP address.
- *
- * Example:
- \code
- uip_ipaddr_t ipaddr;
- uint8_t octet;
-
- uip_ipaddr(&ipaddr, 1,2,3,4);
- octet = uip_ipaddr4(&ipaddr);
- \endcode
- *
- * In the example above, the variable "octet" will contain the value 4.
- *
- * \hideinitializer
- */
-#define uip_ipaddr4(addr) ((addr)->u8[3])
-
-/**
- * Convert 16-bit quantity from host byte order to network byte order.
- *
- * This macro is primarily used for converting constants from host
- * byte order to network byte order. For converting variables to
- * network byte order, use the uip_htons() function instead.
- *
- * \hideinitializer
- */
-#ifndef UIP_HTONS
-#   if UIP_BYTE_ORDER == UIP_BIG_ENDIAN
-#      define UIP_HTONS(n) (n)
-#      define UIP_HTONL(n) (n)
-#   else /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
-#      define UIP_HTONS(n) (uint16_t)((((uint16_t) (n)) << 8) | (((uint16_t) (n)) >> 8))
-#      define UIP_HTONL(n) (((uint32_t)UIP_HTONS(n) << 16) | UIP_HTONS((uint32_t)(n) >> 16))
-#   endif /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
-#else
-#error "UIP_HTONS already defined!"
-#endif /* UIP_HTONS */
-
-/**
- * Convert a 16-bit quantity from host byte order to network byte order.
- *
- * This function is primarily used for converting variables from host
- * byte order to network byte order. For converting constants to
- * network byte order, use the UIP_HTONS() macro instead.
- */
-#ifndef uip_htons
-CCIF uint16_t uip_htons(uint16_t val);
-#endif /* uip_htons */
-#ifndef uip_ntohs
-#define uip_ntohs uip_htons
-#endif
-
-#ifndef uip_htonl
-CCIF uint32_t uip_htonl(uint32_t val);
-#endif /* uip_htonl */
-#ifndef uip_ntohl
-#define uip_ntohl uip_htonl
-#endif
-
 /** @} */
 
 /**
@@ -1258,7 +843,7 @@ CCIF uint32_t uip_htonl(uint32_t val);
  * called. If the application wishes to send data, the application may
  * use this space to write the data into before calling uip_send().
  */
-CCIF extern void *uip_appdata;
+extern void *uip_appdata;
 
 #if UIP_URGDATA > 0
 /* uint8_t *uip_urgdata:
@@ -1293,12 +878,16 @@ extern void *uip_urgdata;
  * packet.
  *
  */
-CCIF extern uint16_t uip_len;
+extern uint16_t uip_len;
 
 /**
  * The length of the extension headers
  */
-extern uint8_t uip_ext_len;
+extern uint16_t uip_ext_len;
+
+/** The final protocol after IPv6 extension headers:
+  * UIP_PROTO_TCP, UIP_PROTO_UDP or UIP_PROTO_ICMP6 */
+extern uint8_t uip_last_proto;
 /** @} */
 
 #if UIP_URGDATA > 0
@@ -1352,7 +941,6 @@ struct uip_conn {
   uint8_t timer;         /**< The retransmission timer. */
   uint8_t nrtx;          /**< The number of retransmissions for the last
                               segment sent. */
-
   uip_tcp_appstate_t appstate; /** The application state. */
 };
 
@@ -1364,10 +952,10 @@ struct uip_conn {
  * connection.
  */
 
-CCIF extern struct uip_conn *uip_conn;
+extern struct uip_conn *uip_conn;
 #if UIP_TCP
 /* The array containing all uIP connections. */
-CCIF extern struct uip_conn uip_conns[UIP_CONNS];
+extern struct uip_conn uip_conns[UIP_TCP_CONNS];
 #endif
 
 /**
@@ -1389,7 +977,6 @@ struct uip_udp_conn {
   uint16_t lport;        /**< The local port number in network byte order. */
   uint16_t rport;        /**< The remote port number in network byte order. */
   uint8_t  ttl;          /**< Default time-to-live. */
-
   /** The application state. */
   uip_udp_appstate_t appstate;
 };
@@ -1501,7 +1088,18 @@ struct uip_stats {
  */
 /*---------------------------------------------------------------------------*/
 
+/**
+ * The Ethernet header.
+ */
+struct uip_eth_hdr {
+  struct uip_eth_addr dest;
+  struct uip_eth_addr src;
+  uint16_t type;
+};
 
+#define UIP_ETHTYPE_ARP  0x0806
+#define UIP_ETHTYPE_IP   0x0800
+#define UIP_ETHTYPE_IPV6 0x86dd
 
 /* uint8_t uip_flags:
  *
@@ -1509,7 +1107,7 @@ struct uip_stats {
  * that are defined in this file. Please read below for more
  * information.
  */
-CCIF extern uint8_t uip_flags;
+extern uint8_t uip_flags;
 
 /* The following flags may be set in the global variable uip_flags
    before calling the application callback. The UIP_ACKDATA,
@@ -1599,111 +1197,13 @@ void uip_process(uint8_t flag);
 
 #define UIP_STOPPED      16
 
-/* The TCP and IP headers. */
-struct uip_tcpip_hdr {
-#if NETSTACK_CONF_WITH_IPV6
-  /* IPv6 header. */
-  uint8_t vtc,
-    tcflow;
-  uint16_t flow;
-  uint8_t len[2];
-  uint8_t proto, ttl;
-  uip_ip6addr_t srcipaddr, destipaddr;
-#else /* NETSTACK_CONF_WITH_IPV6 */
-  /* IPv4 header. */
-  uint8_t vhl,
-    tos,
-    len[2],
-    ipid[2],
-    ipoffset[2],
-    ttl,
-    proto;
-  uint16_t ipchksum;
-  uip_ipaddr_t srcipaddr, destipaddr;
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-
-  /* TCP header. */
-  uint16_t srcport,
-    destport;
-  uint8_t seqno[4],
-    ackno[4],
-    tcpoffset,
-    flags,
-    wnd[2];
-  uint16_t tcpchksum;
-  uint8_t urgp[2];
-  uint8_t optdata[4];
-};
-
-/* The ICMP and IP headers. */
-struct uip_icmpip_hdr {
-#if NETSTACK_CONF_WITH_IPV6
-  /* IPv6 header. */
-  uint8_t vtc,
-    tcf;
-  uint16_t flow;
-  uint8_t len[2];
-  uint8_t proto, ttl;
-  uip_ip6addr_t srcipaddr, destipaddr;
-#else /* NETSTACK_CONF_WITH_IPV6 */
-  /* IPv4 header. */
-  uint8_t vhl,
-    tos,
-    len[2],
-    ipid[2],
-    ipoffset[2],
-    ttl,
-    proto;
-  uint16_t ipchksum;
-  uip_ipaddr_t srcipaddr, destipaddr;
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-
-  /* ICMP header. */
-  uint8_t type, icode;
-  uint16_t icmpchksum;
-#if !NETSTACK_CONF_WITH_IPV6
-  uint16_t id, seqno;
-  uint8_t payload[1];
-#endif /* !NETSTACK_CONF_WITH_IPV6 */
-};
-
-
-/* The UDP and IP headers. */
-struct uip_udpip_hdr {
-#if NETSTACK_CONF_WITH_IPV6
-  /* IPv6 header. */
-  uint8_t vtc,
-    tcf;
-  uint16_t flow;
-  uint8_t len[2];
-  uint8_t proto, ttl;
-  uip_ip6addr_t srcipaddr, destipaddr;
-#else /* NETSTACK_CONF_WITH_IPV6 */
-  /* IP header. */
-  uint8_t vhl,
-    tos,
-    len[2],
-    ipid[2],
-    ipoffset[2],
-    ttl,
-    proto;
-  uint16_t ipchksum;
-  uip_ipaddr_t srcipaddr, destipaddr;
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-
-  /* UDP header. */
-  uint16_t srcport,
-    destport;
-  uint16_t udplen;
-  uint16_t udpchksum;
-};
-
 /*
  * In IPv6 the length of the L3 headers before the transport header is
  * not fixed, due to the possibility to include extension option headers
  * after the IP header. hence we split here L3 and L4 headers
  */
 /* The IP header */
+
 struct uip_ip_hdr {
 #if NETSTACK_CONF_WITH_IPV6
   /* IPV6 header */
@@ -1840,9 +1340,6 @@ struct uip_tcp_hdr {
 struct uip_icmp_hdr {
   uint8_t type, icode;
   uint16_t icmpchksum;
-#if !NETSTACK_CONF_WITH_IPV6
-  uint16_t id, seqno;
-#endif /* !NETSTACK_CONF_WITH_IPV6 */
 };
 
 
@@ -1869,8 +1366,7 @@ struct uip_udp_hdr {
  *
  * \hideinitializer
  */
-#define UIP_APPDATA_SIZE (UIP_BUFSIZE - UIP_LLH_LEN - UIP_TCPIP_HLEN)
-#define UIP_APPDATA_PTR (void *)&uip_buf[UIP_LLH_LEN + UIP_TCPIP_HLEN]
+#define UIP_APPDATA_SIZE (UIP_BUFSIZE - UIP_IPTCPH_LEN)
 
 #define UIP_PROTO_ICMP  1
 #define UIP_PROTO_TCP   6
@@ -1888,11 +1384,14 @@ struct uip_udp_hdr {
 #define UIP_PROTO_NONE        59
 /** @} */
 
+#define uip_is_proto_ext_hdr(proto) ((proto) != UIP_PROTO_TCP && (proto) != UIP_PROTO_UDP && (proto) != UIP_PROTO_ICMP6)
+
 /** @{ */
 /** \brief  Destination and Hop By Hop extension headers option types */
 #define UIP_EXT_HDR_OPT_PAD1  0
 #define UIP_EXT_HDR_OPT_PADN  1
 #define UIP_EXT_HDR_OPT_RPL   0x63
+#define UIP_EXT_HDR_OPT_MPL   0x6D
 
 /** @} */
 
@@ -1919,240 +1418,77 @@ struct uip_udp_hdr {
 
 
 #if UIP_FIXEDADDR
-CCIF extern const uip_ipaddr_t uip_hostaddr, uip_netmask, uip_draddr;
+extern const uip_ipaddr_t uip_hostaddr, uip_netmask, uip_draddr;
 #else /* UIP_FIXEDADDR */
-CCIF extern uip_ipaddr_t uip_hostaddr, uip_netmask, uip_draddr;
+extern uip_ipaddr_t uip_hostaddr, uip_netmask, uip_draddr;
 #endif /* UIP_FIXEDADDR */
-CCIF extern const uip_ipaddr_t uip_broadcast_addr;
-CCIF extern const uip_ipaddr_t uip_all_zeroes_addr;
+extern const uip_ipaddr_t uip_broadcast_addr;
+extern const uip_ipaddr_t uip_all_zeroes_addr;
 
 #if UIP_FIXEDETHADDR
-CCIF extern const uip_lladdr_t uip_lladdr;
+extern const uip_lladdr_t uip_lladdr;
 #else
-CCIF extern uip_lladdr_t uip_lladdr;
+extern uip_lladdr_t uip_lladdr;
 #endif
 
 
 
 
 #if NETSTACK_CONF_WITH_IPV6
-/** Length of the link local prefix */
-#define UIP_LLPREF_LEN     10
-
-/**
- * \brief Is IPv6 address a the unspecified address
- * a is of type uip_ipaddr_t
- */
-#define uip_is_addr_loopback(a)                  \
-  ((((a)->u16[0]) == 0) &&                       \
-   (((a)->u16[1]) == 0) &&                       \
-   (((a)->u16[2]) == 0) &&                       \
-   (((a)->u16[3]) == 0) &&                       \
-   (((a)->u16[4]) == 0) &&                       \
-   (((a)->u16[5]) == 0) &&                       \
-   (((a)->u16[6]) == 0) &&                       \
-   (((a)->u8[14]) == 0) &&                       \
-   (((a)->u8[15]) == 0x01))
-/**
- * \brief Is IPv6 address a the unspecified address
- * a is of type uip_ipaddr_t
- */
-#define uip_is_addr_unspecified(a)               \
-  ((((a)->u16[0]) == 0) &&                       \
-   (((a)->u16[1]) == 0) &&                       \
-   (((a)->u16[2]) == 0) &&                       \
-   (((a)->u16[3]) == 0) &&                       \
-   (((a)->u16[4]) == 0) &&                       \
-   (((a)->u16[5]) == 0) &&                       \
-   (((a)->u16[6]) == 0) &&                       \
-   (((a)->u16[7]) == 0))
-
-/** \brief Is IPv6 address a the link local all-nodes multicast address */
-#define uip_is_addr_linklocal_allnodes_mcast(a)     \
-  ((((a)->u8[0]) == 0xff) &&                        \
-   (((a)->u8[1]) == 0x02) &&                        \
-   (((a)->u16[1]) == 0) &&                          \
-   (((a)->u16[2]) == 0) &&                          \
-   (((a)->u16[3]) == 0) &&                          \
-   (((a)->u16[4]) == 0) &&                          \
-   (((a)->u16[5]) == 0) &&                          \
-   (((a)->u16[6]) == 0) &&                          \
-   (((a)->u8[14]) == 0) &&                          \
-   (((a)->u8[15]) == 0x01))
-
-/** \brief Is IPv6 address a the link local all-routers multicast address */
-#define uip_is_addr_linklocal_allrouters_mcast(a)     \
-  ((((a)->u8[0]) == 0xff) &&                        \
-   (((a)->u8[1]) == 0x02) &&                        \
-   (((a)->u16[1]) == 0) &&                          \
-   (((a)->u16[2]) == 0) &&                          \
-   (((a)->u16[3]) == 0) &&                          \
-   (((a)->u16[4]) == 0) &&                          \
-   (((a)->u16[5]) == 0) &&                          \
-   (((a)->u16[6]) == 0) &&                          \
-   (((a)->u8[14]) == 0) &&                          \
-   (((a)->u8[15]) == 0x02))
-
-/**
- * \brief is addr (a) a link local unicast address, see RFC 4291
- *  i.e. is (a) on prefix FE80::/10
- *  a is of type uip_ipaddr_t*
- */
-#define uip_is_addr_linklocal(a)                 \
-  ((a)->u8[0] == 0xfe &&                         \
-   (a)->u8[1] == 0x80)
-
-/** \brief set IP address a to unspecified */
-#define uip_create_unspecified(a) uip_ip6addr(a, 0, 0, 0, 0, 0, 0, 0, 0)
-
-/** \brief set IP address a to the link local all-nodes multicast address */
-#define uip_create_linklocal_allnodes_mcast(a) uip_ip6addr(a, 0xff02, 0, 0, 0, 0, 0, 0, 0x0001)
-
-/** \brief set IP address a to the link local all-routers multicast address */
-#define uip_create_linklocal_allrouters_mcast(a) uip_ip6addr(a, 0xff02, 0, 0, 0, 0, 0, 0, 0x0002)
-#define uip_create_linklocal_prefix(addr) do { \
-    (addr)->u16[0] = UIP_HTONS(0xfe80);            \
-    (addr)->u16[1] = 0;                        \
-    (addr)->u16[2] = 0;                        \
-    (addr)->u16[3] = 0;                        \
-  } while(0)
-
-/**
- * \brief  is addr (a) a solicited node multicast address, see RFC 4291
- *  a is of type uip_ipaddr_t*
- */
-#define uip_is_addr_solicited_node(a)          \
-  ((((a)->u8[0])  == 0xFF) &&                  \
-   (((a)->u8[1])  == 0x02) &&                  \
-   (((a)->u16[1]) == 0x00) &&                  \
-   (((a)->u16[2]) == 0x00) &&                  \
-   (((a)->u16[3]) == 0x00) &&                  \
-   (((a)->u16[4]) == 0x00) &&                  \
-   (((a)->u8[10]) == 0x00) &&                  \
-   (((a)->u8[11]) == 0x01) &&                  \
-   (((a)->u8[12]) == 0xFF))
-
-/**
- * \brief put in b the solicited node address corresponding to address a
- * both a and b are of type uip_ipaddr_t*
- * */
-#define uip_create_solicited_node(a, b)    \
-  (((b)->u8[0]) = 0xFF);                        \
-  (((b)->u8[1]) = 0x02);                        \
-  (((b)->u16[1]) = 0);                          \
-  (((b)->u16[2]) = 0);                          \
-  (((b)->u16[3]) = 0);                          \
-  (((b)->u16[4]) = 0);                          \
-  (((b)->u8[10]) = 0);                          \
-  (((b)->u8[11]) = 0x01);                       \
-  (((b)->u8[12]) = 0xFF);                       \
-  (((b)->u8[13]) = ((a)->u8[13]));              \
-  (((b)->u16[7]) = ((a)->u16[7]))
-
-/**
- * \brief was addr (a) forged based on the mac address m
- * a type is uip_ipaddr_t
- * m type is uiplladdr_t
- */
-#if UIP_CONF_LL_802154
-#define uip_is_addr_mac_addr_based(a, m) \
-  ((((a)->u8[8])  == (((m)->addr[0]) ^ 0x02)) &&   \
-   (((a)->u8[9])  == (m)->addr[1]) &&            \
-   (((a)->u8[10]) == (m)->addr[2]) &&            \
-   (((a)->u8[11]) == (m)->addr[3]) &&            \
-   (((a)->u8[12]) == (m)->addr[4]) &&            \
-   (((a)->u8[13]) == (m)->addr[5]) &&            \
-   (((a)->u8[14]) == (m)->addr[6]) &&            \
-   (((a)->u8[15]) == (m)->addr[7]))
-#else
-
-#define uip_is_addr_mac_addr_based(a, m) \
-  ((((a)->u8[8])  == (((m)->addr[0]) | 0x02)) &&   \
-   (((a)->u8[9])  == (m)->addr[1]) &&            \
-   (((a)->u8[10]) == (m)->addr[2]) &&            \
-   (((a)->u8[11]) == 0xff) &&            \
-   (((a)->u8[12]) == 0xfe) &&            \
-   (((a)->u8[13]) == (m)->addr[3]) &&            \
-   (((a)->u8[14]) == (m)->addr[4]) &&            \
-   (((a)->u8[15]) == (m)->addr[5]))
-
-#endif /*UIP_CONF_LL_802154*/
-
-/**
- * \brief is address a multicast address, see RFC 4291
- * a is of type uip_ipaddr_t*
- * */
-#define uip_is_addr_mcast(a)                    \
-  (((a)->u8[0]) == 0xFF)
-
-/**
- * \brief is address a global multicast address (FFxE::/16),
- * a is of type uip_ip6addr_t*
- * */
-#define uip_is_addr_mcast_global(a) \
-  ((((a)->u8[0]) == 0xFF) && \
-   (((a)->u8[1] & 0x0F) == 0x0E))
-
-/**
- * \brief is address a non-routable multicast address.
- * Scopes 1 (interface-local) and 2 (link-local) are non-routable
- * See RFC4291 and draft-ietf-6man-multicast-scopes
- * a is of type uip_ip6addr_t*
- * */
-#define uip_is_addr_mcast_non_routable(a) \
-  ((((a)->u8[0]) == 0xFF) && \
-   (((a)->u8[1] & 0x0F) <= 0x02))
-
-/**
- * \brief is address a routable multicast address.
- * Scope 3 (Realm-Local) or higher are routable
- * Realm-Local scope is defined in draft-ietf-6man-multicast-scopes
- * See RFC4291 and draft-ietf-6man-multicast-scopes
- * a is of type uip_ip6addr_t*
- * */
-#define uip_is_addr_mcast_routable(a) \
-  ((((a)->u8[0]) == 0xFF) && \
-   (((a)->u8[1] & 0x0F) > 0x02))
-
-/**
- * \brief is group-id of multicast address a
- * the all nodes group-id
- */
-#define uip_is_mcast_group_id_all_nodes(a) \
-  ((((a)->u16[1])  == 0) &&                 \
-   (((a)->u16[2])  == 0) &&                 \
-   (((a)->u16[3])  == 0) &&                 \
-   (((a)->u16[4])  == 0) &&                 \
-   (((a)->u16[5])  == 0) &&                 \
-   (((a)->u16[6])  == 0) &&                 \
-   (((a)->u8[14])  == 0) &&                 \
-   (((a)->u8[15])  == 1))
-
-/**
- * \brief is group-id of multicast address a
- * the all routers group-id
- */
-#define uip_is_mcast_group_id_all_routers(a) \
-  ((((a)->u16[1])  == 0) &&                 \
-   (((a)->u16[2])  == 0) &&                 \
-   (((a)->u16[3])  == 0) &&                 \
-   (((a)->u16[4])  == 0) &&                 \
-   (((a)->u16[5])  == 0) &&                 \
-   (((a)->u16[6])  == 0) &&                 \
-   (((a)->u8[14])  == 0) &&                 \
-   (((a)->u8[15])  == 2))
-
-
-/**
- * \brief are last three bytes of both addresses equal?
- * This is used to compare solicited node multicast addresses
- */
-#define uip_are_solicited_bytes_equal(a, b)             \
-  ((((a)->u8[13])  == ((b)->u8[13])) &&                 \
-   (((a)->u8[14])  == ((b)->u8[14])) &&                 \
-   (((a)->u8[15])  == ((b)->u8[15])))
-
 #endif /*NETSTACK_CONF_WITH_IPV6*/
+/**
+ * A non-error message that indicates that a packet should be
+ * processed locally.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_LOCAL     0
+
+/**
+ * A non-error message that indicates that something went OK.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_OK        0
+
+/**
+ * A non-error message that indicates that a packet was forwarded.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_FORWARDED 1
+
+/**
+ * A non-error message that indicates that a zero-length packet
+ * transmission was attempted, and that no packet was sent.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_ZEROLEN   2
+
+/**
+ * An error message that indicates that a packet that was too large
+ * for the outbound network interface was detected.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_TOOLARGE  3
+
+/**
+ * An error message that indicates that no suitable interface could be
+ * found for an outbound packet.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_NOROUTE   4
+
+/**
+ * An error message that indicates that a packet that should be
+ * forwarded or output was dropped.
+ *
+ * \hideinitializer
+ */
+#define UIP_FW_DROPPED   5
 
 /**
  * Calculate the Internet checksum over a buffer.
@@ -2212,6 +1548,13 @@ uint16_t uip_udpchksum(void);
  */
 uint16_t uip_icmp6chksum(void);
 
+/**
+ * Removes all IPv6 extension headers from uip_buf, updates length fields
+ * (uip_len and uip_ext_len)
+ *
+ * \return true upon success, false otherwise.
+ */
+bool uip_remove_ext_hdr(void);
 
 #endif /* UIP_H_ */
 

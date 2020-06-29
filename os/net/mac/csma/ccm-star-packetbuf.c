@@ -54,9 +54,8 @@ get_extended_address(const linkaddr_t *addr)
   /* workaround for short addresses: derive EUI64 as in RFC 6282 */
   static linkaddr_extended_t template = { { 0x00 , 0x00 , 0x00 ,
                                             0xFF , 0xFE , 0x00 , 0x00 , 0x00 } };
-  
   template.u16[3] = LLSEC802154_HTONS(addr->u16);
-  
+
   return template.u8;
 }
 #else /* LINKADDR_SIZE == 2 */
@@ -69,7 +68,7 @@ void
 ccm_star_packetbuf_set_nonce(uint8_t *nonce, int forward)
 {
   const linkaddr_t *source_addr;
-  
+
   source_addr = forward ? &linkaddr_node_addr : packetbuf_addr(PACKETBUF_ADDR_SENDER);
   memcpy(nonce, get_extended_address(source_addr), 8);
   nonce[8] = packetbuf_attr(PACKETBUF_ATTR_FRAME_COUNTER_BYTES_2_3) >> 8;

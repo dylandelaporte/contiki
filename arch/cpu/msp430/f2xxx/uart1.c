@@ -33,7 +33,6 @@
  */
 #include "contiki.h"
 #include <stdlib.h>
-#include "sys/energest.h"
 #include "dev/uart1.h"
 #include "dev/watchdog.h"
 #include "lib/ringbuf.h"
@@ -97,9 +96,6 @@ uart1_writeb(unsigned char c)
 #endif /* TX_WITH_INTERRUPT */
 }
 /*---------------------------------------------------------------------------*/
-#if ! NETSTACK_CONF_WITH_IPV4 /* If NETSTACK_CONF_WITH_IPV4 is defined, putchar() is defined by the SLIP driver */
-#endif /* ! NETSTACK_CONF_WITH_IPV4 */
-/*---------------------------------------------------------------------------*/
 /**
  * Initalize the RS232 port.
  *
@@ -116,13 +112,12 @@ uart1_init(unsigned long ubr)
   UCA0CTL1 &= ~UCSWRST;                     /* Initialize USCI state machine */
 
   transmitting = 0;
- 
+
 }
 /*---------------------------------------------------------------------------*/
 ISR(USCIAB1RX, uart1_rx_interrupt)
 {
   uint8_t c;
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
 
   /* Check status register for receive errors. */
   if(UCA0STAT & UCRXERR) {
@@ -135,13 +130,11 @@ ISR(USCIAB1RX, uart1_rx_interrupt)
       }
     }
   }
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 #if TX_WITH_INTERRUPT
 ISR(USCIAB1TX, uart1_tx_interrupt)
 {
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
   if(IFG2 & UCA0TXIFG) {
     if(ringbuf_elements(&txbuf) == 0) {
       transmitting = 0;
@@ -149,8 +142,6 @@ ISR(USCIAB1TX, uart1_tx_interrupt)
       UCA0TXBUF = ringbuf_get(&txbuf);
     }
   }
-  
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 #endif /* TX_WITH_INTERRUPT */
 /*---------------------------------------------------------------------------*/

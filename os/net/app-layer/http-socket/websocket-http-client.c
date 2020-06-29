@@ -31,15 +31,17 @@
 
 #include "websocket-http-client.h"
 #include "net/ip/uiplib.h"
-#include "services/resolv/resolv.h"
+#include "resolv.h"
 
-#include "ip64-addr.h"
+#include "ipv6/ip64-addr.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "Websocket"
+#define LOG_LEVEL LOG_LEVEL_NONE
 
 enum {
   STATE_WAITING_FOR_HEADER,
@@ -78,7 +80,7 @@ send_get(struct websocket_http_client_state *s)
   tcp_socket_send_str(tcps, s->subprotocol);
   tcp_socket_send_str(tcps, "\r\n");
   tcp_socket_send_str(tcps, "\r\n");
-  PRINTF("websocket-http-client: send_get(): output buffer left %d\n", tcp_socket_max_sendlen(tcps));
+  LOG_INFO("send_get(): output buffer left %d\n", tcp_socket_max_sendlen(tcps));
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -153,7 +155,7 @@ parse_header_byte(struct websocket_http_client_state *s,
      (s->proxy_port == 0 && s->http_status != 101)) {
     /* This is a websocket request, so the server should have answered
        with a 101 Switching protocols response. */
-    PRINTF("Websocket HTTP client didn't get the 101 status code (got %d), closing connection\n",
+    LOG_WARN("didn't get the 101 status code (got %d), closing connection\n",
            s->http_status);
     websocket_http_client_close(s);
     while(1) {
@@ -228,23 +230,21 @@ websocket_http_client_register(struct websocket_http_client_state *s,
     return -1;
   }
   strncpy(s->host, host, sizeof(s->host));
-  s->host[sizeof(s->host) - 1] = '\0';
 
   if(file == NULL) {
     return -1;
   }
   strncpy(s->file, file, sizeof(s->file));
-  s->file[sizeof(s->file) - 1] = '\0';
 
   if(subprotocol == NULL) {
     return -1;
   }
   strncpy(s->subprotocol, subprotocol, sizeof(s->subprotocol));
-  s->subprotocol[sizeof(s->subprotocol) - 1] = '\0';
 
-  memset(s->header, 0, sizeof(s->header));
-  if(header != NULL) {
-    strncpy(s->header, header, sizeof(s->header) - 1);
+  if(header == NULL) {
+    strncpy(s->header, "", sizeof(s->header));
+  } else {
+    strncpy(s->header, header, sizeof(s->header));
   }
 
   if(port == 0) {
@@ -263,7 +263,7 @@ websocket_http_client_get(struct websocket_http_client_state *s)
   uip_ip6addr_t *addr;
   uint16_t port;
 
-  PRINTF("websocket_http_client_get: connecting to %s with file %s subprotocol %s header %s\n",
+  LOG_INFO("Get: connecting to %s with file %s subprotocol %s header %s\n",
          s->host, s->file, s->subprotocol, s->header);
 
 

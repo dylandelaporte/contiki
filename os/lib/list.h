@@ -60,11 +60,15 @@
  * list with list_remove(). The head and tail of a list can be
  * extracted using list_head() and list_tail(), respectively.
  *
+ * This library is not safe to be used within an interrupt context.
  * @{
  */
 
 #ifndef LIST_H_
 #define LIST_H_
+
+#include "sys/cc.h"
+#include <stdbool.h>
 
 #define LIST_CONCAT2(s1, s2) s1##s2
 #define LIST_CONCAT(s1, s2) LIST_CONCAT2(s1, s2)
@@ -79,7 +83,7 @@
  *
  * The list variable is declared as static to make it easy to use in a
  * single C module without unnecessarily exporting the name to other
- * modules. 
+ * modules.
  *
  * \param name The name of the list.
  */
@@ -128,42 +132,26 @@
 
 
 
-#if (PACKETBUF_CONF_ATTRS_INLINE) //|| defined(__GNUC__)
-#define LIB_INLINES     1
-#else
-#define LIB_INLINES     0
-#endif
-
 /**
  * The linked list type.
  *
  */
 typedef void ** list_t;
 
-void   list_init(list_t list);
-#if !LIB_INLINES
-void * list_head(list_t list);
-void   list_copy(list_t dest, list_t src);
-#endif
-void * list_tail(list_t list);
-void * list_pop (list_t list);
-void   list_push(list_t list, void *item);
+/**
+ * Initialize a list.
+ *
+ * This function initalizes a list. The list will be empty after this
+ * function has been called.
+ *
+ * \param list The list to be initialized.
+ */
+static inline
+void   list_init(list_t list)
+{
+  *list = NULL;
+}
 
-void * list_chop(list_t list);
-
-void   list_add(list_t list, void *item);
-void   list_remove(list_t list, void *item);
-
-int    list_length(list_t list);
-
-void   list_insert(list_t list, void *previtem, void *newitem);
-
-void * list_item_next(void *item);
-
-#if LIB_INLINES
-#ifndef NULL
-#define NULL 0
-#endif
 /*---------------------------------------------------------------------------*/
 /**
  * Get a pointer to the first element of a list.
@@ -180,6 +168,14 @@ static inline
 void * list_head(list_t list)
 {
   return *list;
+}
+
+static inline
+void * list_item_next(void *item){
+    struct list {
+      struct list *next;
+    };
+    return item == NULL ? NULL : ((struct list *)item)->next;
 }
 /*---------------------------------------------------------------------------*/
 /**
@@ -199,7 +195,23 @@ void list_copy(list_t dest, list_t src)
 {
   *dest = *src;
 }
-#endif //LIB_INLINES
+
+void * list_tail(list_t list);
+void * list_pop (list_t list);
+void   list_push(list_t list, void *item);
+
+void * list_chop(list_t list);
+
+void   list_add(list_t list, void *item);
+// @return true - item was removed from list
+//         false - item not in list
+bool   list_remove(list_t list, void *item);
+
+int    list_length(list_t list);
+
+void   list_insert(list_t list, void *previtem, void *newitem);
+
+bool list_contains(list_t list, void *item);
 
 #endif /* LIST_H_ */
 

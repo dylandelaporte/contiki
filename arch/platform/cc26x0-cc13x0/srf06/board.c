@@ -36,6 +36,7 @@
  *  Board-initialisation for the Srf06EB with a CC13xx/CC26xx EM.
  */
 /*---------------------------------------------------------------------------*/
+#include "contiki.h"
 #include "ti-lib.h"
 #include "lpm.h"
 #include "prcm.h"
@@ -43,8 +44,6 @@
 
 #include <stdint.h>
 #include <string.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
 /*---------------------------------------------------------------------------*/
 static void
 lpm_handler(uint8_t mode)

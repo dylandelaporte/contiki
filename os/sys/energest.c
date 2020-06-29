@@ -37,17 +37,13 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
+#include "contiki.h"
 #include "sys/energest.h"
-#include "contiki-conf.h"
 
 #if ENERGEST_CONF_ON
 
-int energest_total_count;
-energest_t energest_total_time[ENERGEST_TYPE_MAX];
-rtimer_clock_t energest_current_time[ENERGEST_TYPE_MAX];
-#ifdef ENERGEST_CONF_LEVELDEVICE_LEVELS
-energest_t energest_leveldevice_current_leveltime[ENERGEST_CONF_LEVELDEVICE_LEVELS];
-#endif
+uint64_t energest_total_time[ENERGEST_TYPE_MAX];
+ENERGEST_TIME_T energest_current_time[ENERGEST_TYPE_MAX];
 unsigned char energest_current_mode[ENERGEST_TYPE_MAX];
 
 /*---------------------------------------------------------------------------*/
@@ -56,66 +52,51 @@ energest_init(void)
 {
   int i;
   for(i = 0; i < ENERGEST_TYPE_MAX; ++i) {
-    energest_total_time[i].current = energest_current_time[i] = 0;
+    energest_total_time[i] = energest_current_time[i] = 0;
     energest_current_mode[i] = 0;
   }
-#ifdef ENERGEST_CONF_LEVELDEVICE_LEVELS
-  for(i = 0; i < ENERGEST_CONF_LEVELDEVICE_LEVELS; ++i) {
-    energest_leveldevice_current_leveltime[i].current = 0;
-  }
-#endif
+  ENERGEST_ON(ENERGEST_TYPE_CPU);
 }
 /*---------------------------------------------------------------------------*/
-unsigned long
-energest_type_time(int type)
-{
-  /* Note: does not support ENERGEST_CONF_LEVELDEVICE_LEVELS! */
-#ifndef ENERGEST_CONF_LEVELDEVICE_LEVELS
-  if(energest_current_mode[type]) {
-    rtimer_clock_t now = RTIMER_NOW();
-    energest_total_time[type].current += (rtimer_clock_t)
-      (now - energest_current_time[type]);
-    energest_current_time[type] = now;
-  }
-#endif /* ENERGEST_CONF_LEVELDEVICE_LEVELS */
-  return energest_total_time[type].current;
-}
-/*---------------------------------------------------------------------------*/
-unsigned long
-energest_leveldevice_leveltime(int powerlevel)
-{
-#ifdef ENERGEST_CONF_LEVELDEVICE_LEVELS
-  return energest_leveldevice_current_leveltime[powerlevel].current;
-#else
-  return 0;
-#endif
-}
-/*---------------------------------------------------------------------------*/
-void
-energest_type_set(int type, unsigned long val)
-{
-  energest_total_time[type].current = val;
-}
-/*---------------------------------------------------------------------------*/
-/* Note: does not support ENERGEST_CONF_LEVELDEVICE_LEVELS! */
 void
 energest_flush(void)
 {
-  rtimer_clock_t now;
+  uint64_t now;
   int i;
   for(i = 0; i < ENERGEST_TYPE_MAX; i++) {
     if(energest_current_mode[i]) {
-      now = RTIMER_NOW();
-      energest_total_time[i].current += (rtimer_clock_t)
-	(now - energest_current_time[i]);
+      now = ENERGEST_CURRENT_TIME();
+      energest_total_time[i] +=
+        (ENERGEST_TIME_T)(now - energest_current_time[i]);
       energest_current_time[i] = now;
     }
   }
 }
 /*---------------------------------------------------------------------------*/
+uint64_t
+energest_get_total_time(void)
+{
+  return energest_type_time(ENERGEST_TYPE_CPU) +
+    energest_type_time(ENERGEST_TYPE_LPM) +
+    energest_type_time(ENERGEST_TYPE_DEEP_LPM);
+}
+/*---------------------------------------------------------------------------*/
 #else /* ENERGEST_CONF_ON */
-void energest_type_set(int type, unsigned long val) {}
-void energest_init(void) {}
-unsigned long energest_type_time(int type) { return 0; }
-void energest_flush(void) {}
+
+void
+energest_init(void)
+{
+}
+
+void
+energest_flush(void)
+{
+}
+
+uint64_t
+energest_get_total_time(void)
+{
+  return 0;
+}
+
 #endif /* ENERGEST_CONF_ON */

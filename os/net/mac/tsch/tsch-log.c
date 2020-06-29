@@ -40,6 +40,11 @@
  *
  */
 
+/**
+ * \addtogroup tsch
+ * @{
+*/
+
 #include "contiki.h"
 #include <stdio.h>
 #include "net/mac/tsch/tsch.h"
@@ -50,6 +55,7 @@
 #include "net/mac/tsch/tsch-schedule.h"
 #include "net/mac/tsch/tsch-slot-operation.h"
 #include "lib/ringbufindex.h"
+#include "sys/log.h"
 
 #if TSCH_LOG_LEVEL >= 1
 #undef DEBUG
@@ -71,8 +77,9 @@ PROCESS_NAME(tsch_pending_events_process);
 static struct ringbufindex log_ringbuf;
 static struct tsch_log_t log_array[TSCH_LOG_QUEUE_LEN];
 static int log_dropped = 0;
+static int log_active = 0;
 
-#define LOG_PRINTF(...) printf(__VA_ARGS__)
+#define LOG_PRINTF(...) LOG_OUTPUT(__VA_ARGS__)
 
 /*---------------------------------------------------------------------------*/
 /* Process pending log messages */
@@ -87,54 +94,59 @@ int tsch_log_process_pending(void)
   }
   if((log_index = ringbufindex_peek_get(&log_ringbuf)) != -1) {
     struct tsch_log_t *log = &log_array[log_index];
-    if(log->link == NULL) {
-        LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, log->asn.ls4b);
+    struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->slotframe_handle);
+    if(sf == NULL) {
+        LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, (unsigned long)log->asn.ls4b);
     } else {
-      struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->link->slotframe_handle);
-      LOG_PRINTF("TSCH: {asn-%x.%lx link-%u-%u-%u-%u ch-%u} ",
-             log->asn.ms1b, log->asn.ls4b,
-             log->link->slotframe_handle, sf ? sf->size.val : 0, log->link->timeslot, log->link->channel_offset,
-             tsch_calculate_channel(&log->asn, log->link->channel_offset));
+      LOG_PRINTF("TSCH: {asn-%x.%lx link-%u:%u*%u[%u+%u] ch%u} ",
+             log->asn.ms1b, (unsigned long)log->asn.ls4b,
+             log->slotframe_handle, sf ? sf->size.val : 0,
+             log->burst_count, log->timeslot, log->channel_offset,
+             log->channel);
     }
     switch(log->type) {
       case tsch_log_tx:
-          LOG_PRINTF("%s-%u-%u[%u] %u tx %x, st %d-%d",
-            log->tx.dest == 0 ? "bc" : "uc", log->tx.is_data
-            , log->tx.sec_level, log->tx.sec_key,
-                log->tx.datalen,
-                log->tx.dest,
-                log->tx.mac_tx_status, log->tx.num_tx);
+          LOG_PRINTF("%s-%u-%u[%u] tx ->",
+                  linkaddr_cmp(&log->tx.dest, &linkaddr_null) ? "bc" : "uc"
+                          , log->tx.is_data
+                          , log->tx.sec_level, log->tx.sec_key
+                          );
+          log_lladdr_compact(&log->tx.dest);
+          LOG_PRINTF(", len %3u, seq %3u, st %d %2d",
+                  log->tx.datalen, log->tx.seqno, log->tx.mac_tx_status, log->tx.num_tx);
         if(log->tx.drift_used) {
             LOG_PRINTF(", dr %d", log->tx.drift);
         }
         LOG_PRINTF("\n");
         break;
       case tsch_log_rx:
-          LOG_PRINTF("%s-%u-%u[%u] %u rx %x",
+          LOG_PRINTF("%s-%u-%u[%u] rx <-",
             log->rx.is_unicast == 0 ? "bc" : "uc", log->rx.is_data
-            , log->rx.sec_level,log->rx.sec_key,
-                log->rx.datalen,
-                log->rx.src);
+            , log->rx.sec_level,log->rx.sec_key
+            );
+          log_lladdr_compact(&log->rx.src);
+          LOG_PRINTF(", len %3u, seq %3u",
+                  log->rx.datalen, log->rx.seqno);
         if(log->rx.drift_used) {
             LOG_PRINTF(", dr %d", log->rx.drift);
         }
         LOG_PRINTF(", edr %d\n", (int)log->rx.estimated_drift);
         break;
       case tsch_log_message:
-          LOG_PRINTF("%s\n", log->message);
+          LOG_PRINTF("%.*s\n", sizeof(log->message), log->message);
         break;
       case tsch_log_text:
           LOG_PRINTF(log->text);
         break;
       case tsch_log_fmt:
           LOG_PRINTF(log->fmt.text
-                     , log->fmt.arg[1], log->fmt.arg[2], log->fmt.arg[3], log->fmt.arg[4]);
+                     , log->fmt.arg[0], log->fmt.arg[1], log->fmt.arg[2], log->fmt.arg[3]);
         break;
 
       case tsch_log_fmt8:
           LOG_PRINTF(log->fmt.text
-                     , log->fmt.arg[1], log->fmt.arg[2], log->fmt.arg[3], log->fmt.arg[4]
-                     , log->fmt.arg[5], log->fmt.arg[6], log->fmt.arg[7], log->fmt.arg[8]
+                     , log->fmt.arg[0], log->fmt.arg[1], log->fmt.arg[2], log->fmt.arg[3]
+                     , log->fmt.arg[4], log->fmt.arg[5], log->fmt.arg[6], log->fmt.arg[7]
                      );
         break;
 
@@ -174,8 +186,8 @@ int tsch_log_process_pending(void)
           break;
       case tsch_log_rx_drift:
        printf("RX : fantastic drift %ld = %lu[expect time] - %lu[rx time]\n"
-              , log->rx_drift.drift
-              , log->rx_drift.expect_us, log->rx_drift.start_us);
+              , (unsigned long)log->rx_drift.drift
+              , (unsigned long)log->rx_drift.expect_us, (unsigned long)log->rx_drift.start_us);
        break;
     }
     /* Remove input from ringbuf */
@@ -194,7 +206,17 @@ tsch_log_prepare_add(void)
   if(log_index != -1) {
     struct tsch_log_t *log = &log_array[log_index];
     log->asn = tsch_current_asn;
-    log->link = current_link;
+    if (current_link != NULL){
+    log->slotframe_handle   = current_link->slotframe_handle;
+    log->timeslot           = current_link->timeslot;
+    }
+    else {
+        log->slotframe_handle = -1;
+        log->timeslot         = -1;
+    }
+    log->burst_count    = tsch_current_burst_count;
+    log->channel        = tsch_current_channel;
+    log->channel_offset = tsch_current_channel_offset;
     return log;
   } else {
     log_dropped++;
@@ -206,15 +228,30 @@ tsch_log_prepare_add(void)
 void
 tsch_log_commit(void)
 {
-  ringbufindex_put(&log_ringbuf);
-  process_poll(&tsch_pending_events_process);
+  if(log_active == 1) {
+    ringbufindex_put(&log_ringbuf);
+    process_poll(&tsch_pending_events_process);
+  }
 }
 /*---------------------------------------------------------------------------*/
 /* Initialize log module */
 void
 tsch_log_init(void)
 {
-  ringbufindex_init(&log_ringbuf, TSCH_LOG_QUEUE_LEN);
+  if(log_active == 0) {
+    ringbufindex_init(&log_ringbuf, TSCH_LOG_QUEUE_LEN);
+    log_active = 1;
+  }
+}
+/*---------------------------------------------------------------------------*/
+/* Stop log module */
+void
+tsch_log_stop(void)
+{
+  if(log_active == 1) {
+    tsch_log_process_pending();
+    log_active = 0;
+  }
 }
 
 void tsch_log_puts(const char* txt){
@@ -224,19 +261,19 @@ void tsch_log_puts(const char* txt){
 void tsch_log_printf3(const char* fmt, int arg1, int arg2, int arg3){
     TSCH_LOG_ADD(tsch_log_fmt,
                  log->fmt.text = fmt;
-                 log->fmt.arg[1] = arg1;
-                 log->fmt.arg[2] = arg2;
-                 log->fmt.arg[3] = arg3;
+                 log->fmt.arg[0] = arg1;
+                 log->fmt.arg[1] = arg2;
+                 log->fmt.arg[2] = arg3;
                  );
 }
 
 void tsch_log_printf4(const char* fmt, int arg1, int arg2, int arg3, int arg4){
     TSCH_LOG_ADD(tsch_log_fmt,
                  log->fmt.text = fmt;
-                 log->fmt.arg[1] = arg1;
-                 log->fmt.arg[2] = arg2;
-                 log->fmt.arg[3] = arg3;
-                 log->fmt.arg[4] = arg4;
+                 log->fmt.arg[0] = arg1;
+                 log->fmt.arg[1] = arg2;
+                 log->fmt.arg[2] = arg3;
+                 log->fmt.arg[3] = arg4;
                  );
 }
 
@@ -245,14 +282,14 @@ void tsch_log_printf8(const char* fmt
                       , int arg5, int arg6, int arg7, int arg8){
     TSCH_LOG_ADD(tsch_log_fmt8,
                  log->fmt.text = fmt;
-                 log->fmt.arg[1] = arg1;
-                 log->fmt.arg[2] = arg2;
-                 log->fmt.arg[3] = arg3;
-                 log->fmt.arg[4] = arg4;
-                 log->fmt.arg[5] = arg5;
-                 log->fmt.arg[6] = arg6;
-                 log->fmt.arg[7] = arg7;
-                 log->fmt.arg[8] = arg8;
+                 log->fmt.arg[0] = arg1;
+                 log->fmt.arg[1] = arg2;
+                 log->fmt.arg[2] = arg3;
+                 log->fmt.arg[3] = arg4;
+                 log->fmt.arg[4] = arg5;
+                 log->fmt.arg[5] = arg6;
+                 log->fmt.arg[6] = arg7;
+                 log->fmt.arg[7] = arg8;
                  );
 }
 
@@ -270,3 +307,4 @@ void tsch_log_print_frame(const char* msg, frame802154_t *frame, const void* raw
 }
 
 #endif /* TSCH_LOG_LEVEL */
+/** @} */

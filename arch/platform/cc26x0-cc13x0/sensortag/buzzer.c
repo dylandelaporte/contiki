@@ -36,16 +36,14 @@
  *  Driver for the Sensortag Buzzer
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/buzzer.h"
-
+#include "contiki.h"
+#include "buzzer.h"
 #include "ti-lib.h"
 #include "lpm.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
 /*---------------------------------------------------------------------------*/
 static uint8_t buzzer_on;
 LPM_MODULE(buzzer_module, NULL, NULL, NULL, LPM_DOMAIN_PERIPH);

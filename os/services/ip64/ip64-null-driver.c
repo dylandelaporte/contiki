@@ -31,7 +31,7 @@
  */
 #include "contiki-net.h"
 
-#include "ip64-driver.h"
+#include "ip64/ip64-driver.h"
 /*---------------------------------------------------------------------------*/
 static void
 init(void)

@@ -36,17 +36,17 @@
  *  Sensortag-specific board initialisation driver
  */
 /*---------------------------------------------------------------------------*/
+#include "contiki.h"
 #include "lib/sensors.h"
+#include "buzzer.h"
 #include "lpm.h"
 #include "ti-lib.h"
+#include "board-peripherals.h"
+#include "board-i2c.h"
+
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-#include "../../cc26x0-cc13x0/sensortag/board-peripherals.h"
-#include "../../cc26x0-cc13x0/sensortag/buzzer.h"
 /*---------------------------------------------------------------------------*/
 static void
 power_domains_on(void)
@@ -146,7 +146,7 @@ board_init()
   buzzer_init();
 
   /* Make sure the external flash is in the lower power mode */
-  ext_flash_init();
+  ext_flash_init(NULL);
 
   lpm_register_module(&sensortag_module);
 

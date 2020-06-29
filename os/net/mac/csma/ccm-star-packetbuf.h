@@ -30,19 +30,12 @@
  *
  */
 
-/**
- * \file
- *         CCM* convenience functions for MAC security
- * \author
- *         Justin King-Lacroix <justin.kinglacroix@gmail.com>
- *         Konrad Krentz <konrad.krentz@gmail.com>
- */
-
 #ifndef CCM_STAR_PACKETBUF_H_
 #define CCM_STAR_PACKETBUF_H_
 
-#include "lib/ccm-star.h"
+#include <stdint.h>
 
+/*---------------------------------------------------------------------------*/
 void ccm_star_packetbuf_set_nonce(uint8_t *nonce, int forward);
 
 #endif /* CCM_STAR_PACKETBUF_H_ */

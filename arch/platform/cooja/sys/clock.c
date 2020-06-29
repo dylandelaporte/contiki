@@ -28,7 +28,7 @@
  *
  */
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "sys/clock.h"
 #include "lib/simEnvChange.h"
 
@@ -36,6 +36,7 @@ const struct simInterface clock_interface;
 
 // COOJA variables
 clock_time_t simCurrentTime;
+int         simCLOCK_SECOND = CLOCK_SECOND;
 
 /*-----------------------------------------------------------------------------------*/
 void
@@ -68,6 +69,7 @@ doInterfaceActionsBeforeTick(void)
 static void
 doInterfaceActionsAfterTick(void)
 {
+    (void)simCLOCK_SECOND;  //just to prevent garbage clenup
 }
 /*-----------------------------------------------------------------------------------*/
 

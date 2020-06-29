@@ -36,10 +36,9 @@
  *  Driver for the SmartRF06EB ALS when a CC13xx/CC26xxEM is mounted on it
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/srf06/als-sensor.h"
-
 #include "contiki.h"
 #include "lib/sensors.h"
+#include "srf06/als-sensor.h"
 #include "sys/timer.h"
 #include "dev/adc-sensor.h"
 #include "dev/aux-ctrl.h"
@@ -60,10 +59,10 @@ config(int type, int enable)
     ti_lib_ioc_pin_type_gpio_output(BOARD_IOID_ALS_PWR);
     break;
   case SENSORS_ACTIVE:
-    ti_lib_rom_ioc_pin_type_gpio_output(BOARD_IOID_ALS_PWR);
-    ti_lib_rom_ioc_port_configure_set(BOARD_IOID_ALS_OUT, IOC_PORT_GPIO,
-                                      IOC_STD_OUTPUT);
-    ti_lib_rom_ioc_pin_type_gpio_input(BOARD_IOID_ALS_OUT);
+    ti_lib_ioc_pin_type_gpio_output(BOARD_IOID_ALS_PWR);
+    ti_lib_ioc_port_configure_set(BOARD_IOID_ALS_OUT, IOC_PORT_GPIO,
+                                  IOC_STD_OUTPUT);
+    ti_lib_ioc_pin_type_gpio_input(BOARD_IOID_ALS_OUT);
 
     if(enable) {
       ti_lib_gpio_set_dio(BOARD_IOID_ALS_PWR);

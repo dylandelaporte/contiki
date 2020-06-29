@@ -1,8 +1,5 @@
-### Add to the source list
-BOARD_SOURCEFILES += leds-arch.c
-
 ### Will allow the inclusion of the correct CPU makefile
-CPU_FAMILY = cc13xx
+CPU_FAMILY = cc13x0
 
 ### Add to the source dirs
 CONTIKI_TARGET_DIRS += sensortag/cc1350

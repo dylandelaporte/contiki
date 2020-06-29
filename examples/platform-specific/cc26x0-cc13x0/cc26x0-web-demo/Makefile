@@ -1,24 +1,23 @@
-DEFINES+=PROJECT_CONF_H=\"project-conf.h\"
+CONTIKI_PROJECT = cc26x0-web-demo
+all: $(CONTIKI_PROJECT)
 
-all: cc26xx-web-demo
+PLATFORMS_ONLY = cc26x0-cc13x0
 
-REST_RESOURCES_DIR = ./resources
+MODULES_REL += ./resources
 
-REST_RESOURCES_FILES += res-leds.c res-toggle-leds.c res-device.c
-REST_RESOURCES_FILES += res-sensors.c res-ble-advd.c res-net.c
-
-PROJECTDIRS += $(REST_RESOURCES_DIR)
-PROJECT_SOURCEFILES += $(REST_RESOURCES_FILES)
-
-PROJECT_SOURCEFILES += cetic-6lbr-client.c coap-server.c net-uart.c mqtt-client.c
+PROJECT_SOURCEFILES += coap-server.c net-uart.c mqtt-client.c
 PROJECT_SOURCEFILES += httpd-simple.c
+
+ifeq ($(MAKE_ROUTING),MAKE_ROUTING_RPL_CLASSIC)
+# 6lbr only supports RPL Classic
+PROJECT_SOURCEFILES += cetic-6lbr-client.c
+endif
 
 CONTIKI_WITH_IPV6 = 1
 
-# REST Engine shall use Erbium CoAP implementation
-APPS += er-coap
-APPS += rest-engine
-APPS += mqtt
+CONTIKI=../../../..
 
-CONTIKI=../../..
+include $(CONTIKI)/Makefile.dir-variables
+MODULES += $(CONTIKI_NG_APP_LAYER_DIR)/mqtt $(CONTIKI_NG_APP_LAYER_DIR)/coap
+
 include $(CONTIKI)/Makefile.include

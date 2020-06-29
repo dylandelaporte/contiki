@@ -36,20 +36,18 @@
  *  Driver for the Sensortag TI TMP007 infrared thermophile sensor
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/tmp-007-sensor.h"
-
+#include "contiki.h"
 #include "lib/sensors.h"
+#include "tmp-007-sensor.h"
 #include "sys/ctimer.h"
+#include "board-i2c.h"
+#include "sensor-common.h"
 #include "ti-lib.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-#include "../../cc26x0-cc13x0/sensortag/sensor-common.h"
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
 #if DEBUG

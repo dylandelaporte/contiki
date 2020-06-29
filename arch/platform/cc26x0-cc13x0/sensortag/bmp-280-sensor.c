@@ -36,19 +36,17 @@
  *  Driver for the Sensortag BMP280 Altimeter / Pressure Sensor
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/bmp-280-sensor.h"
-
+#include "contiki.h"
 #include "lib/sensors.h"
+#include "bmp-280-sensor.h"
 #include "sys/ctimer.h"
+#include "sensor-common.h"
+#include "board-i2c.h"
 #include "ti-lib.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-#include "../../cc26x0-cc13x0/sensortag/sensor-common.h"
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
 #if DEBUG
@@ -121,9 +119,8 @@ typedef struct bmp_280_calibration {
   int16_t dig_p9;
   int32_t t_fine;
 } bmp_280_calibration_t;
-/*---------------------------------------------------------------------------*/
-#define CALIB_DATA_SIZE (sizeof(bmp_280_calibration_t))
-static uint8_t calibration_data[CALIB_DATA_SIZE];
+
+static bmp_280_calibration_t calibration_data;
 /*---------------------------------------------------------------------------*/
 #define SENSOR_STATUS_DISABLED     0
 #define SENSOR_STATUS_INITIALISED  1
@@ -167,7 +164,8 @@ init(void)
   select_on_bus();
 
   /* Read and store calibration data */
-  sensor_common_read_reg(ADDR_CALIB, calibration_data, CALIB_DATA_SIZE);
+  sensor_common_read_reg(ADDR_CALIB, (uint8_t *)&calibration_data,
+                         sizeof(calibration_data));
 
   /* Reset the sensor */
   val = VAL_RESET_EXECUTE;
@@ -229,7 +227,7 @@ static void
 convert(uint8_t *data, int32_t *temp, uint32_t *press)
 {
   int32_t utemp, upress;
-  bmp_280_calibration_t *p = (bmp_280_calibration_t *)calibration_data;
+  bmp_280_calibration_t *p = &calibration_data;
   int32_t v_x1_u32r;
   int32_t v_x2_u32r;
   int32_t temperature;

@@ -34,162 +34,76 @@
 
 #include "net/routing/rpl-classic/rpl.h"
 #include "net/routing/rpl-classic/rpl-private.h"
-#include "net/routing/rpl-classic/rpl-dag-root.h"
+#include "net/ipv6/uip-ds6-route.h"
+
+#include "sys/log.h"
 
 #include <string.h>
 
-#define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#define LOG_MODULE "RPL"
+#define LOG_LEVEL LOG_LEVEL_RPL
 
-#define RPL_DAG_GRACE_PERIOD (CLOCK_SECOND * 20 * 1)
-
-#if (UIP_CONF_MAX_ROUTES != 0)
-static struct uip_ds6_notification n;
-#endif /* (UIP_CONF_MAX_ROUTES != 0) */
-static uint8_t to_become_root;
-static struct ctimer c;
-/*---------------------------------------------------------------------------*/
-static const uip_ipaddr_t *
-dag_root(void)
-{
-  rpl_dag_t *dag;
-
-  dag = rpl_get_any_dag();
-  if(dag != NULL) {
-    return &dag->dag_id;
-  }
-
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
-static const uip_ipaddr_t *
-get_global_address(void)
-{
-  int i;
-  uint8_t state;
-  uip_ipaddr_t *ipaddr = NULL;
-
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       state == ADDR_PREFERRED &&
-       !uip_is_addr_linklocal(&uip_ds6_if.addr_list[i].ipaddr)) {
-      ipaddr = &uip_ds6_if.addr_list[i].ipaddr;
-    }
-  }
-  return ipaddr;
-}
 /*---------------------------------------------------------------------------*/
 static void
-create_dag_callback(void *ptr)
+set_global_address(uip_ipaddr_t *prefix, uip_ipaddr_t *iid)
 {
-  const uip_ipaddr_t *root, *ipaddr;
-
-  root = dag_root();
-  ipaddr = get_global_address();
-
-  if(root == NULL || uip_ipaddr_cmp(root, ipaddr)) {
-    /* The RPL network we are joining is one that we created, so we
-       become root. */
-    if(to_become_root) {
-      rpl_dag_root_init_dag_immediately();
-      to_become_root = 0;
-    }
-  } else {
-    rpl_dag_t *dag;
-
-    dag = rpl_get_any_dag();
-
-    PRINTF("RPL: Found a network we did not create\n");
-    PRINTF("RPL: version %d grounded %d preference %d used %d joined %d rank %d\n",
-           dag->version, dag->grounded,
-           dag->preference, dag->used,
-           dag->joined, dag->rank);
-
-    /* We found a RPL network that we did not create so we just join
-       it without becoming root. But if the network has an infinite
-       rank, we assume the network has broken, and we become the new
-       root of the network. */
-
-    if(dag->rank == INFINITE_RANK) {
-      if(to_become_root) {
-        rpl_dag_root_init_dag_immediately();
-        to_become_root = 0;
-      }
-    }
-
-    /* Try again after the grace period */
-    ctimer_set(&c, RPL_DAG_GRACE_PERIOD, create_dag_callback, NULL);
-  }
-}
-#if (UIP_CONF_MAX_ROUTES != 0)
-/*---------------------------------------------------------------------------*/
-static void
-route_callback(int event, uip_ipaddr_t *route, uip_ipaddr_t *ipaddr,
-               int numroutes)
-{
-  if(event == UIP_DS6_NOTIFICATION_DEFRT_ADD) {
-    if(route != NULL && ipaddr != NULL &&
-       !uip_is_addr_unspecified(route) &&
-       !uip_is_addr_unspecified(ipaddr)) {
-      if(to_become_root) {
-        ctimer_set(&c, 0, create_dag_callback, NULL);
-      }
-    }
-  }
-}
-#endif /* (UIP_CONF_MAX_ROUTES != 0) */
-/*---------------------------------------------------------------------------*/
-static uip_ipaddr_t *
-set_global_address(void)
-{
-  static uip_ipaddr_t ipaddr;
+  static uip_ipaddr_t root_ipaddr;
+  const uip_ipaddr_t *default_prefix;
   int i;
-  uint8_t state;
+
+  default_prefix = uip_ds6_default_prefix();
 
   /* Assign a unique local address (RFC4193,
      http://tools.ietf.org/html/rfc4193). */
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
-
-  printf("IPv6 addresses: ");
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-      uip_debug_ipaddr_print(&uip_ds6_if.addr_list[i].ipaddr);
-      printf("\n");
-    }
+  if(prefix == NULL) {
+    uip_ip6addr_copy(&root_ipaddr, default_prefix);
+  } else {
+    memcpy(&root_ipaddr, prefix, 8);
+  }
+  if(iid == NULL) {
+    uip_ds6_set_addr_iid(&root_ipaddr, &uip_lladdr);
+  } else {
+    memcpy(((uint8_t*)&root_ipaddr) + 8, ((uint8_t*)iid) + 8, 8);
   }
 
-  return &ipaddr;
+  uip_ds6_addr_add(&root_ipaddr, 0, ADDR_AUTOCONF);
+
+  if(LOG_DBG_ENABLED) {
+    uint8_t state;
+
+    LOG_DBG("IPv6 addresses: \n");
+    for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
+      state = uip_ds6_if.addr_list[i].state;
+      if(uip_ds6_if.addr_list[i].isused &&
+         (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
+        LOG_DBG("   - ");
+        LOG_DBG_6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
+        LOG_DBG_("\n");
+      }
+    }
+  }
 }
 /*---------------------------------------------------------------------------*/
 void
-rpl_dag_root_init(void)
+rpl_dag_root_set_prefix(uip_ipaddr_t *prefix, uip_ipaddr_t *iid)
 {
   static uint8_t initialized = 0;
 
   if(!initialized) {
-    to_become_root = 0;
-    set_global_address();
-#if (UIP_CONF_MAX_ROUTES != 0)
-    uip_ds6_notification_add(&n, route_callback);
-#endif /* (UIP_CONF_MAX_ROUTES != 0) */
+    set_global_address(prefix, iid);
     initialized = 1;
   }
 }
 /*---------------------------------------------------------------------------*/
 int
-rpl_dag_root_init_dag_immediately(void)
+rpl_dag_root_start(void)
 {
   struct uip_ds6_addr *root_if;
   int i;
   uint8_t state;
   uip_ipaddr_t *ipaddr = NULL;
 
-  rpl_dag_root_init();
+  rpl_dag_root_set_prefix(NULL, NULL);
 
   for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
     state = uip_ds6_if.addr_list[i].state;
@@ -205,45 +119,34 @@ rpl_dag_root_init_dag_immediately(void)
     if(root_if != NULL) {
       rpl_dag_t *dag;
       uip_ipaddr_t prefix;
+      const uip_ipaddr_t *default_prefix;
 
       rpl_set_root(RPL_DEFAULT_INSTANCE, ipaddr);
       dag = rpl_get_any_dag();
+      default_prefix = uip_ds6_default_prefix();
 
       /* If there are routes in this dag, we remove them all as we are
          from now on the new dag root and the old routes are wrong */
       if(RPL_IS_STORING(dag->instance)) {
         rpl_remove_routes(dag);
       }
-      if(dag->instance != NULL &&
-         dag->instance->def_route != NULL) {
-	uip_ds6_defrt_rm(dag->instance->def_route);
+      if(dag->instance != NULL && dag->instance->def_route != NULL) {
+        uip_ds6_defrt_rm(dag->instance->def_route);
         dag->instance->def_route = NULL;
       }
 
-      uip_ip6addr(&prefix, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+      uip_ip6addr_copy(&prefix, default_prefix);
       rpl_set_prefix(dag, &prefix, 64);
-      PRINTF("RPL: rpl_dag_root_init_dag: created a new RPL dag\n");
+      LOG_INFO("root_set_prefix: created a new RPL dag\n");
       return 0;
     } else {
-      PRINTF("RPL: rpl_dag_root_init_dag: failed to create a new RPL DAG\n");
+      LOG_ERR("root_set_prefix: failed to create a new RPL DAG\n");
       return -1;
     }
   } else {
-    PRINTF("RPL: rpl_dag_root_init_dag: failed to create a new RPL DAG, no preferred IP address found\n");
+    LOG_ERR("root_set_prefix_dag: failed to create a new RPL DAG, no preferred IP address found\n");
     return -2;
   }
-}
-/*---------------------------------------------------------------------------*/
-void
-rpl_dag_root_init_dag(void)
-{
-  rpl_dag_root_init();
-
-  ctimer_set(&c, RPL_DAG_GRACE_PERIOD, create_dag_callback, NULL);
-  to_become_root = 1;
-
-  /* Send a DIS packet to request RPL info from neighbors. */
-  dis_output(NULL);
 }
 /*---------------------------------------------------------------------------*/
 int

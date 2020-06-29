@@ -1,12 +1,14 @@
-DEFINES+=PROJECT_CONF_H=\"project-conf.h\"
-CONTIKI = ../..
+CONTIKI = ../../..
 
-all: test-cfs test-coffee example-coffee
+PLATFORMS_ONLY= cc2538dk zoul sky
+
+include $(CONTIKI)/Makefile.dir-variables
+
+MODULES += $(CONTIKI_NG_STORAGE_DIR)/cfs $(CONTIKI_NG_SERVICES_DIR)/unit-test
 
 CONTIKI_WITH_RIME = 1
 
-ifeq ($(TARGET),avr-raven)
-  COFFEE_FILES = 4
-endif
+CONTIKI_PROJECT = test-cfs test-coffee example-coffee
+all: $(CONTIKI_PROJECT)
 
 include $(CONTIKI)/Makefile.include

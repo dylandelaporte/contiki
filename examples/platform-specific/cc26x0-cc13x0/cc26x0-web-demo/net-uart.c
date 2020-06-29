@@ -28,7 +28,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /**
- * \addtogroup cc26xx-web-demo
+ * \addtogroup cc26x0-web-demo
  * @{
  *
  * \file
@@ -56,13 +56,13 @@
  *        nc -6u \<node IPv6 address\> REMOTE_PORT
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "sys/process.h"
 #include "dev/serial-line.h"
 #include "dev/cc26xx-uart.h"
-#include "net/ip/uip.h"
-#include "net/ip/uip-udp-packet.h"
-#include "net/ip/uiplib.h"
+#include "net/ipv6/uip.h"
+#include "net/ipv6/uip-udp-packet.h"
+#include "net/ipv6/uiplib.h"
 #include "net-uart.h"
 #include "httpd-simple.h"
 #include "sys/cc.h"
@@ -71,11 +71,12 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
 /*---------------------------------------------------------------------------*/
 #define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 /*---------------------------------------------------------------------------*/
 #define REMOTE_PORT  7777
 #define MAX_MSG_SIZE  100

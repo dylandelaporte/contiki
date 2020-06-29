@@ -147,7 +147,7 @@ update_clock_variable(void)
 #endif
 }
 /*---------------------------------------------------------------------------*/
-CCIF clock_time_t
+clock_time_t
 clock_time(void)
 {
   update_clock_variable();
@@ -165,7 +165,7 @@ clock_update(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-CCIF unsigned long
+unsigned long
 clock_seconds(void)
 {
   uint32_t secs_now;

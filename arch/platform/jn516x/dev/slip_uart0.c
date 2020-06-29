@@ -32,7 +32,7 @@
  * Machine dependent jn516x SLIP routines for UART0.
  */
 
-#include "contiki-conf.h"
+#include "contiki.h"
 #include "dev/slip.h"
 #include "dev/uart0.h"
 /*---------------------------------------------------------------------------*/
@@ -47,7 +47,7 @@ slip_arch_writeb(unsigned char c)
  *
  */
 void
-slip_arch_init(unsigned long ubr)
+slip_arch_init()
 {
   uart0_set_input(slip_input_byte);
 }

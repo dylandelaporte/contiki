@@ -28,8 +28,8 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "ip64.h"
-#include "ip64-special-ports.h"
+#include "ip64/ip64.h"
+#include "ip64/ip64-special-ports.h"
 
 #ifndef IP64_SPECIAL_PORTS_CONF_ENABLE
 #define EMPTY_DEFINITIONS 1

@@ -29,7 +29,7 @@
  *
  */
 /**
- * \addtogroup cc26xx-web-demo
+ * \addtogroup cc26x0-web-demo
  * @{
  *
  * \file
@@ -38,11 +38,12 @@
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "httpd-simple.h"
+#include "net/ipv6/uip-ds6-nbr.h"
 #include "net/ipv6/uip-ds6-route.h"
 #include "batmon-sensor.h"
 #include "lib/sensors.h"
 #include "lib/list.h"
-#include "cc26xx-web-demo.h"
+#include "cc26x0-web-demo.h"
 #include "mqtt-client.h"
 #include "net-uart.h"
 
@@ -136,10 +137,6 @@ PROCESS(httpd_simple_process, "CC26XX Web Server");
 /*---------------------------------------------------------------------------*/
 #define REQUEST_TYPE_GET  1
 #define REQUEST_TYPE_POST 2
-/*---------------------------------------------------------------------------*/
-/* Temporary buffer for holding escaped HTML used by html_escape_quotes */
-#define HTML_ESCAPED_BUFFER_SIZE 128
-static char html_escaped_buf[HTML_ESCAPED_BUFFER_SIZE];
 /*---------------------------------------------------------------------------*/
 static const char *NOT_FOUND = "<html><body bgcolor=\"white\">"
                                "<center>"
@@ -309,31 +306,6 @@ url_unescape(const char *src, size_t srclen, char *dst, size_t dstlen)
   return i == srclen;
 }
 /*---------------------------------------------------------------------------*/
-static char*
-html_escape_quotes(const char *src, size_t srclen)
-{
-  size_t srcpos, dstpos;
-  memset(html_escaped_buf, 0, HTML_ESCAPED_BUFFER_SIZE);
-  for(srcpos = dstpos = 0;
-      srcpos < srclen && dstpos < HTML_ESCAPED_BUFFER_SIZE - 1; srcpos++) {
-    if(src[srcpos] == '\0') {
-      break;
-    } else if(src[srcpos] == '"') {
-      if(dstpos + 7 > HTML_ESCAPED_BUFFER_SIZE) {
-        break;
-      }
-
-      strcpy(&html_escaped_buf[dstpos], "&quot;");
-      dstpos += 6;
-    } else {
-      html_escaped_buf[dstpos++] = src[srcpos];
-    }
-  }
-
-  html_escaped_buf[HTML_ESCAPED_BUFFER_SIZE - 1] = '\0';
-  return html_escaped_buf;
-}
-/*---------------------------------------------------------------------------*/
 void
 httpd_simple_register_post_handler(httpd_simple_post_handler_t *h)
 {
@@ -465,8 +437,8 @@ PT_THREAD(generate_index(struct httpd_state *s))
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, SECTION_OPEN "Neighbors" CONTENT_OPEN));
 
-  for(s->nbr = nbr_table_head(ds6_neighbors); s->nbr != NULL;
-      s->nbr = nbr_table_next(ds6_neighbors, s->nbr)) {
+  for(s->nbr = uip_ds6_nbr_head(); s->nbr != NULL;
+      s->nbr = uip_ds6_nbr_next(s->nbr)) {
 
     PT_WAIT_THREAD(&s->generate_pt, enqueue_chunk(s, 0, "\n"));
 
@@ -704,9 +676,7 @@ PT_THREAD(generate_mqtt_config(struct httpd_state *s))
                                config_div_right));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "value=\"%s\" ",
-                               html_escape_quotes(
-                               cc26xx_web_demo_config.mqtt_config.type_id,
-                               MQTT_CLIENT_CONFIG_TYPE_ID_LEN)));
+                               cc26xx_web_demo_config.mqtt_config.type_id));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "name=\"type_id\">%s", config_div_close));
 
@@ -718,9 +688,7 @@ PT_THREAD(generate_mqtt_config(struct httpd_state *s))
                                config_div_right));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "value=\"%s\" ",
-                               html_escape_quotes(
-                               cc26xx_web_demo_config.mqtt_config.org_id,
-                               MQTT_CLIENT_CONFIG_ORG_ID_LEN)));
+                               cc26xx_web_demo_config.mqtt_config.org_id));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "name=\"org_id\">%s", config_div_close));
 
@@ -744,9 +712,7 @@ PT_THREAD(generate_mqtt_config(struct httpd_state *s))
                                config_div_right));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "value=\"%s\" ",
-                               html_escape_quotes(
-                               cc26xx_web_demo_config.mqtt_config.cmd_type,
-                               MQTT_CLIENT_CONFIG_CMD_TYPE_LEN)));
+                               cc26xx_web_demo_config.mqtt_config.cmd_type));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "name=\"cmd_type\">%s",
                                config_div_close));
@@ -759,9 +725,7 @@ PT_THREAD(generate_mqtt_config(struct httpd_state *s))
                                config_div_right));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "value=\"%s\" ",
-                               html_escape_quotes(
-                               cc26xx_web_demo_config.mqtt_config.event_type_id,
-                               MQTT_CLIENT_CONFIG_EVENT_TYPE_ID_LEN)));
+                               cc26xx_web_demo_config.mqtt_config.event_type_id));
   PT_WAIT_THREAD(&s->generate_pt,
                  enqueue_chunk(s, 0, "name=\"event_type_id\">%s",
                                config_div_close));

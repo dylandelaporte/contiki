@@ -328,8 +328,6 @@ static struct timer suppressTimer1, suppressTimer2;
 
 ISR(PORT1, port1_isr)
 {
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
-
   /* ADXL345_IFG.x goes high when interrupt occurs, use to check what
    * interrupted
    */
@@ -357,7 +355,6 @@ ISR(PORT1, port1_isr)
       LPM4_EXIT;
     }
   }
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 static int

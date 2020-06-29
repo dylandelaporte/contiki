@@ -36,17 +36,47 @@
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#ifndef ER_COAP_CONF_H_
-#define ER_COAP_CONF_H_
+/**
+ * \addtogroup coap
+ * @{
+ */
+
+#ifndef COAP_CONF_H_
+#define COAP_CONF_H_
+
+#include "contiki.h"
+
+/*
+ * The maximum buffer size that is provided for resource responses and must be
+ * respected due to the limited IP buffer.  Larger data must be handled by the
+ * resource and will be sent chunk-wise through a TCP stream or CoAP blocks.
+ */
+#ifndef COAP_MAX_CHUNK_SIZE
+#ifdef REST_MAX_CHUNK_SIZE
+#define COAP_MAX_CHUNK_SIZE REST_MAX_CHUNK_SIZE
+#else /* REST_MAX_CHUNK_SIZE */
+#define COAP_MAX_CHUNK_SIZE     64
+#endif /* REST_MAX_CHUNK_SIZE */
+#endif /* COAP_MAX_CHUNK_SIZE */
+
+/* Define REST_MAX_CHUNK_SIZE for backward compatibility */
+#ifndef REST_MAX_CHUNK_SIZE
+#define REST_MAX_CHUNK_SIZE COAP_MAX_CHUNK_SIZE
+#endif /* REST_MAX_CHUNK_SIZE */
 
 /* Features that can be disabled to achieve smaller memory footprint */
+#ifndef COAP_LINK_FORMAT_FILTERING
 #define COAP_LINK_FORMAT_FILTERING     0
+#endif /* COAP_LINK_FORMAT_FILTERING */
+
+#ifndef COAP_PROXY_OPTION_PROCESSING
 #define COAP_PROXY_OPTION_PROCESSING   0
+#endif /* COAP_PROXY_OPTION_PROCESSING */
 
 /* Listening port for the CoAP REST Engine */
 #ifndef COAP_SERVER_PORT
 #define COAP_SERVER_PORT               COAP_DEFAULT_PORT
-#endif
+#endif /* COAP_SERVER_PORT */
 
 /* The number of concurrent messages that can be stored for retransmission in the transaction layer. */
 #ifndef COAP_MAX_OPEN_TRANSACTIONS
@@ -69,6 +99,18 @@
 #endif /* COAP_MAX_OBSERVERS */
 
 /* Interval in notifies in which NON notifies are changed to CON notifies to check client. */
+#ifdef COAP_CONF_OBSERVE_REFRESH_INTERVAL
+#define COAP_OBSERVE_REFRESH_INTERVAL COAP_CONF_OBSERVE_REFRESH_INTERVAL
+#else
 #define COAP_OBSERVE_REFRESH_INTERVAL  20
+#endif /* COAP_OBSERVE_REFRESH_INTERVAL */
 
-#endif /* ER_COAP_CONF_H_ */
+/* Maximal length of observable URL */
+#ifdef COAP_CONF_OBSERVER_URL_LEN
+#define COAP_OBSERVER_URL_LEN COAP_CONF_OBSERVER_URL_LEN
+#else
+#define COAP_OBSERVER_URL_LEN 20
+#endif
+
+#endif /* COAP_CONF_H_ */
+/** @} */

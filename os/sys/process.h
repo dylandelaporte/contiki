@@ -31,14 +31,14 @@
  */
 
 /**
- * \addtogroup sys
+ * \addtogroup threads
  * @{
  */
 
 /**
  * \defgroup process Contiki processes
  *
- * A process in Contiki consists of a single \ref pt "protothread".
+ * A process in Contiki consists of a single protothread.
  *
  * @{
  */
@@ -271,7 +271,7 @@ typedef unsigned char process_num_events_t;
  * \hideinitializer
  */
 #define PROCESS_THREAD(name, ev, data) 				\
-static PT_THREAD(process_thread_##name(struct pt *process_pt,	\
+PT_THREAD(process_thread_##name(struct pt *process_pt,	\
 				       process_event_t ev,	\
 				       process_data_t data))
 
@@ -339,7 +339,7 @@ struct process {
  * process
  *
  */
-CCIF void process_start(struct process *p, process_data_t data);
+void process_start(struct process *p, process_data_t data);
 
 /**
  * Post an asynchronous event.
@@ -362,12 +362,12 @@ CCIF void process_start(struct process *p, process_data_t data);
  * \retval PROCESS_ERR_FULL The event queue was full and the event could
  * not be posted.
  */
-CCIF int process_post(struct process *p, process_event_t ev, process_data_t data);
+int process_post(struct process *p, process_event_t ev, process_data_t data);
 
 /**
  * \brief Helper function for PROCESS_PAUSE
  */
-CCIF void process_post_pause(void);
+void process_post_pause(void);
 
 /**
  * Post a synchronous event to a process.
@@ -379,8 +379,8 @@ CCIF void process_post_pause(void);
  * \param data A pointer to additional data that is posted together
  * with the event.
  */
-CCIF void process_post_synch(struct process *p,
-			     process_event_t ev, process_data_t data);
+void process_post_synch(struct process *p,
+                        process_event_t ev, process_data_t data);
 
 /**
  * \brief      Cause a process to exit
@@ -392,7 +392,7 @@ CCIF void process_post_synch(struct process *p,
  *
  * \sa PROCESS_CURRENT()
  */
-CCIF void process_exit(struct process *p);
+void process_exit(struct process *p);
 
 /**
  * \brief Makes status of current process not running, for silent process exiting
@@ -402,7 +402,7 @@ CCIF void process_exit(struct process *p);
  *       such notification can be useless and wasteful. so process_abort can
  *       mark process alredy stops, to block notification in process_exit
  * */
-CCIF void process_abort(void);
+void process_abort(void);
 
 #define PROCESS_ABORT()             process_abort()
 
@@ -416,7 +416,7 @@ CCIF void process_abort(void);
  * \hideinitializer
  */
 #define PROCESS_CURRENT() process_current
-CCIF extern struct process *process_current;
+extern struct process *process_current;
 
 /**
  * Switch context to another process
@@ -466,7 +466,7 @@ process_current = p
  * \note       There currently is no way to deallocate an allocated event
  *             number.
  */
-CCIF process_event_t process_alloc_event(void);
+process_event_t process_alloc_event(void);
 
 /** @} */
 
@@ -483,7 +483,7 @@ CCIF process_event_t process_alloc_event(void);
  *
  * \param p A pointer to the process' process structure.
  */
-CCIF void process_poll(struct process *p);
+void process_poll(struct process *p);
 
 /** @} */
 
@@ -525,7 +525,7 @@ int process_run(void);
  * \retval Non-zero if the process is running.
  * \retval Zero if the process is not running.
  */
-CCIF int process_is_running(struct process *p);
+int process_is_running(struct process *p);
 
 /**
  *  Number of events waiting to be processed.
@@ -537,7 +537,7 @@ int process_nevents(void);
 
 /** @} */
 
-CCIF extern struct process *process_list;
+extern struct process *process_list;
 
 #define PROCESS_LIST() process_list
 

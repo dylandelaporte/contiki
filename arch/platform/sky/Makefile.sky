@@ -2,16 +2,9 @@
 
 CONTIKI_TARGET_SOURCEFILES += contiki-sky-platform.c \
 	sht11.c sht11-sensor.c light-sensor.c battery-sensor.c \
-	button-sensor.c radio-sensor.c
+	button-sensor.c
 
-ifndef SMALL
-SMALL=1
-endif
+include $(CONTIKI_NG_RELOC_PLATFORM_DIR)/sky/Makefile.common
 
-include $(CONTIKI)/platform/sky/Makefile.common
-
-MODULES += core/net/mac \
-           core/net \
-           core/net/mac/contikimac core/net/mac/cxmac \
-           core/net/llsec core/net/llsec/noncoresec \
-           dev/cc2420 dev/sht11 dev/ds2411
+MODULES += $(CONTIKI_NG_DRIVERS_DIR)/cc2420 $(CONTIKI_NG_DRIVERS_DIR)/sht11
+MODULES += $(CONTIKI_NG_DRIVERS_DIR)/ds2411 $(CONTIKI_NG_STORAGE_DIR)/cfs

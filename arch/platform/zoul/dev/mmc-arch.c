@@ -30,6 +30,7 @@
  */
 /**
  * \addtogroup mmc-arch
+ * \ingroup zoul
  * @{
  *
  * \file
@@ -38,10 +39,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "spi-arch.h"
+#include "dev/spi-arch-legacy.h"
 #include "dev/ioc.h"
 #include "dev/gpio.h"
-#include "dev/spi.h"
+#include "dev/spi-legacy.h"
 #include "mmc-arch.h"
 
 #define USD_SEL_PORT_BASE       GPIO_PORT_TO_BASE(USD_SEL_PORT)
@@ -122,7 +123,7 @@ mmc_arch_spi_xfer(uint8_t dev, const void *tx_buf, size_t tx_cnt,
       SPIX_BUF(USD_SPI_INSTANCE) = *tx_buf_u8++;
       tx_cnt--;
     } else {
-      SPIX_BUF(USD_SPI_INSTANCE) = 0;
+      SPIX_BUF(USD_SPI_INSTANCE) = 0xff;
     }
     SPIX_WAITFOREOTx(USD_SPI_INSTANCE);
     SPIX_WAITFOREORx(USD_SPI_INSTANCE);

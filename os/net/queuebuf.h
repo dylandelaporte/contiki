@@ -32,18 +32,18 @@
 
 /**
  * \file
- *         Header file for the Rime queue buffer management
+ *         Header file for the Packet queue buffer management
  * \author
  *         Adam Dunkels <adam@sics.se>
  */
 
 /**
- * \addtogroup rime
+ * \addtogroup net
  * @{
  */
 
 /**
- * \defgroup rimequeuebuf Rime queue buffer management
+ * \defgroup queuebuf Packet buffer queue
  * @{
  *
  * The queuebuf module handles buffers that are queued.
@@ -54,6 +54,12 @@
 #define QUEUEBUF_H_
 
 #include "net/packetbuf.h"
+
+#ifdef QUEUEBUF_CONF_ENABLED
+#define QUEUEBUF_ENABLED QUEUEBUF_CONF_ENABLED
+#else /* QUEUEBUF_CONF_ENABLED */
+#define QUEUEBUF_ENABLED 1
+#endif /* QUEUEBUF_CONF_ENABLED */
 
 /* QUEUEBUF_NUM is the total number of queuebuf */
 #ifdef QUEUEBUF_CONF_NUM

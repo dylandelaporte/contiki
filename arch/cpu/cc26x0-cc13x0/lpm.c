@@ -176,7 +176,9 @@ lpm_shutdown(uint32_t wakeup_pin, uint32_t io_pull, uint32_t wake_on)
   ti_lib_aon_wuc_mcu_power_off_config(MCU_VIRT_PWOFF_DISABLE);
 
   /* Latch the IOs in the padring and enable I/O pad sleep mode */
-  ti_lib_pwr_ctrl_io_freeze_enable();
+  ti_lib_aon_ioc_freeze_enable();
+  HWREG(AON_SYSCTL_BASE + AON_SYSCTL_O_SLEEPCTL) = 0;
+  ti_lib_sys_ctrl_aon_sync();
 
   /* Turn off VIMS cache, CRAM and TRAM - possibly not required */
   ti_lib_prcm_cache_retention_disable();
@@ -199,9 +201,7 @@ wake_up(void)
 {
   lpm_registered_module_t *module;
 
-  /* Remember IRQ energest for next pass */
-  ENERGEST_IRQ_SAVE(irq_energest);
-  ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
+  ENERGEST_SWITCH(ENERGEST_TYPE_DEEP_LPM, ENERGEST_TYPE_CPU);
 
   /* Sync so that we get the latest values before adjusting recharge settings */
   ti_lib_sys_ctrl_aon_sync();
@@ -393,16 +393,13 @@ lpm_sleep(void)
 {
   ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_LPM);
 
-  /* We are only interested in IRQ energest while idle or in LPM */
-  ENERGEST_IRQ_RESTORE(irq_energest);
-
   /* Just to be on the safe side, explicitly disable Deep Sleep */
   HWREG(NVIC_SYS_CTRL) &= ~(NVIC_SYS_CTRL_SLEEPDEEP);
 
   ti_lib_prcm_sleep();
 
-  /* Remember IRQ energest for next pass */
-  ENERGEST_IRQ_SAVE(irq_energest);
+  /* Kick watchdog to ensure a full interval is available after sleep */
+  watchdog_periodic();
 
   ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
 }
@@ -509,9 +506,7 @@ deep_sleep(void)
     ti_lib_pwr_ctrl_source_set(PWRCTRL_PWRSRC_ULDO);
   }
 
-  /* We are only interested in IRQ energest while idle or in LPM */
-  ENERGEST_IRQ_RESTORE(irq_energest);
-  ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_LPM);
+  ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_DEEP_LPM);
 
   /* Sync the AON interface to ensure all writes have gone through. */
   ti_lib_sys_ctrl_aon_sync();

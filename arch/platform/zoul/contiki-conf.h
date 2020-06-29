@@ -29,10 +29,10 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /**
- * \addtogroup zoul
+ * \addtogroup zoul-core
  * @{
  *
- * \defgroup zoul-platforms Zolertia platforms based on the Zoul core module
+ * \defgroup zoul-platforms Zolertia Zoul platforms
  *
  * The Zoul allows a fast reuse and easy integration to most applications and
  * products.  Its small size and module format eases to place in different PCB
@@ -47,41 +47,33 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <inttypes.h>
 /*---------------------------------------------------------------------------*/
 /* Include Project Specific conf */
-#ifdef PROJECT_CONF_H
-#include PROJECT_CONF_H
-#endif /* PROJECT_CONF_H */
+#ifdef PROJECT_CONF_PATH
+#include PROJECT_CONF_PATH
+#endif /* PROJECT_CONF_PATH */
 /*---------------------------------------------------------------------------*/
-/**
- * \name Compiler configuration and platform-specific type definitions
- *
- * Those values are not meant to be modified by the user
- * @{
- */
-#define CLOCK_CONF_SECOND 128
+#include "cc2538-def.h"
 
-/* Compiler configurations */
-#define CCIF
-#define CLIF
+unsigned radio_phy_overhead(void);
+unsigned radio_byte_air_time(void);
+unsigned radio_delay_before_tx(void);
+unsigned radio_delay_before_rx(void);
+unsigned radio_delay_before_detect(void);
+uint16_t *radio_tsch_timeslot_timing(void);
 
-/* Platform typedefs */
-typedef uint32_t clock_time_t;
-typedef uint32_t uip_stats_t;
-
-/*
- * rtimer.h typedefs rtimer_clock_t as unsigned short. We need to define
- * RTIMER_CLOCK_DIFF to override this
- */
-typedef uint32_t rtimer_clock_t;
-#define RTIMER_CLOCK_DIFF(a, b)     ((int32_t)((a) - (b)))
 /** @} */
 /*---------------------------------------------------------------------------*/
-/* 352us from calling transmit() until the SFD byte has been sent */
-#define RADIO_DELAY_BEFORE_TX     ((unsigned)US_TO_RTIMERTICKS(352))
-/* 192us as in datasheet but ACKs are not always received, so adjusted to 250us */
-#define RADIO_DELAY_BEFORE_RX     ((unsigned)US_TO_RTIMERTICKS(250))
-#define RADIO_DELAY_BEFORE_DETECT 0
+
+#define RADIO_PHY_OVERHEAD        radio_phy_overhead()
+#define RADIO_BYTE_AIR_TIME       radio_byte_air_time()
+#define RADIO_DELAY_BEFORE_TX     radio_delay_before_tx()
+#define RADIO_DELAY_BEFORE_RX     radio_delay_before_rx()
+#define RADIO_DELAY_BEFORE_DETECT radio_delay_before_detect()
+
+#define TSCH_CONF_DEFAULT_TIMESLOT_TIMING   radio_tsch_timeslot_timing()
+
 /*---------------------------------------------------------------------------*/
 /**
  * \name Serial Boot Loader Backdoor configuration
@@ -111,254 +103,32 @@ typedef uint32_t rtimer_clock_t;
 #endif
 /** @} */
 /*---------------------------------------------------------------------------*/
-/**
- * \name CFS configuration
- *
- * @{
- */
-#ifndef COFFEE_CONF_SIZE
-#define COFFEE_CONF_SIZE            (4 * COFFEE_SECTOR_SIZE)
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name Watchdog Timer configuration
- *
- * @{
- */
-#ifndef WATCHDOG_CONF_ENABLE
-#define WATCHDOG_CONF_ENABLE        1 /**< Enable the watchdog timer */
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name USB 'core' configuration
- *
- * Those values are not meant to be modified by the user, except where stated
- * otherwise
- * @{
- */
-#define CTRL_EP_SIZE                8
-#define USB_EP1_SIZE               32
-#define USB_EP2_SIZE               64
-#define USB_EP3_SIZE               64
-#define USB_ARCH_WRITE_NOTIFY       0
-
-#ifndef USB_ARCH_CONF_DMA
-#define USB_ARCH_CONF_DMA           1 /**< Change to Enable/Disable USB DMA */
-
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name Generic Configuration directives
- *
- * @{
- */
-#ifndef ENERGEST_CONF_ON
-#define ENERGEST_CONF_ON            0 /**< Energest Module */
-#endif
-
-#ifndef STARTUP_CONF_VERBOSE
-#define STARTUP_CONF_VERBOSE        1 /**< Set to 0 to decrease startup verbosity */
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name uDMA Configuration and channel allocations
- *
- * @{
- */
-#define USB_ARCH_CONF_RX_DMA_CHAN   0 /**< USB -> RAM DMA channel */
-#define USB_ARCH_CONF_TX_DMA_CHAN   1 /**< RAM -> USB DMA channel */
-#define CC2538_RF_CONF_TX_DMA_CHAN  2 /**< RF -> RAM DMA channel */
-#define CC2538_RF_CONF_RX_DMA_CHAN  3 /**< RAM -> RF DMA channel */
-#define UDMA_CONF_MAX_CHANNEL       CC2538_RF_CONF_RX_DMA_CHAN
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name Character I/O Configuration
- *
- * @{
- */
-#ifndef UART_CONF_ENABLE
-#define UART_CONF_ENABLE            1 /**< Enable/Disable UART I/O */
-#endif
-
-#ifndef UART0_CONF_BAUD_RATE
-#define UART0_CONF_BAUD_RATE   115200 /**< Default UART0 baud rate */
-#endif
-
-#ifndef UART1_CONF_BAUD_RATE
-#define UART1_CONF_BAUD_RATE   115200 /**< Default UART1 baud rate */
-#endif
-
-#ifndef SLIP_ARCH_CONF_USB
-#define SLIP_ARCH_CONF_USB          0 /**< SLIP over UART by default */
-#endif
-
-#ifndef DBG_CONF_USB
-#define DBG_CONF_USB                0 /**< All debugging over UART by default */
-#endif
-
-#ifndef SERIAL_LINE_CONF_UART
-#define SERIAL_LINE_CONF_UART       0 /**< UART to use with serial line */
-#endif
-
-#if !SLIP_ARCH_CONF_USB
-#ifndef SLIP_ARCH_CONF_UART
-#define SLIP_ARCH_CONF_UART         0 /**< UART to use with SLIP */
-#endif
-#endif
-
-#if !DBG_CONF_USB
-#ifndef DBG_CONF_UART
-#define DBG_CONF_UART               0 /**< UART to use for debugging */
-#endif
-#endif
-
-#ifndef UART1_CONF_UART
-#define UART1_CONF_UART             0 /**< UART to use for examples relying on
-                                           the uart1_* API */
-#endif
-
-/* Turn off example-provided putchars */
-#define SLIP_BRIDGE_CONF_NO_PUTCHAR 1
-#define SLIP_RADIO_CONF_NO_PUTCHAR  1
-
-#ifndef SLIP_ARCH_CONF_ENABLED
-/*
- * Determine whether we need SLIP
- * This will keep working while UIP_FALLBACK_INTERFACE and CMD_CONF_OUTPUT
- * keep using SLIP
- */
-#if defined(UIP_FALLBACK_INTERFACE) || defined(CMD_CONF_OUTPUT)
-#define SLIP_ARCH_CONF_ENABLED      1
-#endif
-#endif
-
-/**
- * \brief Define this as 1 to build a headless node.
- *
- * The UART will not be initialised its clock will be gated, offering some
- * energy savings. The USB will not be initialised either
- */
-#ifndef CC2538_CONF_QUIET
-#define CC2538_CONF_QUIET           0
-#endif
-
-/* CC2538_CONF_QUIET is hard and overrides all other related defines */
-#if CC2538_CONF_QUIET
-#undef USB_SERIAL_CONF_ENABLE
-#define USB_SERIAL_CONF_ENABLE      0
-
-#undef UART_CONF_ENABLE
-#define UART_CONF_ENABLE            0
-
-#undef STARTUP_CONF_VERBOSE
-#define STARTUP_CONF_VERBOSE        0
-#endif /* CC2538_CONF_QUIET */
-
-/**
- * \brief Enable the USB core only if we need it
- */
-#ifndef USB_SERIAL_CONF_ENABLE
-#define USB_SERIAL_CONF_ENABLE \
-  ((SLIP_ARCH_CONF_USB & SLIP_ARCH_CONF_ENABLED) | \
-   DBG_CONF_USB)
-#endif
-
-/*
- * If debugging and SLIP use the same peripheral, this will be 1. Don't modify
- * this
- */
-#if SLIP_ARCH_CONF_ENABLED
-#define DBG_CONF_SLIP_MUX (SLIP_ARCH_CONF_USB == DBG_CONF_USB && \
-                           (SLIP_ARCH_CONF_USB || \
-                            SLIP_ARCH_CONF_UART == DBG_CONF_UART))
-#endif
-
-/*
- * Automatic detection of whether a specific UART is in use
- */
-#define UART_IN_USE_BY_SERIAL_LINE(u) (SERIAL_LINE_CONF_UART == (u))
-#define UART_IN_USE_BY_SLIP(u)        (SLIP_ARCH_CONF_ENABLED && \
-                                       !SLIP_ARCH_CONF_USB && \
-                                       SLIP_ARCH_CONF_UART == (u))
-#define UART_IN_USE_BY_DBG(u)         (!DBG_CONF_USB && DBG_CONF_UART == (u))
-#define UART_IN_USE_BY_UART1(u)       (UART1_CONF_UART == (u))
-
-#define UART_IN_USE(u) ( \
-  UART_CONF_ENABLE && \
-  (UART_IN_USE_BY_SERIAL_LINE(u) || \
-   UART_IN_USE_BY_SLIP(u) || \
-   UART_IN_USE_BY_DBG(u) || \
-   UART_IN_USE_BY_UART1(u)) \
-)
-/** @} */
-/*---------------------------------------------------------------------------*/
 /* board.h assumes that basic configuration is done */
 #include "board.h"
+
+#define PLATFORM_SUPPORTS_BUTTON_HAL PLATFORM_HAS_BUTTON
 /*---------------------------------------------------------------------------*/
 /**
- * \name Network Stack Configuration
+ * \name Radio Configuration
  *
  * @{
  */
-#ifndef NETSTACK_CONF_NETWORK
-#if NETSTACK_CONF_WITH_IPV6
-#define NETSTACK_CONF_NETWORK sicslowpan_driver
-#else
-#define NETSTACK_CONF_NETWORK rime_driver
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-#endif /* NETSTACK_CONF_NETWORK */
-
-#ifndef NETSTACK_CONF_MAC
-#define NETSTACK_CONF_MAC     csma_driver
+#ifndef ZOUL_CONF_USE_CC1200_RADIO
+#define ZOUL_CONF_USE_CC1200_RADIO 0
 #endif
 
-#ifndef NETSTACK_CONF_RDC
-#define NETSTACK_CONF_RDC     contikimac_driver
+#if ZOUL_CONF_USE_CC1200_RADIO
+#define NETSTACK_CONF_RADIO                           cc1200_driver
+#define ANTENNA_SW_SELECT_DEF_CONF                    ANTENNA_SW_SELECT_SUBGHZ
+#define CC1200_CONF_USE_GPIO2                         0
+#define CC1200_CONF_USE_RX_WATCHDOG                   0
+
+#define CSMA_CONF_ACK_WAIT_TIME                       (RTIMER_SECOND / 200)
+#define CSMA_CONF_AFTER_ACK_DETECTED_WAIT_TIME        (RTIMER_SECOND / 1500)
+
+#ifndef CC1200_CONF_RF_CFG
+#define CC1200_CONF_RF_CFG                   cc1200_802154g_863_870_fsk_50kbps
 #endif
-
-/* Configure NullRDC for when it's selected */
-#define NULLRDC_CONF_802154_AUTOACK             1
-#define NULLRDC_CONF_802154_AUTOACK_HW			    1
-
-/* Configure ContikiMAC for when it's selected */
-#define CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION 0
-#define WITH_FAST_SLEEP                         1
-
-#ifndef NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE
-#define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE    8
-#endif
-
-#ifndef NETSTACK_CONF_FRAMER
-#if NETSTACK_CONF_WITH_IPV6
-#define NETSTACK_CONF_FRAMER  framer_802154
-#else /* NETSTACK_CONF_WITH_IPV6 */
-#define NETSTACK_CONF_FRAMER  contikimac_framer
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-#endif /* NETSTACK_CONF_FRAMER */
-
-#if CC1200_CONF_SUBGHZ_50KBPS_MODE
-#define NETSTACK_CONF_RADIO                                 cc1200_driver
-#define CC1200_CONF_RF_CFG                                  cc1200_802154g_863_870_fsk_50kbps
-#define ANTENNA_SW_SELECT_DEF_CONF                          ANTENNA_SW_SELECT_SUBGHZ
-#define CC1200_CONF_USE_GPIO2                               0
-#define CC1200_CONF_USE_RX_WATCHDOG                         0
-
-#define NULLRDC_CONF_ACK_WAIT_TIME                          (RTIMER_SECOND / 200)
-#define NULLRDC_CONF_AFTER_ACK_DETECTED_WAIT_TIME           (RTIMER_SECOND / 1500)
-#define NULLRDC_CONF_802154_AUTOACK                         1
-#define NULLRDC_CONF_802154_AUTOACK_HW                      1
-#define NULLRDC_CONF_SEND_802154_ACK                        0
-
-#define CONTIKIMAC_CONF_CCA_CHECK_TIME                      (RTIMER_ARCH_SECOND / 800)
-#define CONTIKIMAC_CONF_CCA_SLEEP_TIME                      (RTIMER_ARCH_SECOND / 120)
-#define CONTIKIMAC_CONF_LISTEN_TIME_AFTER_PACKET_DETECTED   (RTIMER_ARCH_SECOND / 8)
-#define CONTIKIMAC_CONF_AFTER_ACK_DETECTED_WAIT_TIME        (RTIMER_SECOND / 300)
-#define CONTIKIMAC_CONF_INTER_PACKET_INTERVAL               (RTIMER_SECOND / 200)
 #endif
 
 /* This can be overriden to use the cc1200_driver instead */
@@ -410,190 +180,6 @@ typedef uint32_t rtimer_clock_t;
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
- * \name IEEE address configuration
- *
- * Used to generate our RIME & IPv6 address
- * @{
- */
-/**
- * \brief Location of the IEEE address
- * 0 => Read from InfoPage,
- * 1 => Use a hardcoded address, configured by IEEE_ADDR_CONF_ADDRESS
- */
-#ifndef IEEE_ADDR_CONF_HARDCODED
-#define IEEE_ADDR_CONF_HARDCODED             0
-#endif
-
-/**
- * \brief The hardcoded IEEE address to be used when IEEE_ADDR_CONF_HARDCODED
- * is defined as 1
- */
-#ifndef IEEE_ADDR_CONF_ADDRESS
-#define IEEE_ADDR_CONF_ADDRESS { 0x00, 0x12, 0x4B, 0x00, 0x89, 0xAB, 0xCD, 0xEF }
-#endif
-
-/**
- * \brief Location of the IEEE address in the InfoPage when
- * IEEE_ADDR_CONF_HARDCODED is defined as 0
- * 0 => Use the primary address location
- * 1 => Use the secondary address location
- */
-#ifndef IEEE_ADDR_CONF_USE_SECONDARY_LOCATION
-#define IEEE_ADDR_CONF_USE_SECONDARY_LOCATION 0
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name RF configuration
- *
- * @{
- */
-/* RF Config */
-#ifndef IEEE802154_CONF_PANID
-#define IEEE802154_CONF_PANID           0xABCD
-#endif
-
-#ifdef RF_CHANNEL
-#define CC2538_RF_CONF_CHANNEL      RF_CHANNEL
-#endif
-
-#ifndef CC2538_RF_CONF_CHANNEL
-#define CC2538_RF_CONF_CHANNEL              26
-#endif /* CC2538_RF_CONF_CHANNEL */
-
-#ifndef CC2538_RF_CONF_AUTOACK
-#define CC2538_RF_CONF_AUTOACK               1 /**< RF H/W generates ACKs */
-#endif /* CC2538_CONF_AUTOACK */
-
-#ifndef CC2538_RF_CONF_TX_USE_DMA
-#define CC2538_RF_CONF_TX_USE_DMA            1 /**< RF TX over DMA */
-#endif
-
-#ifndef CC2538_RF_CONF_RX_USE_DMA
-#define CC2538_RF_CONF_RX_USE_DMA            1 /**< RF RX over DMA */
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name IPv6, RIME and network buffer configuration
- *
- * @{
- */
-
-/* Don't let contiki-default-conf.h decide if we are an IPv6 build */
-#ifndef NETSTACK_CONF_WITH_IPV6
-#define NETSTACK_CONF_WITH_IPV6              0
-#endif
-
-#if NETSTACK_CONF_WITH_IPV6
-/* Addresses, Sizes and Interfaces */
-/* 8-byte addresses here, 2 otherwise */
-#define LINKADDR_CONF_SIZE                   8
-#define UIP_CONF_LL_802154                   1
-#define UIP_CONF_LLH_LEN                     0
-#define UIP_CONF_NETIF_MAX_ADDRESSES         3
-
-/* TCP, UDP, ICMP */
-#ifndef UIP_CONF_TCP
-#define UIP_CONF_TCP                         1
-#endif
-#ifndef UIP_CONF_TCP_MSS
-#define UIP_CONF_TCP_MSS                    64
-#endif
-#define UIP_CONF_UDP                         1
-#define UIP_CONF_UDP_CHECKSUMS               1
-#define UIP_CONF_ICMP6                       1
-
-/* ND and Routing */
-#ifndef UIP_CONF_ROUTER
-#define UIP_CONF_ROUTER                      1
-#endif
-
-#define UIP_CONF_ND6_SEND_RA                 0
-#define UIP_CONF_IP_FORWARD                  0
-#define RPL_CONF_STATS                       0
-
-#define UIP_CONF_ND6_REACHABLE_TIME     600000
-#define UIP_CONF_ND6_RETRANS_TIMER       10000
-
-#ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS        16
-#endif
-#ifndef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES                 16
-#endif
-
-/* uIP */
-#ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE              1300
-#endif
-
-#define UIP_CONF_IPV6_QUEUE_PKT              0
-#define UIP_CONF_IPV6_CHECKS                 1
-#define UIP_CONF_IPV6_REASSEMBLY             0
-#define UIP_CONF_MAX_LISTENPORTS             8
-
-/* 6lowpan */
-#define SICSLOWPAN_CONF_COMPRESSION          SICSLOWPAN_COMPRESSION_HC06
-#ifndef SICSLOWPAN_CONF_COMPRESSION_THRESHOLD
-#define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 63
-#endif
-#ifndef SICSLOWPAN_CONF_FRAG
-#define SICSLOWPAN_CONF_FRAG                 1
-#endif
-#define SICSLOWPAN_CONF_MAXAGE               8
-
-/* Define our IPv6 prefixes/contexts here */
-#define SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS    1
-#ifndef SICSLOWPAN_CONF_ADDR_CONTEXT_0
-#define SICSLOWPAN_CONF_ADDR_CONTEXT_0 { \
-  addr_contexts[0].prefix[0] = UIP_DS6_DEFAULT_PREFIX_0; \
-  addr_contexts[0].prefix[1] = UIP_DS6_DEFAULT_PREFIX_1; \
-}
-#endif
-
-#define MAC_CONF_CHANNEL_CHECK_RATE          8
-
-#ifndef QUEUEBUF_CONF_NUM
-#define QUEUEBUF_CONF_NUM                    8
-#endif
-/*---------------------------------------------------------------------------*/
-#else /* NETSTACK_CONF_WITH_IPV6 */
-/* Network setup for non-IPv6 (rime). */
-#define UIP_CONF_IP_FORWARD                  1
-
-#ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE               108
-#endif
-
-#define RIME_CONF_NO_POLITE_ANNOUCEMENTS     0
-
-#ifndef QUEUEBUF_CONF_NUM
-#define QUEUEBUF_CONF_NUM                    8
-#endif
-
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name Security
- *
- * @{
- */
-#ifndef CRYPTO_CONF_INIT
-#define CRYPTO_CONF_INIT        1 /**< Whether to init cryptoprocessor */
-#endif
-
-#ifndef AES_128_CONF
-#define AES_128_CONF            cc2538_aes_128_driver /**< AES-128 driver */
-#endif
-
-#ifndef CCM_STAR_CONF
-#define CCM_STAR_CONF           cc2538_ccm_star_driver /**< AES-CCM* driver */
-#endif
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
  * \name RTC
  *
  * @{
@@ -614,7 +200,9 @@ typedef uint32_t rtimer_clock_t;
 #endif
 /** @} */
 /*---------------------------------------------------------------------------*/
-
+/* Include CPU-related configuration */
+#include "cc2538-conf.h"
+/*---------------------------------------------------------------------------*/
 #endif /* CONTIKI_CONF_H_ */
-
+/*---------------------------------------------------------------------------*/
 /** @} */

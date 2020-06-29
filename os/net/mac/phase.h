@@ -46,6 +46,8 @@
 #include "lib/list.h"
 #include "lib/memb.h"
 #include "net/netstack.h"
+#include "net/mac/rdc.h"
+
 
 typedef enum {
   PHASE_UNKNOWN,

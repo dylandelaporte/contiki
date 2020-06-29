@@ -1,0 +1,16 @@
+include $(CONTIKI)/Makefile.identify-target
+
+# Include BR variant depending on platform and also generic BR code for all
+# embedded platforms
+
+### Include the board-specific makefile
+ifneq ("$(BOARD)","")
+MODULES += os/services/rpl-border-router/$(TARGET)/$(BOARD)
+else
+MODULES += os/services/rpl-border-router/$(TARGET)
+endif
+
+
+ifneq ($(TARGET),native)
+	MODULES += os/services/rpl-border-router/embedded
+endif

@@ -32,16 +32,18 @@
 
 /**
  * \file
- *         A brief description of what this file is.
+ *         A shell back-end for the serial port
  * \author
  *         Adam Dunkels <adam@sics.se>
+ *         Simon Duquennoy <simon.duquennoy@inria.fr>
  */
 
 #ifndef SERIAL_SHELL_H_
 #define SERIAL_SHELL_H_
 
-#include "contiki.h"
-
+/**
+ * Initializes Serial Shell module
+ */
 void serial_shell_init(void);
 
 #endif /* SERIAL_SHELL_H_ */

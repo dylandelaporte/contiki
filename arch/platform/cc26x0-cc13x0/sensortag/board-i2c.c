@@ -37,16 +37,14 @@
  * Board-specific I2C driver for the Sensortags
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-
+#include "contiki.h"
 #include "ti-lib.h"
+#include "board-i2c.h"
 #include "lpm.h"
 #include "rtimer.h"
 
 #include <string.h>
 #include <stdbool.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
 /*---------------------------------------------------------------------------*/
 #define I2C_MAX_WAIT_TIME    (RTIMER_SECOND / 10)
 

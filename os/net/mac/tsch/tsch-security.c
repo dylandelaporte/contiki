@@ -37,15 +37,15 @@
  *         Simon Duquennoy <simonduq@sics.se>
  */
 
+/**
+ * \addtogroup tsch
+ * @{
+*/
+
 #include "contiki.h"
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-packet.h"
-#include "net/mac/tsch/tsch-private.h"
-#include "net/mac/tsch/tsch-schedule.h"
-#include "net/mac/tsch/tsch-security.h"
-#include "net/mac/tsch/tsch-log.h"
-#include "net/mac/frame802154.h"
-#include "net/mac/framer-802154.h"
+#include "net/mac/framer/frame802154.h"
+#include "net/mac/framer/framer-802154.h"
 #include "net/netstack.h"
 #include "net/packetbuf.h"
 #include "lib/ccm-star.h"
@@ -53,6 +53,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#if LLSEC802154_ENABLED && !LLSEC802154_USES_EXPLICIT_KEYS
+#error LLSEC802154_ENABLED set but LLSEC802154_USES_EXPLICIT_KEYS unset
+#endif /* LLSEC802154_ENABLED */
 #if TSCH_LOG_LEVEL >= 1
 #undef DEBUG
 #define DEBUG DEBUG_PRINT
@@ -72,14 +75,17 @@ static aes_key keys[] = {
   TSCH_SECURITY_K2
 };
 #define N_KEYS (sizeof(keys) / sizeof(aes_key))
+
 uint8_t* tsch_sec_key(uint8_t key_index){
     if(key_index == 0 || key_index > N_KEYS) {
       return NULL;
     }
     return keys[key_index - 1];
 }
+
 #define TSCH_SEC_KEY(key_idx, addr) tsch_sec_key(key_idx)
 #define TSCH_SEC_USER_KEYS 0
+
 #else
 #define TSCH_SEC_USER_KEYS (TSCH_SECURITY_RELAX_KEYID & TSCH_SECURITY_STRICT)
 #endif
@@ -172,6 +178,7 @@ tsch_security_secure_frame(uint8_t *hdr, uint8_t *outbuf,
   frame802154_t frame;
   uint8_t key_index = 0;
   uint8_t security_level = 0;
+  struct ieee802154_ies ies;
 
   if(hdr == NULL || outbuf == NULL || hdrlen < 0 || datalen < 0) {
     return tschERR_BADARG;
@@ -180,6 +187,13 @@ tsch_security_secure_frame(uint8_t *hdr, uint8_t *outbuf,
   /* Parse the frame header to extract security settings */
   if(frame802154_parse(hdr, hdrlen + datalen, &frame) < 3) {
     return tschERR_UNSECURED;
+  }
+
+  memset(&ies, 0, sizeof(ies));
+  if(frame802154e_parse_information_elements(hdr + hdrlen, datalen, &ies) > 0) {
+    /* put Header IEs into the header part which is not encrypted */
+    hdrlen += ies.ie_payload_ie_offset;
+    datalen -= ies.ie_payload_ie_offset;
   }
 
   if(!frame.fcf.security_enabled) {
@@ -252,6 +266,7 @@ tsch_security_parse_frame(const uint8_t *hdr, int hdrlen, int datalen,
   uint8_t nonce[16];
   uint8_t a_len;
   uint8_t m_len;
+  struct ieee802154_ies ies;
 
   if(frame == NULL || hdr == NULL || hdrlen < 0 || datalen < 0) {
     return 0;
@@ -277,6 +292,12 @@ tsch_security_parse_frame(const uint8_t *hdr, int hdrlen, int datalen,
     return 0;
   }
 
+  memset(&ies, 0, sizeof(ies));
+  (void)frame802154e_parse_information_elements(hdr + hdrlen, datalen, &ies);
+  /* put Header IEs into the header part which is not encrypted */
+  hdrlen += ies.ie_payload_ie_offset;
+  datalen -= ies.ie_payload_ie_offset;
+
   tsch_security_init_nonce(nonce, sender, asn);
 
   if(with_encryption) {
@@ -300,3 +321,36 @@ tsch_security_parse_frame(const uint8_t *hdr, int hdrlen, int datalen,
     return 1;
   }
 }
+/*---------------------------------------------------------------------------*/
+void
+tsch_security_set_packetbuf_attr(uint8_t frame_type)
+{
+#if LLSEC802154_ENABLED
+  if(tsch_is_pan_secured)
+   // if packet securitiis alredy inited, do not override that settings
+  if(packetbuf_attr(PACKETBUF_ATTR_SECURITY_LEVEL) == 0)
+  {
+    /* Set security level, key id and index */
+    switch(frame_type) {
+      case FRAME802154_ACKFRAME:
+        /* For ACKs, we set attriburtes via tsch_packet_eackbuf_set_attr, as classic
+         * interrupts can not be used from interrupt context. */
+        tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_SECURITY_LEVEL, TSCH_SECURITY_KEY_SEC_LEVEL_ACK);
+        tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_KEY_ID_MODE, FRAME802154_1_BYTE_KEY_ID_MODE);
+        tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_KEY_INDEX, TSCH_SECURITY_KEY_INDEX_ACK);
+        break;
+      case FRAME802154_BEACONFRAME:
+        packetbuf_set_attr(PACKETBUF_ATTR_SECURITY_LEVEL, TSCH_SECURITY_KEY_SEC_LEVEL_EB);
+        packetbuf_set_attr(PACKETBUF_ATTR_KEY_ID_MODE, FRAME802154_1_BYTE_KEY_ID_MODE);
+        packetbuf_set_attr(PACKETBUF_ATTR_KEY_INDEX, TSCH_SECURITY_KEY_INDEX_EB);
+        break;
+      default:
+        packetbuf_set_attr(PACKETBUF_ATTR_SECURITY_LEVEL, TSCH_SECURITY_KEY_SEC_LEVEL_OTHER);
+        packetbuf_set_attr(PACKETBUF_ATTR_KEY_ID_MODE, FRAME802154_1_BYTE_KEY_ID_MODE);
+        packetbuf_set_attr(PACKETBUF_ATTR_KEY_INDEX, TSCH_SECURITY_KEY_INDEX_OTHER);
+        break;
+    }
+  }
+#endif /* LLSEC802154_ENABLED */
+}
+/** @} */

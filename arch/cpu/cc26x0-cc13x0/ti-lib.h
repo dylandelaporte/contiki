@@ -200,8 +200,16 @@
 #define ti_lib_chipinfo_get_device_id_hw_rev_code(...) ChipInfo_GetDeviceIdHwRevCode(__VA_ARGS__)
 #define ti_lib_chipinfo_get_chip_type(...)             ChipInfo_GetChipType(__VA_ARGS__)
 #define ti_lib_chipinfo_get_chip_family(...)           ChipInfo_GetChipFamily(__VA_ARGS__)
+
+#if CPU_FAMILY_CC26X0R2
+#define ti_lib_chipinfo_chip_family_is_cc26xx(...)     ChipInfo_ChipFamilyIs_CC26x0(__VA_ARGS__)
+#define ti_lib_chipinfo_chip_family_is_cc13xx(...)     ChipInfo_ChipFamilyIs_CC13x0(__VA_ARGS__)
+#define ti_lib_chipinfo_chip_family_is_cc26x0r2(...)   ChipInfo_ChipFamilyIs_CC26x0R2(__VA_ARGS__)
+#else
 #define ti_lib_chipinfo_chip_family_is_cc26xx(...)     ChipInfo_ChipFamilyIsCC26xx(__VA_ARGS__)
 #define ti_lib_chipinfo_chip_family_is_cc13xx(...)     ChipInfo_ChipFamilyIsCC13xx(__VA_ARGS__)
+#endif /* CPU_FAMILY_CC26X0R2 */
+
 #define ti_lib_chipinfo_get_hw_revision(...)           ChipInfo_GetHwRevision(__VA_ARGS__)
 #define ti_lib_chipinfo_hw_revision_is_1_0(...)        ChipInfo_HwRevisionIs_1_0(__VA_ARGS__)
 #define ti_lib_chipinfo_hw_revision_is_gteq_2_0(...)   ChipInfo_HwRevisionIs_GTEQ_2_0(__VA_ARGS__)
@@ -396,6 +404,9 @@
 
 #define ti_lib_rfc_rtrim(...)                    RFCRTrim(__VA_ARGS__)
 #define ti_lib_rfc_adi3vco_ldo_voltage_mode(...) RFCAdi3VcoLdoVoltageMode(__VA_ARGS__)
+#define ti_lib_rfc_hw_int_enable(...)            RFCHwIntEnable(__VA_ARGS__)
+#define ti_lib_rfc_hw_int_disable(...)           RFCHwIntDisable(__VA_ARGS__)
+#define ti_lib_rfc_hw_int_clear(...)             RFCHwIntClear(__VA_ARGS__)
 /*---------------------------------------------------------------------------*/
 /* sys_ctrl.h */
 #include "driverlib/sys_ctrl.h"
@@ -408,7 +419,14 @@
 #define ti_lib_sys_ctrl_aon_sync(...)                         SysCtrlAonSync(__VA_ARGS__)
 #define ti_lib_sys_ctrl_aon_update(...)                       SysCtrlAonUpdate(__VA_ARGS__)
 #define ti_lib_sys_ctrl_set_recharge_before_power_down(...)   SysCtrlSetRechargeBeforePowerDown(__VA_ARGS__)
-#define ti_lib_sys_ctrl_adjust_recharge_after_power_down(...) SysCtrlAdjustRechargeAfterPowerDown(__VA_ARGS__)
+
+#if CPU_FAMILY_CC26X0R2
+/* May need to change to XOSC_IN_LOW_POWER_MODE */
+#define ti_lib_sys_ctrl_adjust_recharge_after_power_down()    SysCtrlAdjustRechargeAfterPowerDown(XOSC_IN_HIGH_POWER_MODE)
+#else
+#define ti_lib_sys_ctrl_adjust_recharge_after_power_down()    SysCtrlAdjustRechargeAfterPowerDown()
+#endif /* CPU_FAMILY_CC26X0R2 */
+
 #define ti_lib_sys_ctrl_dcdc_voltage_conditional_control(...) SysCtrl_DCDC_VoltageConditionalControl(__VA_ARGS__)
 #define ti_lib_sys_ctrl_reset_source_get(...)                 SysCtrlResetSourceGet(__VA_ARGS__)
 #define ti_lib_sys_ctrl_system_reset(...)                     SysCtrlSystemReset(__VA_ARGS__)
@@ -558,6 +576,14 @@
 #define ti_lib_watchdog_int_type_set(...)   WatchdogIntTypeSet(__VA_ARGS__)
 #define ti_lib_watchdog_stall_enable(...)   WatchdogStallEnable(__VA_ARGS__)
 #define ti_lib_watchdog_stall_disable(...)  WatchdogStallDisable(__VA_ARGS__)
+/*---------------------------------------------------------------------------*/
+/* crypto.h */
+#include "driverlib/crypto.h"
+
+#define ti_lib_crypto_aes_load_key(...)   CRYPTOAesLoadKey(__VA_ARGS__)
+#define ti_lib_crypto_aes_ecb(...)        CRYPTOAesEcb(__VA_ARGS__)
+#define ti_lib_crypto_aes_ecb_status(...) CRYPTOAesEcbStatus(__VA_ARGS__)
+#define ti_lib_crypto_aes_ecb_finish(...) CRYPTOAesEcbFinish(__VA_ARGS__)
 /*---------------------------------------------------------------------------*/
 #endif /* TI_LIB_H_ */
 /*---------------------------------------------------------------------------*/

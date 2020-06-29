@@ -42,7 +42,7 @@
 #include "lib/memb.h"
 
 #define DEBUG DEBUG_NONE
-#include "net/ip/uip-debug.h"
+#include "net/ipv6/uip-debug.h"
 
 #include "db-options.h"
 #include "index.h"
@@ -813,9 +813,9 @@ relation_process_select(void *handle_ptr)
     }
   }
 
-  wanted_result = TRUE;
+  wanted_result = LVM_TRUE;
   if(AQL_GET_FLAGS(adt) & AQL_FLAG_INVERSE_LOGIC) {
-    wanted_result = FALSE;
+    wanted_result = LVM_FALSE;
   }
 
   /* Check whether the given predicate is true for this tuple. */

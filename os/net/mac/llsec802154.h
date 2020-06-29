@@ -30,24 +30,22 @@
  *
  */
 
+ /**
+  * \addtogroup link-layer
+  * @{
+  *
+  * \defgroup llsec802154 Link-layer security common functionality
+  *
+  * Macros related to 802.15.4 link-layer security.
+  *
+  * @{
+  */
+
 /**
  * \file
  *         Common functionality of 802.15.4-compliant llsec_drivers.
  * \author
  *         Konrad Krentz <konrad.krentz@gmail.com>
- */
-
-/**
- * \addtogroup llsec
- * @{
- */
-
-/**
- * \defgroup llsec802154 Link Layer Security Common Functionality
- * 
- * Common functionality of 802.15.4-compliant llsec_drivers.
- * 
- * @{
  */
 
 #ifndef LLSEC802154_H_
@@ -62,25 +60,23 @@
 #define LLSEC802154_ENABLED            0
 #endif /* LLSEC802154_CONF_ENABLED */
 
-#define LLSEC802154_MIC_LEN(sec_lvl)   (2 << (sec_lvl & 3))
-
 #ifdef LLSEC802154_CONF_USES_EXPLICIT_KEYS
 #define LLSEC802154_USES_EXPLICIT_KEYS LLSEC802154_CONF_USES_EXPLICIT_KEYS
 #else /* LLSEC802154_CONF_USES_EXPLICIT_KEYS */
-#define LLSEC802154_USES_EXPLICIT_KEYS 0
+#define LLSEC802154_USES_EXPLICIT_KEYS LLSEC802154_ENABLED
 #endif /* LLSEC802154_CONF_USES_EXPLICIT_KEYS */
-
-#ifdef LLSEC802154_CONF_USES_FRAME_COUNTER
-#define LLSEC802154_USES_FRAME_COUNTER LLSEC802154_CONF_USES_FRAME_COUNTER
-#else /* LLSEC802154_CONF_USES_FRAME_COUNTER */
-#define LLSEC802154_USES_FRAME_COUNTER LLSEC802154_ENABLED
-#endif /* LLSEC802154_CONF_USES_FRAME_COUNTER */
 
 #ifdef LLSEC802154_CONF_USES_AUX_HEADER
 #define LLSEC802154_USES_AUX_HEADER    LLSEC802154_CONF_USES_AUX_HEADER
 #else /* LLSEC802154_CONF_USES_AUX_HEADER */
 #define LLSEC802154_USES_AUX_HEADER    LLSEC802154_ENABLED
 #endif /* LLSEC802154_CONF_USES_AUX_HEADER */
+
+#ifdef LLSEC802154_CONF_USES_FRAME_COUNTER
+#define LLSEC802154_USES_FRAME_COUNTER LLSEC802154_CONF_USES_FRAME_COUNTER
+#else
+#define LLSEC802154_USES_FRAME_COUNTER LLSEC802154_ENABLED
+#endif /* LLSEC802154_CONF_USES_FRAME_COUNTER */
 
 #if UIP_BYTE_ORDER == UIP_LITTLE_ENDIAN
 #define LLSEC802154_HTONS(n) (n)
@@ -89,6 +85,14 @@
 #define LLSEC802154_HTONS(n) (uint16_t)((((uint16_t) (n)) << 8) | (((uint16_t) (n)) >> 8))
 #define LLSEC802154_HTONL(n) (((uint32_t)UIP_HTONS(n) << 16) | UIP_HTONS((uint32_t)(n) >> 16))
 #endif /* UIP_CONF_BYTE_ORDER == UIP_LITTLE_ENDIAN */
+
+#define LLSEC802154_MIC_LEN(sec_lvl)   (2 << (sec_lvl & 3))
+
+#if LLSEC802154_USES_AUX_HEADER
+#define LLSEC802154_PACKETBUF_MIC_LEN() LLSEC802154_MIC_LEN(packetbuf_attr(PACKETBUF_ATTR_SECURITY_LEVEL))
+#else
+#define LLSEC802154_PACKETBUF_MIC_LEN() 0
+#endif
 
 #endif /* LLSEC802154_H_ */
 

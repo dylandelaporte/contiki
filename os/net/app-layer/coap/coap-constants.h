@@ -36,10 +36,16 @@
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#ifndef ER_COAP_CONSTANTS_H_
-#define ER_COAP_CONSTANTS_H_
+/**
+ * \addtogroup coap
+ * @{
+ */
+
+#ifndef COAP_CONSTANTS_H_
+#define COAP_CONSTANTS_H_
 
 #define COAP_DEFAULT_PORT                    5683
+#define COAP_DEFAULT_SECURE_PORT             5684
 
 #define COAP_DEFAULT_MAX_AGE                 60
 #define COAP_RESPONSE_TIMEOUT                3
@@ -160,7 +166,28 @@ typedef enum {
   APPLICATION_FASTINFOSET = 48,
   APPLICATION_SOAP_FASTINFOSET = 49,
   APPLICATION_JSON = 50,
-  APPLICATION_X_OBIX_BINARY = 51
+  APPLICATION_X_OBIX_BINARY = 51,
+  APPLICATION_CBOR = 60
 } coap_content_format_t;
 
-#endif /* ER_COAP_CONSTANTS_H_ */
+/**
+ * Resource flags for allowed methods and special functionalities.
+ */
+typedef enum {
+  NO_FLAGS = 0,
+
+  /* methods to handle */
+  METHOD_GET = (1 << 0),
+  METHOD_POST = (1 << 1),
+  METHOD_PUT = (1 << 2),
+  METHOD_DELETE = (1 << 3),
+
+  /* special flags */
+  HAS_SUB_RESOURCES = (1 << 4),
+  IS_SEPARATE = (1 << 5),
+  IS_OBSERVABLE = (1 << 6),
+  IS_PERIODIC = (1 << 7)
+} coap_resource_flags_t;
+
+#endif /* COAP_CONSTANTS_H_ */
+/** @} */

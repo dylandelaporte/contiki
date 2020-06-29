@@ -1,12 +1,14 @@
-DEFINES+=PROJECT_CONF_H=\"project-conf.h\"
 CONTIKI_PROJECT = very-sleepy-demo
+
+PLATFORMS_ONLY = cc26x0-cc13x0
 
 all: $(CONTIKI_PROJECT)
 
 CONTIKI_WITH_IPV6 = 1
 
-APPS += er-coap
-APPS += rest-engine
+CONTIKI = ../../../..
 
-CONTIKI = ../../..
+include $(CONTIKI)/Makefile.dir-variables
+MODULES += $(CONTIKI_NG_APP_LAYER_DIR)/coap
+
 include $(CONTIKI)/Makefile.include

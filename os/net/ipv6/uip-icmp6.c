@@ -31,7 +31,7 @@
  */
 
 /**
- * \addtogroup uip6
+ * \addtogroup uip
  * @{
  */
 
@@ -46,27 +46,14 @@
 #include "net/ipv6/uip-ds6.h"
 #include "net/ipv6/uip-icmp6.h"
 #include "contiki-default-conf.h"
+#include "net/routing/routing.h"
 
-#define DEBUG 0
-#if DEBUG
-#include <stdio.h>
-#define PRINTF(...) printf(__VA_ARGS__)
-#define PRINT6ADDR(addr) PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
-#define PRINTLLADDR(lladdr) PRINTF(" %02x:%02x:%02x:%02x:%02x:%02x ",lladdr->addr[0], lladdr->addr[1], lladdr->addr[2], lladdr->addr[3],lladdr->addr[4], lladdr->addr[5])
-#else
-#define PRINTF(...)
-#define PRINT6ADDR(addr)
-#endif
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "ICMPv6"
+#define LOG_LEVEL LOG_LEVEL_IPV6
 
-#define UIP_IP_BUF                ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
-#define UIP_ICMP_BUF            ((struct uip_icmp_hdr *)&uip_buf[uip_l2_l3_hdr_len])
-#define UIP_ICMP6_ERROR_BUF  ((struct uip_icmp6_error *)&uip_buf[uip_l2_l3_icmp_hdr_len])
-#define UIP_EXT_BUF              ((struct uip_ext_hdr *)&uip_buf[uip_l2_l3_hdr_len])
-#define UIP_FIRST_EXT_BUF        ((struct uip_ext_hdr *)&uip_buf[UIP_LLIPH_LEN])
-
-#if UIP_CONF_IPV6_RPL
-#include "rpl/rpl.h"
-#endif /* UIP_CONF_IPV6_RPL */
+#define UIP_ICMP6_ERROR_BUF  ((struct uip_icmp6_error *)UIP_ICMP_PAYLOAD)
 
 /** \brief temporary IP address */
 static uip_ipaddr_t tmp_ipaddr;
@@ -125,11 +112,11 @@ echo_request_input(void)
    * headers in the request otherwise we need to remove the extension
    * headers and change a few fields
    */
-  PRINTF("Received Echo Request from ");
-  PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
-  PRINTF(" to ");
-  PRINT6ADDR(&UIP_IP_BUF->destipaddr);
-  PRINTF("\n");
+  LOG_INFO("Received Echo Request from ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->srcipaddr);
+  LOG_INFO_(" to ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->destipaddr);
+  LOG_INFO_("\n");
 
   /* IP header */
   UIP_IP_BUF->ttl = uip_ds6_if.cur_hop_limit;
@@ -143,22 +130,7 @@ echo_request_input(void)
     uip_ipaddr_copy(&UIP_IP_BUF->destipaddr, &tmp_ipaddr);
   }
 
-  if(uip_ext_len > 0) {
-    /* Remove extension headers if any */
-    UIP_IP_BUF->proto = UIP_PROTO_ICMP6;
-    uip_len -= uip_ext_len;
-    UIP_IP_BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
-    UIP_IP_BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
-    /* move the echo request payload (starting after the icmp header)
-     * to the new location in the reply.
-     * The shift is equal to the length of the extension headers present
-     * Note: UIP_ICMP_BUF still points to the echo request at this stage
-     */
-    memmove((uint8_t *)UIP_ICMP_BUF + UIP_ICMPH_LEN - uip_ext_len,
-        (uint8_t *)UIP_ICMP_BUF + UIP_ICMPH_LEN,
-        (uip_len - UIP_IPH_LEN - UIP_ICMPH_LEN));
-    uip_ext_len = 0;
-  }
+  uip_remove_ext_hdr();
 
   /* Below is important for the correctness of UIP_ICMP_BUF and the
    * checksum
@@ -170,64 +142,57 @@ echo_request_input(void)
   UIP_ICMP_BUF->icmpchksum = 0;
   UIP_ICMP_BUF->icmpchksum = ~uip_icmp6chksum();
 
-  PRINTF("Sending Echo Reply to ");
-  PRINT6ADDR(&UIP_IP_BUF->destipaddr);
-  PRINTF(" from ");
-  PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
-  PRINTF("\n");
+  LOG_INFO("Sending Echo Reply to ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->destipaddr);
+  LOG_INFO_(" from ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->srcipaddr);
+  LOG_INFO_("\n");
   UIP_STAT(++uip_stat.icmp.sent);
   return;
 }
 /*---------------------------------------------------------------------------*/
 void
-uip_icmp6_error_output(uint8_t type, uint8_t code, uint32_t param) {
+uip_icmp6_error_output(uint8_t type, uint8_t code, uint32_t param)
+{
   /* check if originating packet is not an ICMP error */
-  if(uip_ext_len) {
-    if(UIP_EXT_BUF->next == UIP_PROTO_ICMP6 && UIP_ICMP_BUF->type < 128) {
-      uip_clear_buf();
-      return;
-    }
-  } else {
-    if(UIP_IP_BUF->proto == UIP_PROTO_ICMP6 && UIP_ICMP_BUF->type < 128) {
-      uip_clear_buf();
-      return;
-    }
+  uint16_t shift;
+
+  if(uip_last_proto == UIP_PROTO_ICMP6 && UIP_ICMP_BUF->type < 128) {
+    uipbuf_clear();
+    return;
   }
 
-#if UIP_CONF_IPV6_RPL
-  rpl_remove_header();
-#else
-  uip_ext_len = 0;
-#endif /* UIP_CONF_IPV6_RPL */
+  /* the source should not be unspecified nor multicast */
+  if(uip_is_addr_unspecified(&UIP_IP_BUF->srcipaddr) ||
+     uip_is_addr_mcast(&UIP_IP_BUF->srcipaddr)) {
+    uipbuf_clear();
+    return;
+  }
+
+  /* Remove all extension headers related to the routing protocol in place.
+   * Keep all other extension headers, so as to match original packet. */
+  if(NETSTACK_ROUTING.ext_header_remove() == 0) {
+    LOG_WARN("Unable to remove ext header before sending ICMPv6 ERROR message\n");
+  }
 
   /* remember data of original packet before shifting */
   uip_ipaddr_copy(&tmp_ipaddr, &UIP_IP_BUF->destipaddr);
 
-  uip_len += UIP_IPICMPH_LEN + UIP_ICMP6_ERROR_LEN;
-
-  if(uip_len > UIP_LINK_MTU) {
-    uip_len = UIP_LINK_MTU;
-  }
-
-  memmove((uint8_t *)UIP_ICMP6_ERROR_BUF + uip_ext_len + UIP_ICMP6_ERROR_LEN,
-          (void *)UIP_IP_BUF, uip_len - UIP_IPICMPH_LEN - uip_ext_len - UIP_ICMP6_ERROR_LEN);
+  /* The ICMPv6 error message contains as much of possible of the invoking packet
+   * (see RFC 4443 section 3). Make space for the additional IPv6 and
+   * ICMPv6 headers here and move payload to the "right". What we move includes
+    * extension headers */
+  shift = UIP_IPH_LEN + UIP_ICMPH_LEN + UIP_ICMP6_ERROR_LEN;
+  uip_len += shift;
+  uip_len = MIN(uip_len, UIP_LINK_MTU);
+  uip_ext_len = 0;
+  memmove(uip_buf + shift, (void *)UIP_IP_BUF, uip_len - shift);
 
   UIP_IP_BUF->vtc = 0x60;
   UIP_IP_BUF->tcflow = 0;
   UIP_IP_BUF->flow = 0;
-  if (uip_ext_len) {
-    UIP_FIRST_EXT_BUF->next = UIP_PROTO_ICMP6;
-  } else {
-    UIP_IP_BUF->proto = UIP_PROTO_ICMP6;
-  }
+  UIP_IP_BUF->proto = UIP_PROTO_ICMP6;
   UIP_IP_BUF->ttl = uip_ds6_if.cur_hop_limit;
-
-  /* the source should not be unspecified nor multicast, the check for
-     multicast is done in uip_process */
-  if(uip_is_addr_unspecified(&UIP_IP_BUF->srcipaddr)){
-    uip_clear_buf();
-    return;
-  }
 
   uip_ipaddr_copy(&UIP_IP_BUF->destipaddr, &UIP_IP_BUF->srcipaddr);
 
@@ -235,33 +200,28 @@ uip_icmp6_error_output(uint8_t type, uint8_t code, uint32_t param) {
     if(type == ICMP6_PARAM_PROB && code == ICMP6_PARAMPROB_OPTION){
       uip_ds6_select_src(&UIP_IP_BUF->srcipaddr, &tmp_ipaddr);
     } else {
-      uip_clear_buf();
+      uipbuf_clear();
       return;
     }
   } else {
-#if UIP_CONF_ROUTER
     /* need to pick a source that corresponds to this node */
     uip_ds6_select_src(&UIP_IP_BUF->srcipaddr, &tmp_ipaddr);
-#else
-    uip_ipaddr_copy(&UIP_IP_BUF->srcipaddr, &tmp_ipaddr);
-#endif
   }
 
   UIP_ICMP_BUF->type = type;
   UIP_ICMP_BUF->icode = code;
   UIP_ICMP6_ERROR_BUF->param = uip_htonl(param);
-  UIP_IP_BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
-  UIP_IP_BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
+  uipbuf_set_len_field(UIP_IP_BUF, uip_len - UIP_IPH_LEN);
   UIP_ICMP_BUF->icmpchksum = 0;
   UIP_ICMP_BUF->icmpchksum = ~uip_icmp6chksum();
 
   UIP_STAT(++uip_stat.icmp.sent);
 
-  PRINTF("Sending ICMPv6 ERROR message type %d code %d to ", type, code);
-  PRINT6ADDR(&UIP_IP_BUF->destipaddr);
-  PRINTF(" from ");
-  PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
-  PRINTF("\n");
+  LOG_WARN("Sending ICMPv6 ERROR message type %d code %d to ", type, code);
+  LOG_WARN_6ADDR(&UIP_IP_BUF->destipaddr);
+  LOG_WARN_(" from ");
+  LOG_WARN_6ADDR(&UIP_IP_BUF->srcipaddr);
+  LOG_WARN_("\n");
   return;
 }
 
@@ -269,14 +229,17 @@ uip_icmp6_error_output(uint8_t type, uint8_t code, uint32_t param) {
 void
 uip_icmp6_send(const uip_ipaddr_t *dest, int type, int code, int payload_len)
 {
-
   UIP_IP_BUF->vtc = 0x60;
   UIP_IP_BUF->tcflow = 0;
   UIP_IP_BUF->flow = 0;
   UIP_IP_BUF->proto = UIP_PROTO_ICMP6;
   UIP_IP_BUF->ttl = uip_ds6_if.cur_hop_limit;
-  UIP_IP_BUF->len[0] = (UIP_ICMPH_LEN + payload_len) >> 8;
-  UIP_IP_BUF->len[1] = (UIP_ICMPH_LEN + payload_len) & 0xff;
+  uipbuf_set_len_field(UIP_IP_BUF, UIP_ICMPH_LEN + payload_len);
+
+  if(dest == NULL) {
+    LOG_ERR("invalid argument; dest is NULL\n");
+    return;
+  }
 
   memcpy(&UIP_IP_BUF->destipaddr, dest, sizeof(*dest));
   uip_ds6_select_src(&UIP_IP_BUF->srcipaddr, &UIP_IP_BUF->destipaddr);
@@ -292,6 +255,10 @@ uip_icmp6_send(const uip_ipaddr_t *dest, int type, int code, int payload_len)
   UIP_STAT(++uip_stat.icmp.sent);
   UIP_STAT(++uip_stat.ip.sent);
 
+  LOG_INFO("Sending ICMPv6 packet to ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->destipaddr);
+  LOG_INFO_(", type %u, code %u, len %u\n", type, code, payload_len);
+
   tcpip_ipv6_output();
 }
 /*---------------------------------------------------------------------------*/
@@ -301,31 +268,16 @@ echo_reply_input(void)
   int ttl;
   uip_ipaddr_t sender;
 
-  PRINTF("Received Echo Reply from ");
-  PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
-  PRINTF(" to ");
-  PRINT6ADDR(&UIP_IP_BUF->destipaddr);
-  PRINTF("\n");
+  LOG_INFO("Received Echo Reply from ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->srcipaddr);
+  LOG_INFO_(" to ");
+  LOG_INFO_6ADDR(&UIP_IP_BUF->destipaddr);
+  LOG_INFO_("\n");
 
   uip_ipaddr_copy(&sender, &UIP_IP_BUF->srcipaddr);
   ttl = UIP_IP_BUF->ttl;
 
-  if(uip_ext_len > 0) {
-    /* Remove extension headers if any */
-    UIP_IP_BUF->proto = UIP_PROTO_ICMP6;
-    uip_len -= uip_ext_len;
-    UIP_IP_BUF->len[0] = ((uip_len - UIP_IPH_LEN) >> 8);
-    UIP_IP_BUF->len[1] = ((uip_len - UIP_IPH_LEN) & 0xff);
-    /* move the echo reply payload (starting after the icmp header)
-     * to the new location in the reply.  The shift is equal to the
-     * length of the extension headers present Note: UIP_ICMP_BUF
-     * still points to the echo request at this stage
-     */
-    memmove((uint8_t *)UIP_ICMP_BUF + UIP_ICMPH_LEN - uip_ext_len,
-        (uint8_t *)UIP_ICMP_BUF + UIP_ICMPH_LEN,
-        (uip_len - UIP_IPH_LEN - UIP_ICMPH_LEN));
-    uip_ext_len = 0;
-  }
+  uip_remove_ext_hdr();
 
   /* Call all registered applications to let them know an echo reply
      has been received. */
@@ -336,13 +288,13 @@ echo_reply_input(void)
         n = list_item_next(n)) {
       if(n->callback != NULL) {
         n->callback(&sender, ttl,
-                    (uint8_t *)&UIP_ICMP_BUF[sizeof(struct uip_icmp_hdr)],
+                    (uint8_t *)UIP_ICMP_PAYLOAD,
                     uip_len - sizeof(struct uip_icmp_hdr) - UIP_IPH_LEN);
       }
     }
   }
 
-  uip_clear_buf();
+  uipbuf_clear();
   return;
 }
 /*---------------------------------------------------------------------------*/

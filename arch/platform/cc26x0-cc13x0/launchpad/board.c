@@ -36,17 +36,15 @@
  *  LaunchPad-specific board initialisation driver
  */
 /*---------------------------------------------------------------------------*/
-#include "lib/sensors.h"
+#include "contiki.h"
 #include "lpm.h"
 #include "ti-lib.h"
+#include "board-peripherals.h"
 #include "rf-core/rf-switch.h"
+
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/launchpad/board-i2c.h"
-#include "../../cc26x0-cc13x0/launchpad/board-peripherals.h"
 /*---------------------------------------------------------------------------*/
 static void
 wakeup_handler(void)
@@ -55,13 +53,6 @@ wakeup_handler(void)
   ti_lib_prcm_power_domain_on(PRCM_DOMAIN_PERIPH);
   while(ti_lib_prcm_power_domain_status(PRCM_DOMAIN_PERIPH)
         != PRCM_DOMAIN_POWER_ON);
-}
-/*---------------------------------------------------------------------------*/
-static void
-shutdown_handler(uint8_t mode)
-{
-  /* Stop the I2C */
-  board_i2c_shutdown();
 }
 /*---------------------------------------------------------------------------*/
 /*
@@ -75,9 +66,9 @@ LPM_MODULE(launchpad_module, NULL, NULL, wakeup_handler, LPM_DOMAIN_NONE);
 static void
 configure_unused_pins(void)
 {
-  const uint32_t pins[] = BOARD_UNUSED_PINS;
+  uint32_t pins[] = BOARD_UNUSED_PINS;
 
-  const uint32_t *pin;
+  uint32_t *pin;
 
   for(pin = pins; *pin != IOID_UNUSED; pin++) {
     ti_lib_ioc_pin_type_gpio_input(*pin);
@@ -102,7 +93,7 @@ board_init()
   while(!ti_lib_prcm_load_get());
 
   /* Make sure the external flash is in the lower power mode */
-  ext_flash_init();
+  ext_flash_init(NULL);
 
   lpm_register_module(&launchpad_module);
 
@@ -116,9 +107,6 @@ board_init()
   if(!int_disabled) {
     ti_lib_int_master_enable();
   }
-
-  /* I2C controller */
-  board_i2c_wakeup();
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

@@ -41,37 +41,40 @@
 #define CONTIKI_CONF_H
 
 #include <stdint.h>
+#include <inttypes.h>
 /*---------------------------------------------------------------------------*/
 /* Include Project Specific conf */
-#ifdef PROJECT_CONF_H
-#include PROJECT_CONF_H
-#endif /* PROJECT_CONF_H */
+#ifdef PROJECT_CONF_PATH
+#include PROJECT_CONF_PATH
+#endif /* PROJECT_CONF_PATH */
 /*---------------------------------------------------------------------------*/
 /* Include platform peripherals configuration */
-#include "platform-conf.h"
+#include "nrf52dk-def.h"
+#include "nrf52832-def.h"
 /*---------------------------------------------------------------------------*/
 /**
  * \name Network Stack Configuration
  *
  * @{
  */
-#ifndef NETSTACK_CONF_NETWORK
-#define NETSTACK_CONF_NETWORK sicslowpan_driver
-#endif /* NETSTACK_CONF_NETWORK */
 
-#ifndef NETSTACK_CONF_MAC
+/* Select the BLE mac driver */
+#if MAC_CONF_WITH_OTHER
 #define NETSTACK_CONF_MAC     ble_ipsp_mac_driver
-#endif /* NETSTACK_CONF_MAC */
+#endif
 
-/* 6LoWPAN */
-#define SICSLOWPAN_CONF_MAC_MAX_PAYLOAD         1280
-#define SICSLOWPAN_CONF_COMPRESSION             SICSLOWPAN_COMPRESSION_HC06
-#define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD   0     /**< Always compress IPv6 packets. */
+#ifndef SICSLOWPAN_CONF_FRAG
 #define SICSLOWPAN_CONF_FRAG                    0     /**< We don't use 6LoWPAN fragmentation as IPSP takes care of that for us.*/
+#endif
+
 #define SICSLOWPAN_FRAMER_HDRLEN                0     /**< Use fixed header len rather than framer.length() function */
 
 /* Packet buffer */
 #define PACKETBUF_CONF_SIZE                     1280  /**< Required IPv6 MTU size */
+
+/* Queuebuf */
+#define QUEUEBUF_CONF_ENABLED                   0
+
 /** @} */
 
 /**
@@ -90,61 +93,16 @@
  *
  * @{
  */
-/* Don't let contiki-default-conf.h decide if we are an IPv6 build */
-#ifndef NETSTACK_CONF_WITH_IPV6
-#define NETSTACK_CONF_WITH_IPV6              0
-#endif
 
 #if NETSTACK_CONF_WITH_IPV6
 /*---------------------------------------------------------------------------*/
-/* Addresses, Sizes and Interfaces */
-#define LINKADDR_CONF_SIZE                   8
-#define UIP_CONF_LL_802154                   1
-#define UIP_CONF_LLH_LEN                     0
-
-/* The size of the uIP main buffer */
-#ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE              1280
-#endif
 
 /* ND and Routing */
 #define UIP_CONF_ROUTER                      0 /**< BLE master role, which allows for routing, isn't supported. */
 #define UIP_CONF_ND6_SEND_NS                 1
-#define UIP_CONF_IP_FORWARD                  0 /**< No packet forwarding. */
 
-#define UIP_CONF_ND6_REACHABLE_TIME     600000
-#define UIP_CONF_ND6_RETRANS_TIMER       10000
-
-#ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS        20
-#endif
-
-#ifndef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES                 20
-#endif
-
-#ifndef UIP_CONF_TCP
-#define UIP_CONF_TCP                         1
-#endif
-
-#ifndef UIP_CONF_TCP_MSS
-#define UIP_CONF_TCP_MSS                    64
-#endif
-
-#define UIP_CONF_UDP                         1
-#define UIP_CONF_UDP_CHECKSUMS               1
-#define UIP_CONF_ICMP6                       1
 #endif /* NETSTACK_CONF_WITH_IPV6 */
-/** @} */
-/*---------------------------------------------------------------------------*/
-/**
- * \name Generic Configuration directives
- *
- * @{
- */
-#ifndef ENERGEST_CONF_ON
-#define ENERGEST_CONF_ON                     1 /**< Energest Module */
-#endif
+
 /** @} */
 #endif /* CONTIKI_CONF_H */
 /**

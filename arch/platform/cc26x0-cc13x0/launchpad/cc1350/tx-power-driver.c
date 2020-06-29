@@ -36,7 +36,7 @@
  * TX power settings for the CC1350 LP
  */
 /*---------------------------------------------------------------------------*/
-#include "../../../cc26x0-cc13x0/contiki-conf.h"
+#include "contiki.h"
 #include "dev/radio.h"
 #include "rf-core/prop-mode.h"
 /*---------------------------------------------------------------------------*/

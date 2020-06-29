@@ -34,6 +34,7 @@
  *         A shell back-end for the serial port
  * \author
  *         Adam Dunkels <adam@sics.se>
+ *         Simon Duquennoy <simon.duquennoy@inria.fr>
  */
 
 /**
@@ -42,52 +43,18 @@
  */
 
 #include "contiki.h"
-#include "shell.h"
-
 #include "dev/serial-line.h"
-#include "net/rime/rime.h"
-
-#include <stdio.h>
-#include <string.h>
-
+#include "sys/log.h"
+#include "shell.h"
+#include "serial-shell.h"
 
 /*---------------------------------------------------------------------------*/
 PROCESS(serial_shell_process, "Contiki serial shell");
-/*---------------------------------------------------------------------------*/
-void
-shell_default_output(const char *text1, int len1, const char *text2, int len2)
-{
-  int i;
-  if(text1 == NULL) {
-    text1 = "";
-    len1 = 0;
-  }
-  if(text2 == NULL) {
-    text2 = "";
-    len2 = 0;
-  }
 
-  /* Precision (printf("%.Ns", text1)) not supported on all platforms.
-     putchar(c) not be supported on all platforms. */
-  for(i = 0; i < len1; i++) {
-    printf("%c", text1[i]);
-  }
-  for(i = 0; i < len2; i++) {
-    printf("%c", text2[i]);
-  }
-  printf("\r\n");
-}
 /*---------------------------------------------------------------------------*/
-void
-shell_prompt(char *str)
-{
-  printf("%d.%d: %s\r\n", linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1],
-	 str);
-}
-/*---------------------------------------------------------------------------*/
-void
-shell_exit(void)
-{
+static void
+serial_shell_output(const char *str) {
+  printf("%s", str);
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(serial_shell_process, ev, data)
@@ -97,8 +64,9 @@ PROCESS_THREAD(serial_shell_process, ev, data)
   shell_init();
 
   while(1) {
+    static struct pt shell_input_pt;
     PROCESS_WAIT_EVENT_UNTIL(ev == serial_line_event_message && data != NULL);
-    shell_input(data, strlen(data));
+    PROCESS_PT_SPAWN(&shell_input_pt, shell_input(&shell_input_pt, serial_shell_output, data));
   }
 
   PROCESS_END();

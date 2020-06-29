@@ -36,20 +36,19 @@
  *  Driver for the Sensortag HDC sensor
  */
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/sensortag/hdc-1000-sensor.h"
-
+#include "contiki.h"
 #include "sys/ctimer.h"
 #include "lib/sensors.h"
+#include "hdc-1000-sensor.h"
+#include "sensor-common.h"
+#include "board-i2c.h"
+
 #include "ti-lib.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-#include "../../cc26x0-cc13x0/contiki-conf.h"
-#include "../../cc26x0-cc13x0/sensortag/board-i2c.h"
-#include "../../cc26x0-cc13x0/sensortag/sensor-common.h"
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
 #if DEBUG
@@ -206,7 +205,7 @@ notify_ready(void *not_used)
 /*---------------------------------------------------------------------------*/
 /**
  * \brief Returns a reading from the sensor
- * \param type HDC_1000_SENSOR_TYPE_TEMP or HDC_1000_SENSOR_TYPE_HUMIDITY
+ * \param type HDC_1000_SENSOR_TYPE_TEMP or HDC_1000_SENSOR_TYPE_HUMID
  * \return Temperature (centi degrees C) or Humidity (centi %RH)
  */
 static int
@@ -222,7 +221,7 @@ value(int type)
   }
 
   if((type != HDC_1000_SENSOR_TYPE_TEMP) &&
-     type != HDC_1000_SENSOR_TYPE_HUMIDITY) {
+     type != HDC_1000_SENSOR_TYPE_HUMID) {
     PRINTF("Invalid type\n");
     return CC26XX_SENSOR_READING_ERROR;
   } else {
@@ -232,7 +231,7 @@ value(int type)
 
     if(type == HDC_1000_SENSOR_TYPE_TEMP) {
       rv = (int)(temp * 100);
-    } else if(type == HDC_1000_SENSOR_TYPE_HUMIDITY) {
+    } else if(type == HDC_1000_SENSOR_TYPE_HUMID) {
       rv = (int)(hum * 100);
     }
   }

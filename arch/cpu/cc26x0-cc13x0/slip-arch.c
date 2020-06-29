@@ -56,7 +56,7 @@ slip_arch_writeb(unsigned char c)
  * \param ubr Ignored for the cc26xx
  */
 void
-slip_arch_init(unsigned long ubr)
+slip_arch_init()
 {
   /*
    * Enable an input handler. In doing so, the driver will make sure that UART

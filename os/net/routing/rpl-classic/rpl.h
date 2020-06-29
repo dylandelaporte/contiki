@@ -38,9 +38,10 @@
 #ifndef RPL_H
 #define RPL_H
 
-#include "rpl-conf.h"
+#include "net/routing/rpl-classic/rpl-conf.h"
+
 #include "lib/list.h"
-#include "net/ip/uip.h"
+#include "net/ipv6/uip.h"
 #include "net/ipv6/uip-ds6.h"
 #include "sys/ctimer.h"
 
@@ -251,6 +252,7 @@ struct rpl_instance {
 #if RPL_WITH_PROBING
   struct ctimer probing_timer;
   rpl_parent_t *urgent_probing_target;
+  int last_dag;
 #endif /* RPL_WITH_PROBING */
   struct ctimer dio_timer;
   struct ctimer dao_timer;
@@ -264,7 +266,6 @@ struct rpl_instance {
 
 /*---------------------------------------------------------------------------*/
 /* Public RPL functions. */
-void rpl_init(void);
 void uip_rpl_input(void);
 rpl_dag_t *rpl_set_root(uint8_t instance_id, uip_ipaddr_t *dag_id);
 int rpl_set_prefix(rpl_dag_t *dag, uip_ipaddr_t *prefix, unsigned len);
@@ -273,28 +274,27 @@ int rpl_set_default_route(rpl_instance_t *instance, uip_ipaddr_t *from);
 rpl_dag_t *rpl_get_dag(const uip_ipaddr_t *addr);
 rpl_dag_t *rpl_get_any_dag(void);
 rpl_instance_t *rpl_get_instance(uint8_t instance_id);
-int rpl_update_header(void);
-int rpl_finalize_header(uip_ipaddr_t *addr);
-int rpl_verify_hbh_header(int);
+int rpl_ext_header_update(void);
+int rpl_ext_header_hbh_update(uint8_t *, int);
 void rpl_insert_header(void);
-void rpl_remove_header(void);
+bool rpl_ext_header_remove(void);
 const struct link_stats *rpl_get_parent_link_stats(rpl_parent_t *p);
 int rpl_parent_is_fresh(rpl_parent_t *p);
 int rpl_parent_is_reachable(rpl_parent_t *p);
 uint16_t rpl_get_parent_link_metric(rpl_parent_t *p);
 rpl_rank_t rpl_rank_via_parent(rpl_parent_t *p);
 const linkaddr_t *rpl_get_parent_lladdr(rpl_parent_t *p);
-uip_ipaddr_t *rpl_get_parent_ipaddr(rpl_parent_t *nbr);
-rpl_parent_t *rpl_get_parent(uip_lladdr_t *addr);
+uip_ipaddr_t *rpl_parent_get_ipaddr(rpl_parent_t *nbr);
+rpl_parent_t *rpl_get_parent(const uip_lladdr_t *addr);
 rpl_rank_t rpl_get_parent_rank(uip_lladdr_t *addr);
 void rpl_dag_init(void);
 uip_ds6_nbr_t *rpl_get_nbr(rpl_parent_t *parent);
 void rpl_print_neighbor_list(void);
-int rpl_process_srh_header(void);
-int rpl_srh_get_next_hop(uip_ipaddr_t *ipaddr);
-
+int rpl_ext_header_srh_update(void);
+int rpl_ext_header_srh_get_next_hop(uip_ipaddr_t *ipaddr);
+void rpl_link_callback(const linkaddr_t *addr, int status, int numtx);
 /* Per-parent RPL information */
-NBR_TABLE_DECLARE(rpl_parents);
+NBR_TABLE_DECLARE(rpl_parent_t, rpl_parents);
 
 /**
  * RPL modes
@@ -327,6 +327,12 @@ enum rpl_mode rpl_set_mode(enum rpl_mode mode);
  */
 enum rpl_mode rpl_get_mode(void);
 
+/**
+ * Tells whether the node has joined a network or not
+ *
+ * \retval 1 if we have joined a network, 0 if not.
+ */
+int rpl_has_joined(void);
 
 /**
  * Get the RPL's best guess on if we have downward route or not.
@@ -334,6 +340,13 @@ enum rpl_mode rpl_get_mode(void);
  * \retval 1 if we have a downward route from RPL Root, 0 if not.
  */
 int rpl_has_downward_route(void);
+
+/**
+ * Tells whether the protocol is in leaf mode
+ *
+ * \retval 1 if the protocol is in leaf mode, 0 if not.
+ */
+uint8_t rpl_is_in_leaf_mode(void);
 
 /*---------------------------------------------------------------------------*/
 #endif /* RPL_H */

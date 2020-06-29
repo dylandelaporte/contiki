@@ -48,14 +48,13 @@
 #ifndef BOARD_PERIPHERALS_H_
 #define BOARD_PERIPHERALS_H_
 /*---------------------------------------------------------------------------*/
-#include "../../cc26x0-cc13x0/common/ext-flash.h"
-#include "../../cc26x0-cc13x0/sensortag/bmp-280-sensor.h"
-#include "../../cc26x0-cc13x0/sensortag/buzzer.h"
-#include "../../cc26x0-cc13x0/sensortag/hdc-1000-sensor.h"
-#include "../../cc26x0-cc13x0/sensortag/mpu-9250-sensor.h"
-#include "../../cc26x0-cc13x0/sensortag/opt-3001-sensor.h"
-#include "../../cc26x0-cc13x0/sensortag/reed-relay.h"
-#include "../../cc26x0-cc13x0/sensortag/tmp-007-sensor.h"
+#include "bmp-280-sensor.h"
+#include "tmp-007-sensor.h"
+#include "opt-3001-sensor.h"
+#include "hdc-1000-sensor.h"
+#include "mpu-9250-sensor.h"
+#include "buzzer.h"
+#include "ext-flash.h"
 /*---------------------------------------------------------------------------*/
 #endif /* BOARD_PERIPHERALS_H_ */
 /*---------------------------------------------------------------------------*/
