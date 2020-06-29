@@ -84,6 +84,7 @@
 #include "net/ipv6/uipopt.h"
 #include "net/ipv6/uipbuf.h"
 #include "net/linkaddr.h"
+#include "uip-hton.h"
 
 /* For memcmp */
 #include <string.h>
@@ -1208,48 +1209,6 @@ struct uip_udp_conn *uip_udp_new(const uip_ipaddr_t *ripaddr, uint16_t rport);
  * \hideinitializer
  */
 #define uip_ipaddr4(addr) ((addr)->u8[3])
-
-/**
- * Convert 16-bit quantity from host byte order to network byte order.
- *
- * This macro is primarily used for converting constants from host
- * byte order to network byte order. For converting variables to
- * network byte order, use the uip_htons() function instead.
- *
- * \hideinitializer
- */
-#ifndef UIP_HTONS
-#   if UIP_BYTE_ORDER == UIP_BIG_ENDIAN
-#      define UIP_HTONS(n) (n)
-#      define UIP_HTONL(n) (n)
-#   else /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
-#      define UIP_HTONS(n) (uint16_t)((((uint16_t) (n)) << 8) | (((uint16_t) (n)) >> 8))
-#      define UIP_HTONL(n) (((uint32_t)UIP_HTONS(n) << 16) | UIP_HTONS((uint32_t)(n) >> 16))
-#   endif /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
-#else
-#error "UIP_HTONS already defined!"
-#endif /* UIP_HTONS */
-
-/**
- * Convert a 16-bit quantity from host byte order to network byte order.
- *
- * This function is primarily used for converting variables from host
- * byte order to network byte order. For converting constants to
- * network byte order, use the UIP_HTONS() macro instead.
- */
-#ifndef uip_htons
-uint16_t uip_htons(uint16_t val);
-#endif /* uip_htons */
-#ifndef uip_ntohs
-#define uip_ntohs uip_htons
-#endif
-
-#ifndef uip_htonl
-uint32_t uip_htonl(uint32_t val);
-#endif /* uip_htonl */
-#ifndef uip_ntohl
-#define uip_ntohl uip_htonl
-#endif
 
 /** @} */
 

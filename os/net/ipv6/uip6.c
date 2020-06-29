@@ -2334,17 +2334,21 @@ uip_process(uint8_t flag)
   return;
 }
 /*---------------------------------------------------------------------------*/
+#ifndef uip_htons
 uint16_t
 uip_htons(uint16_t val)
 {
   return UIP_HTONS(val);
 }
+#endif
 
+#ifndef uip_htonl
 uint32_t
 uip_htonl(uint32_t val)
 {
   return UIP_HTONL(val);
 }
+#endif
 /*---------------------------------------------------------------------------*/
 void
 uip_send(const void *data, int len)
