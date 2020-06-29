@@ -1175,8 +1175,8 @@ SIXPError sixp_pkt_load(SIXPHandle* h, void* dst, unsigned offset, unsigned len)
     assert(h->body != NULL);
 
     if(h->body_len < (offset + len)) {
-      LOG_ERR("copy: too short packet(%d:%d) body[%u+%u]\n"
-              , h->type, h->code, offset, len
+      LOG_ERR("copy: too short packet(%d:%u) body[%u+%u]\n"
+              , h->type, h->code.value, offset, len
               );
       return -1;
     }
