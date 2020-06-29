@@ -60,9 +60,9 @@
 #endif
 
 unsigned                avoids_list_num = 0;
-msf_cell_t              avoids_list[MSF_USED_LIST_LIMIT] = {0};
+msf_cell_t              avoids_list[MSF_USED_LIST_LIMIT];// = {0};
 const tsch_neighbor_t*  avoids_nbrs[MSF_USED_LIST_LIMIT];
-AvoidOption             avoids_ops [MSF_USED_LIST_LIMIT] = {0};
+AvoidOption             avoids_ops [MSF_USED_LIST_LIMIT];// = {0};
 
 // special codes for cells.raw
 enum {
@@ -172,40 +172,50 @@ int msf_avoids_nbr_cell_idx(msf_cell_t x, const tsch_neighbor_t *n){
     return -1;
 }
 
-int  msf_is_avoid_slot(uint16_t slot_offset){
+AvoidOptionsResult  msf_is_avoid_slot_range(uint16_t slot_offset, AvoidOptions range ){
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = avoids_list_num; idx > 0; --idx, cell++){
         if (cell->field.slot == slot_offset){
             int idx = cell-avoids_list;
-            if (avoids_ops[idx]& aoUSE)
+            if (avoids_ops[idx]& range)
                 return idx;
         }
     }
     return -1;
 }
 
+AvoidOptionsResult  msf_is_avoid_slot(uint16_t slot_offset){
+    return msf_is_avoid_slot_range(slot_offset, aoUSE);
+}
+
+
 AvoidOptionsResult msf_is_avoid_local_slot(uint16_t slot_offset){
+    return msf_is_avoid_slot_range(slot_offset, aoUSE_LOCAL);
+}
+
+// check for RX cells in slots
+AvoidOptionsResult  msf_is_avoid_slot_nbr_range(uint16_t slot_offset, const tsch_neighbor_t * n
+                                                , AvoidOptions range)
+{
     msf_cell_t* cell = avoids_list;
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
+        if (avoids_nbrs[idx] == n)
         if (cell->field.slot == slot_offset){
-            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
+            if ((avoids_ops[idx] & range) != 0)
                 return avoids_ops[idx];
         }
     }
     return -1;
 }
 
-// check for RX cells in slots
 AvoidOptionsResult  msf_is_avoid_local_slot_nbr(uint16_t slot_offset, const tsch_neighbor_t * n){
-    msf_cell_t* cell = avoids_list;
-    for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cell){
-        if (avoids_nbrs[idx] == n)
-        if (cell->field.slot == slot_offset){
-            if ((avoids_ops[idx] & aoUSE_LOCAL) != 0)
-                return avoids_ops[idx];
-        }
-    }
-    return -1;
+    return msf_is_avoid_slot_nbr_range(slot_offset, n, aoUSE_LOCAL);
+}
+
+
+
+AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
+    return msf_is_avoid_slot_nbr_range(slot_offset, n, aoUSE);
 }
 
 // check for RX cells in slot
@@ -238,18 +248,6 @@ int  msf_is_avoid_close_slot_outnbr(uint16_t slot_offset, const tsch_neighbor_t 
     return -1;
 }
 
-
-AvoidOptionsResult  msf_is_avoid_nbr_slot(uint16_t slot_offset, const tsch_neighbor_t *n){
-    msf_cell_t* cell = avoids_list;
-    for (unsigned idx = 0; idx < avoids_list_num; ++idx, cell++){
-        if (cell->field.slot == slot_offset){
-            if (avoids_nbrs[idx] == n)
-            if (avoids_ops[idx]& aoUSE)
-                return avoids_ops[idx];
-        }
-    }
-    return -1;
-}
 
 
 /*
@@ -375,6 +373,7 @@ void msf_unmark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsigned ops){
     int idx = msf_avoids_nbr_cell_idx(x, n);
     if (idx >= 0){
         msf_cell_t* cell = avoids_list + idx;
+
         avoids_ops[idx]  &= ~ops;
         if ( (avoids_ops[idx] & aoUSE) != 0) {
             LOG_DBG("unuse %u+%u = %x\n"
@@ -455,7 +454,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
     LOG_DBG("unuse:%lx ->/%x\n", (unsigned long)x.raw, (unsigned)range);
 
     msf_cell_t*             cells= avoids_list;
-    const tsch_neighbor_t** nbrs = avoids_nbrs;
+
     for (unsigned idx = 0; idx < avoids_list_num; ++idx, ++cells){
         if (cells->raw != x.raw) continue;
 
@@ -474,7 +473,7 @@ int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOptio
 
             avoids_ops[idx]  &= ~(aoUSE_REMOTE | aoMARK);
             //assign nbr of clearer
-            nbrs[idx]           = n;
+            avoids_nbrs[idx]           = n;
 
             LOG_DBG("unuse %u+%u = %x\n"
                         , (unsigned)cells->field.slot

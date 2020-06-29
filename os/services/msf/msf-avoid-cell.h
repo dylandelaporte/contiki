@@ -169,7 +169,7 @@ void msf_unvoid_link_cell(const tsch_link_t* x);
  */
 int  msf_is_avoid_cell(msf_cell_t x);
 int  msf_is_avoid_cell_at(uint16_t slot_offset, uint16_t channel_offset);
-int  msf_is_avoid_slot(uint16_t slot_offset);
+AvoidOptionsResult  msf_is_avoid_slot(uint16_t slot_offset);
 
 /* @brief check that cell is used local
  * @return < 0 - no cell found
