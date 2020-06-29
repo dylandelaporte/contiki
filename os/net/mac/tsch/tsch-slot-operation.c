@@ -63,6 +63,16 @@
 #define LOG_MODULE "TSCH Slop"
 #define LOG_LEVEL LOG_LEVEL_MAC
 
+// turn on TSCH_PRINT if have some LOG_LEVEL_MAC
+#if LOG_CONF_LEVEL_MAC > LOG_LEVEL_NONE
+#define DEBUG   (DEBUG_PRINT)
+#else
+#define DEBUG   0
+#endif
+#include "net/net-debug.h"
+
+
+
 /* TSCH debug macros, i.e. to set LEDs or GPIOs on various TSCH
  * timeslot events */
 #ifndef TSCH_DEBUG_INIT
