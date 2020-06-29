@@ -82,15 +82,13 @@ tsch_slotframe_t * msf_negotiate_slotframe;
 static const bool is_used = true;
 static const bool is_unused = true;
 static const bool is_kept = true;
-static const bool is_used_relocate = true;
-static const bool is_unused_relocate = true;
 
 MEMB(msf_negotiated_cell_data_memb,
      msf_negotiated_cell_data_t,
      MSF_MAX_NUM_NEGOTIATED_TX_CELLS);
 
 /* static functions */
-static void keep_rx_cells(const linkaddr_t *peer_addr);
+static void keep_all_rx_cells(const linkaddr_t *peer_addr);
 static void mark_as_used(tsch_link_t *cell);
 static void mark_as_unused(tsch_link_t *cell);
 static void mark_as_kept(tsch_link_t *cell);
@@ -125,7 +123,7 @@ msf_negotiated_cell_data_t * neglink_data(tsch_link_t *cell){
 
 /*---------------------------------------------------------------------------*/
 static void
-keep_rx_cells(const linkaddr_t *peer_addr)
+keep_all_rx_cells(const linkaddr_t *peer_addr)
 {
   if(slotframe == NULL || peer_addr == NULL) {
     /* do nothing */
@@ -174,31 +172,22 @@ mark_as_kept(tsch_link_t *cell)
 static bool
 is_marked_as_used(const tsch_link_t *cell)
 {
-    if (cell != NULL){
-        if (cell->data == (void *)&is_used)
-            return true;
-        if (cell->data == (void *)&is_used_relocate)
-            return true;
-    }
-    return false;
+    assert(cell != NULL);
+    return (cell->data == (void *)&is_used);
 }
 /*---------------------------------------------------------------------------*/
 static bool
 is_marked_as_unused(const tsch_link_t *cell)
 {
-    if (cell != NULL){
-        if (cell->data == (void *)&is_unused)
-            return true;
-        if (cell->data == (void *)&is_unused_relocate)
-            return true;
-    }
-    return false;
+    assert(cell != NULL);
+    return (cell->data == (void *)&is_unused);
 }
 /*---------------------------------------------------------------------------*/
 static bool
 is_marked_as_kept(const tsch_link_t *cell)
 {
-  return cell != NULL && cell->data == (void *)&is_kept;
+  assert(cell != NULL);
+  return cell->data == (void *)&is_kept;
 }
 
 bool msf_is_marked_as_relocate(const tsch_link_t *cell){
@@ -516,10 +505,18 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
   tsch_link_t *cell;
   assert(slotframe);
 
-  {
     tsch_neighbor_t *nbr = NULL;
+  if ( peer_addr != NULL) {
+      nbr = tsch_queue_get_nbr(peer_addr);
+      assert(nbr != NULL);
+      if (nbr == NULL)
+            //strange this
+            return;
+
+      msf_negotiated_drop_all_tx(nbr);
+  }
+
     tsch_link_t *next_cell;
-    if(peer_addr == NULL) {
         for(cell = list_head(slotframe->links_list);
             cell != NULL;
             cell = next_cell)
@@ -529,6 +526,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
           if ((cell->link_options & LINK_OPTION_LINK_TO_DELETE) != 0)
               continue;
 
+          if(peer_addr == NULL) {
           nbr = tsch_queue_get_nbr(&cell->addr);
           assert(nbr != NULL);
           if (nbr->negotiated_tx_cell == NULL){
@@ -536,37 +534,23 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
               msf_negotiated_cell_delete_as(cell, doBAREDROP);
           }
           else {
-          msf_negotiated_drop_all_tx(nbr);
+              msf_negotiated_drop_all_tx(nbr);
               msf_negotiated_cell_delete_as(cell, doCAREFUL);
           }
-        }
+          }
+          else {
+            if (linkaddr_cmp(&cell->addr, peer_addr)) {
+                msf_negotiated_cell_delete_as(cell, doBAREDROP);
+            }
+          }
+        }//for(cell = list_head
+
+    if (peer_addr == NULL) {
         LOG_INFO("removed all negotiated cells\n");
-        MSF_AFTER_CELL_CLEAN(NULL);
-    } else {
-      nbr = tsch_queue_get_nbr(peer_addr);
-      assert(nbr != NULL);
-      if (nbr == NULL)
-            //strange this
-            return;
-      msf_negotiated_drop_all_tx(nbr);
-
-      for(cell = list_head(slotframe->links_list);
-          cell != NULL;
-          cell = next_cell) {
-        next_cell = list_item_next(cell);
-        if(linkaddr_cmp(&cell->addr, peer_addr) &&
-           (cell->link_options & LINK_OPTION_LINK_TO_DELETE) == 0) {
-            msf_negotiated_cell_delete_as(cell, doBAREDROP);
-        } else {
-          /* this cell is not scheduled with peer_addr; ignore it */
-          continue;
-        }
-      }
-
+    }else {
       msf_sending_nbr_ensure_tx(nbr, peer_addr);
-      MSF_AFTER_CELL_CLEAN(nbr);
     }
-  }
+    MSF_AFTER_CELL_CLEAN(nbr);
 }
 /*---------------------------------------------------------------------------*/
 bool
@@ -906,15 +890,7 @@ msf_negotiated_cell_delete_unused_cells(void)
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
 
     tsch_link_t *cell, *next_cell;
-    /* mark cells to keep with "is_kept" */
-    for(cell = list_head(slotframe->links_list);
-        cell != NULL;
-        cell = list_item_next(cell))
-    {
-      if( is_link_rx(cell->link_options) && is_marked_as_used(cell)) {
-        keep_rx_cells(&cell->addr);
-      }
-    }
+
     for(cell = list_head(slotframe->links_list), next_cell = NULL;
         cell != NULL;
         cell = next_cell)
@@ -924,7 +900,10 @@ msf_negotiated_cell_delete_unused_cells(void)
       if ( !is_link_rx(cell->link_options) )
           continue;
 
-      // do not garbage cells that are listen parent. why?
+      if (is_marked_as_used(cell))
+          keep_all_rx_cells(&cell->addr);
+
+      // do not garbage cells that are listen parent. they ar managed by Num
       if (parent_addr != NULL)
       if (linkaddr_cmp(&cell->addr, parent_addr))
           continue;

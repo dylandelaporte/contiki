@@ -66,10 +66,12 @@ long msf_find_unused_slot_offset(tsch_slotframe_t *slotframe
 {
   long ret;
   uint16_t slot_offset;
-  const tsch_link_t *autonomous_rx_cell = msf_autonomous_cell_get_rx();
-  tsch_neighbor_t* nbr = NULL;
 
+  const tsch_link_t *autonomous_rx_cell = msf_autonomous_cell_get_rx();
+  (void)autonomous_rx_cell;
   assert(autonomous_rx_cell != NULL);
+
+  tsch_neighbor_t* nbr = NULL;
   if (mode == RESERVE_NBR_BUSY_CELL)
       nbr = tsch_queue_get_nbr(peer_addr);
 
@@ -251,9 +253,9 @@ msf_reserved_cell_add(const linkaddr_t *peer_addr,
     if(slot_offset > 0)
     if ( msf_is_avoid_local_slot(slot_offset) >= 0) {
         /* this slot is used; we cannot reserve a cell */
-        LOG_DBG("reserve %s miss at slot_offset:%d, channel_offset:%d\n",
+        LOG_DBG("reserve %s miss at slot_offset:%ld, channel_offset:%ld\n",
                 msf_negotiated_cell_type_str(cell_type),
-                slot_offset, channel_offset);
+                (long)slot_offset, (long)channel_offset);
         return NULL;
     }
 
@@ -348,20 +350,20 @@ tsch_link_t * msf_reserved_cell_add_anyvoid(const linkaddr_t *peer_addr,
                                       );
     if (cell != NULL){
         cell->data = NULL;
-        LOG_DBG("reserved a %s cell at slot_offset:%d, channel_offset:%d\n",
+        LOG_DBG("reserved a %s cell at slot_offset:%ld, channel_offset:%ld\n",
                 msf_negotiated_cell_type_str(cell_type),
-                _slot_offset, _channel_offset);
+                (long)_slot_offset, (long)_channel_offset);
     } else  {
       LOG_ERR("failed to reserve a %s cell at "
-              "slot_offset:%d, channel_offset:%d\n",
+              "slot_offset:%ld, channel_offset:%ld\n",
               msf_negotiated_cell_type_str(cell_type),
-              _slot_offset, _channel_offset);
+              (long)_slot_offset, (long)_channel_offset);
     }
   }
   else{
-      LOG_DBG("reserve %s miss at slot_offset:%d, channel_offset:%d\n",
+      LOG_DBG("reserve %s miss at slot_offset:%ld, channel_offset:%ld\n",
               msf_negotiated_cell_type_str(cell_type),
-              slot_offset, channel_offset);
+              (long)slot_offset, (long)channel_offset);
   }
 
   return cell;

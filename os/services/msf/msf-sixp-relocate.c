@@ -221,7 +221,8 @@ void msf_rel_send_response(const linkaddr_t *peer_addr,
       msf_sixp_start_retry_wait_timer(peer_addr);
       rc = SIXP_PKT_RC_ERR_BUSY;
       reserved_cell = NULL;
-  }
+      cell_to_relocate = NULL;
+}
   else if((cell_to_relocate =
              msf_sixp_find_scheduled_cell(peer_addr,
                                           cell_type,
