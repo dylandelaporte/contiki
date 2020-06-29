@@ -30,6 +30,8 @@ ifeq ($(HOST_OS),Linux)
 TARGET_LIBFILES += -lrt
 endif
 
+TARGET_IS_POSIX = 1
+
 # looks gcc ld can`t handle weak symbols in archives. 
 # !!!So sure that board.o links out of archive
 
