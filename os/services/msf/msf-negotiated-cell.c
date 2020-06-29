@@ -88,7 +88,7 @@ MEMB(msf_negotiated_cell_data_memb,
      MSF_MAX_NUM_NEGOTIATED_TX_CELLS);
 
 /* static functions */
-static void keep_rx_cells(const linkaddr_t *peer_addr);
+static void keep_all_rx_cells(const linkaddr_t *peer_addr);
 static void mark_as_used(tsch_link_t *cell);
 static void mark_as_unused(tsch_link_t *cell);
 static void mark_as_kept(tsch_link_t *cell);
@@ -123,7 +123,7 @@ msf_negotiated_cell_data_t * neglink_data(tsch_link_t *cell){
 
 /*---------------------------------------------------------------------------*/
 static void
-keep_rx_cells(const linkaddr_t *peer_addr)
+keep_all_rx_cells(const linkaddr_t *peer_addr)
 {
   if(slotframe == NULL || peer_addr == NULL) {
     /* do nothing */
@@ -186,7 +186,8 @@ is_marked_as_unused(const tsch_link_t *cell)
 static bool
 is_marked_as_kept(const tsch_link_t *cell)
 {
-  return cell != NULL && cell->data == (void *)&is_kept;
+  assert(cell != NULL);
+  return cell->data == (void *)&is_kept;
 }
 
 bool msf_is_marked_as_relocate(const tsch_link_t *cell){
@@ -889,15 +890,7 @@ msf_negotiated_cell_delete_unused_cells(void)
   const linkaddr_t *parent_addr = msf_housekeeping_get_parent_addr();
 
     tsch_link_t *cell, *next_cell;
-    /* mark cells to keep with "is_kept" */
-    for(cell = list_head(slotframe->links_list);
-        cell != NULL;
-        cell = list_item_next(cell))
-    {
-      if( is_link_rx(cell->link_options) && is_marked_as_used(cell)) {
-        keep_rx_cells(&cell->addr);
-      }
-    }
+
     for(cell = list_head(slotframe->links_list), next_cell = NULL;
         cell != NULL;
         cell = next_cell)
@@ -907,7 +900,10 @@ msf_negotiated_cell_delete_unused_cells(void)
       if ( !is_link_rx(cell->link_options) )
           continue;
 
-      // do not garbage cells that are listen parent. why?
+      if (is_marked_as_used(cell))
+          keep_all_rx_cells(&cell->addr);
+
+      // do not garbage cells that are listen parent. they ar managed by Num
       if (parent_addr != NULL)
       if (linkaddr_cmp(&cell->addr, parent_addr))
           continue;
