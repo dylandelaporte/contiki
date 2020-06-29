@@ -193,7 +193,7 @@ static int last_tx_status;
 /** @} */
 
 
-static int last_rssi;
+int sixlowpan_last_rssi;
 
 /* ----------------------------------------------------------------- */
 /* Support for reassembling multiple packets                         */
@@ -414,22 +414,21 @@ static bool
 copy_frags2uip(int context)
 {
   int i;
+  struct sicslowpan_frag_info* frag_c = &frag_info[context];
 
   /* Check length fields before proceeding. */
-  if(frag_info[context].len < frag_info[context].first_frag_len ||
-     frag_info[context].len > sizeof(uip_buf)) {
+  if(frag_c->len < frag_c->first_frag_len || frag_c->len > sizeof(uip_buf)) {
     LOG_WARN("input: invalid total size of fragments\n");
     clear_fragments(context);
     return false;
   }
 
   /* Copy from the fragment context info buffer first */
-  memcpy((uint8_t *)UIP_IP_BUF, (uint8_t *)frag_info[context].first_frag,
-         frag_info[context].first_frag_len);
+  memcpy((uint8_t *)UIP_IP_BUF, (uint8_t *)frag_c->first_frag, frag_c->first_frag_len);
 
   /* Ensure that no previous data is used for reassembly in case of missing fragments. */
-  memset((uint8_t *)UIP_IP_BUF + frag_info[context].first_frag_len, 0,
-         frag_info[context].len - frag_info[context].first_frag_len);
+  memset((uint8_t *)UIP_IP_BUF + frag_c->first_frag_len, 0,
+          frag_c->len - frag_c->first_frag_len);
 
   for(i = 0; i < SICSLOWPAN_FRAGMENT_BUFFERS; i++) {
     /* And also copy all matching fragments */
@@ -455,19 +454,8 @@ copy_frags2uip(int context)
 /*-------------------------------------------------------------------------*/
 /* Basic netstack sniffer */
 /*-------------------------------------------------------------------------*/
-static struct netstack_sniffer *callback = NULL;
-
-void
-netstack_sniffer_add(struct netstack_sniffer *s)
-{
-  callback = s;
-}
-
-void
-netstack_sniffer_remove(struct netstack_sniffer *s)
-{
-  callback = NULL;
-}
+struct netstack_sniffer *netstack_sniffer_callback = NULL;
+#define callback    netstack_sniffer_callback
 
 static void
 set_packet_attrs(void)
@@ -1839,7 +1827,7 @@ input(void)
 
   /* Save the RSSI of the incoming packet in case the upper layer will
      want to query us for it later. */
-  last_rssi = (signed short)packetbuf_attr(PACKETBUF_ATTR_RSSI);
+  sixlowpan_last_rssi = (signed short)packetbuf_attr(PACKETBUF_ATTR_RSSI);
 
 #if SICSLOWPAN_CONF_FRAG
 
@@ -2110,12 +2098,6 @@ sicslowpan_init(void)
 #endif /* SICSLOWPAN_CONF_MAX_ADDR_CONTEXTS > 1 */
 
 #endif /* SICSLOWPAN_COMPRESSION == SICSLOWPAN_COMPRESSION_IPHC */
-}
-/*--------------------------------------------------------------------*/
-int
-sicslowpan_get_last_rssi(void)
-{
-  return last_rssi;
 }
 /*--------------------------------------------------------------------*/
 const struct network_driver sicslowpan_driver = {
