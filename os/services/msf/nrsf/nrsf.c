@@ -447,9 +447,10 @@ SIXPError nrsf_sixp_add_request(SIXPeerHandle* hpeer)
           nrsf_avoid_cells(hpeer, &hcells);
         }
         else{
-            LOG_DBG("pkt:%x*%d > %x,%x\n"
+            LOG_DBG("pkt:%x*%d > %lx,%lx\n"
                     , hcells.meta, hcells.num_cells
-                    , hcells.cell_list[-1], hcells.cell_list[0]);
+                    , hcells.cell_list[-1].raw, hcells.cell_list[0].raw
+                    );
             return sixpFAIL;
         }
     }
