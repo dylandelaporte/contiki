@@ -516,10 +516,18 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
   tsch_link_t *cell;
   assert(slotframe);
 
-  {
     tsch_neighbor_t *nbr = NULL;
+  if ( peer_addr != NULL) {
+      nbr = tsch_queue_get_nbr(peer_addr);
+      assert(nbr != NULL);
+      if (nbr == NULL)
+            //strange this
+            return;
+
+      msf_negotiated_drop_all_tx(nbr);
+  }
+
     tsch_link_t *next_cell;
-    if(peer_addr == NULL) {
         for(cell = list_head(slotframe->links_list);
             cell != NULL;
             cell = next_cell)
@@ -529,6 +537,7 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
           if ((cell->link_options & LINK_OPTION_LINK_TO_DELETE) != 0)
               continue;
 
+          if(peer_addr == NULL) {
           nbr = tsch_queue_get_nbr(&cell->addr);
           assert(nbr != NULL);
           if (nbr->negotiated_tx_cell == NULL){
@@ -536,37 +545,23 @@ msf_negotiated_cell_delete_all(const linkaddr_t *peer_addr)
               msf_negotiated_cell_delete_as(cell, doBAREDROP);
           }
           else {
-          msf_negotiated_drop_all_tx(nbr);
+              msf_negotiated_drop_all_tx(nbr);
               msf_negotiated_cell_delete_as(cell, doCAREFUL);
           }
-        }
+          }
+          else {
+            if (linkaddr_cmp(&cell->addr, peer_addr)) {
+                msf_negotiated_cell_delete_as(cell, doBAREDROP);
+            }
+          }
+        }//for(cell = list_head
+
+    if (peer_addr == NULL) {
         LOG_INFO("removed all negotiated cells\n");
-        MSF_AFTER_CELL_CLEAN(NULL);
-    } else {
-      nbr = tsch_queue_get_nbr(peer_addr);
-      assert(nbr != NULL);
-      if (nbr == NULL)
-            //strange this
-            return;
-      msf_negotiated_drop_all_tx(nbr);
-
-      for(cell = list_head(slotframe->links_list);
-          cell != NULL;
-          cell = next_cell) {
-        next_cell = list_item_next(cell);
-        if(linkaddr_cmp(&cell->addr, peer_addr) &&
-           (cell->link_options & LINK_OPTION_LINK_TO_DELETE) == 0) {
-            msf_negotiated_cell_delete_as(cell, doBAREDROP);
-        } else {
-          /* this cell is not scheduled with peer_addr; ignore it */
-          continue;
-        }
-      }
-
+    }else {
       msf_sending_nbr_ensure_tx(nbr, peer_addr);
-      MSF_AFTER_CELL_CLEAN(nbr);
     }
-  }
+    MSF_AFTER_CELL_CLEAN(nbr);
 }
 /*---------------------------------------------------------------------------*/
 bool
