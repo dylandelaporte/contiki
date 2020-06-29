@@ -329,7 +329,7 @@ AvoidResult msf_avoid_mark_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, unsi
         ++avoids_list_num;
     }
     else {
-        LOG_WARN("rich limit reserve for cell %x\n", x.raw);
+        LOG_WARN("rich limit reserve for cell %lx\n", (unsigned long)x.raw);
     }
     return arNEW;
 }
@@ -452,7 +452,7 @@ void msf_unmark_nbr_cells(const tsch_neighbor_t* n, unsigned ops){
 //           >0 - cell is marked as aoDROPED, return last cell  AvoidOptions
 int  msf_unvoid_drop_nbr_cell(msf_cell_t x, const tsch_neighbor_t *n, AvoidOption range)
 {
-    LOG_DBG("unuse:%x ->/%x\n", x, range);
+    LOG_DBG("unuse:%lx ->/%x\n", (unsigned long)x.raw, (unsigned)range);
 
     msf_cell_t*             cells= avoids_list;
     const tsch_neighbor_t** nbrs = avoids_nbrs;
