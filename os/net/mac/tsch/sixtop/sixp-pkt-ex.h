@@ -154,6 +154,7 @@ bool sixp_pkt_is_single_cell(SIXPHandle* h, SIXPCellsPkt* pkt){
 static inline
 void sixp_pkt_cells_append(SIXPHandle* h, SIXPCellsPkt* pkt){
     const uint8_t* body =(const uint8_t*)pkt;
+    (void)body;
     // ensure that pkt lay right after h.body
     assert( (h->body + h->body_len) == body);
     h->body_len         += sixp_pkt_cells_total(pkt);

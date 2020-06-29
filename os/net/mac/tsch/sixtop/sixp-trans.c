@@ -101,7 +101,8 @@ void sixp_handle_trans_timeout(void *ptr)
 static void
 start_trans_timer(sixp_trans_t *trans)
 {
-  LOG_DBG("trans(%p) timeout(%p) %d\n", trans, &trans->timer, trans->sf->timeout_interval);
+  LOG_DBG("trans(%p) timeout(%p) %lu\n", trans, &trans->timer
+                          , (unsigned long)trans->sf->timeout_interval);
   ctimer_set(&trans->timer, trans->sf->timeout_interval,
           sixp_handle_trans_timeout, trans);
 }
