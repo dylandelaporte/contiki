@@ -508,6 +508,7 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
 
       if(n->tx_priority != NULL) {
         packet = n->tx_priority;
+        get_index = -1;
         trace_tx_prio_on();
       } else if((get_index = ringbufindex_peek_get(&n->tx_ringbuf)) != -1) {
         packet = n->tx_array[get_index];
