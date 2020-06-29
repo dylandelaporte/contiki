@@ -119,6 +119,21 @@ bool ext_flash_write(const spi_device_t *conf, uint32_t offset, uint32_t length,
  */
 bool ext_flash_init(const spi_device_t *conf);
 /*---------------------------------------------------------------------------*/
+
+
+
+//==============================================================================
+/* Part specific constants */
+#define BLS_DEVICE_ID_W25X20CL    0x11
+#define BLS_DEVICE_ID_W25X40CL    0x12
+#define BLS_DEVICE_ID_MX25R8035F  0x14
+#define BLS_DEVICE_ID_MX25R1635F  0x15
+
+#define BLS_WINBOND_MID           0xEF
+#define BLS_MACRONIX_MID          0xC2
+
+
+
 #endif /* EXT_FLASH_H_ */
 /*---------------------------------------------------------------------------*/
 /**
