@@ -266,6 +266,7 @@ remove_key(nbr_table_key_t *least_used_key)
 #if defined( __GNUC__ )
 static inline
 int popcount8( unsigned x ){  return __builtin_popcount(x); }
+static inline
 int popcount( unsigned x ){  return __builtin_popcount(x); }
 #else
 static
