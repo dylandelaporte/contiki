@@ -133,7 +133,7 @@
 #endif
 
 static int8_t rssi_threshold = PROP_MODE_RSSI_THRESHOLD;
-static int8_t rssi_last      = RF_CMD_CCA_REQ_RSSI_UNKNOWN;
+static int8_t rssi_last      = RF_CORE_CMD_CCA_REQ_RSSI_UNKNOWN;
 /*---------------------------------------------------------------------------*/
 #if MAC_CONF_WITH_TSCH
 static volatile uint8_t is_receiving_packet;
@@ -881,7 +881,7 @@ transmit(unsigned short transmit_len)
    * Disable LAST_FG_COMMAND_DONE interrupt. We don't really care about it
    * except when we are transmitting
    */
-  rf_core_cmd_done_dis(rf_core_poll_mode);
+  rf_core_cmd_done_dis();
 
   /* Workaround. Set status to IDLE */
   cmd_tx_adv->status = RF_CORE_RADIO_OP_STATUS_IDLE;
@@ -933,7 +933,6 @@ read_frame(void *buf, unsigned short buf_len)
   rfc_dataEntryGeneral_t *entry = (rfc_dataEntryGeneral_t *)rx_read_entry;
   uint8_t *data_ptr;
   int len = 0;
-  uint32_t rat_timestamp;
 
   int is_found = 0;
   /* Go through all RX buffers and check their status */
@@ -1024,7 +1023,6 @@ static int
 channel_clear(void)
 {
   uint8_t was_off = 0;
-  uint32_t cmd_status;
   int8_t rssi = RF_CORE_CMD_CCA_REQ_RSSI_UNKNOWN;
 
   /*
@@ -1258,7 +1256,7 @@ on(void)
   }
 #endif
 
-  rf_core_setup_interrupts(poll_mode);
+  rf_core_setup_interrupts();
 
   init_rx_buffers();
 
@@ -1302,6 +1300,8 @@ off(void)
    * Just in case there was an ongoing RX (which started after we begun the
    * shutdown sequence), we don't want to leave the buffer in state == ongoing
    */
+  int i;
+  rfc_dataEntry_t *entry;
   for(i = 0; i < PROP_MODE_RX_BUF_CNT; i++) {
     entry = (rfc_dataEntry_t *)rx_buf[i];
     if(entry->status == DATA_ENTRY_STATUS_BUSY) {
@@ -1407,17 +1407,6 @@ get_value(radio_param_t param, radio_value_t *value)
   }
 }
 /*---------------------------------------------------------------------------*/
-/* Enable or disable CCA before sending */
-static radio_result_t
-set_send_on_cca(uint8_t enable)
-{
-  if(enable) {
-    /* this driver does not have support for CCA on Tx */
-    return RADIO_RESULT_NOT_SUPPORTED;
-  }
-  return RADIO_RESULT_OK;
-}
-
 typedef int (*radio_prop_func)(void);
 static
 radio_result_t update_prop(radio_prop_func f){
@@ -1508,9 +1497,14 @@ set_value(radio_param_t param, radio_value_t value)
       if(value & ~(RADIO_RX_MODE_POLL_MODE)) {
         return RADIO_RESULT_INVALID_VALUE;
       }
+      (void)old_poll_mode;
 #ifndef RF_CORE_POLL_MODE
-      poll_mode = (value & RADIO_RX_MODE_POLL_MODE) != 0;
-    return RADIO_RESULT_OK;
+      old_poll_mode = rf_core_poll_mode;
+      rf_core_poll_mode = (value & RADIO_RX_MODE_POLL_MODE) != 0;
+      if(rf_core_poll_mode == old_poll_mode) {
+        return RADIO_RESULT_OK;
+      }
+      break;
 #else
       if ( (poll_mode != 0) == ((value & RADIO_RX_MODE_POLL_MODE) != 0) )
           return RADIO_RESULT_OK;
