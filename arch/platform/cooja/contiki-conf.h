@@ -37,6 +37,14 @@
 #define CONTIKI_TARGET_COOJA 1
 #endif
 
+#define PLATFORM_CONF_PROVIDES_MAIN_LOOP 1
+
+#define LOG_CONF_ENABLED 1
+
+#define COOJA 1
+
+#define ASSERT_CONF_RETURNS  1
+
 /* include the project config */
 #ifdef PROJECT_CONF_PATH
 #include PROJECT_CONF_PATH
@@ -46,19 +54,12 @@
 #include "subplatform-conf.h"
 #endif /* INCLUDE_SUBPLATFORM_CONF */
 
-#define PLATFORM_CONF_PROVIDES_MAIN_LOOP 1
-
-#define LOG_CONF_ENABLED 1
-
-#define COOJA 1
-
-#define ASSERT_CONF_RETURNS  1
-
 #ifndef EEPROM_CONF_SIZE
 #define EEPROM_CONF_SIZE				1024
 #endif
 
 #define w_memcpy memcpy
+
 
 #ifdef NETSTACK_CONF_H
 

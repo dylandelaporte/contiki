@@ -43,7 +43,7 @@
 #include <lpm.h>
 
 #include <stdbool.h>
-#include "../../cc26x0-cc13x0/srf06/cc13xx/board.h"
+#include "board.h"
 
 #ifndef BOARD_SPI_LPM
 #define BOARD_SPI_LPM BOARD_SPI_LPM_NONE

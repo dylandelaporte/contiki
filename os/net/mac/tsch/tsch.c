@@ -1404,8 +1404,8 @@ send_packet(mac_callback_t sent, void *ptr)
       p->header_len = hdr_len;
       TSCH_PRINTF8("TSCH: send packet to %x with seqno %u, queue[%u/%u], len %u %u\n",
              TSCH_LOG_ID_FROM_LINKADDR(nbr_addr), tsch_packet_seqno,
-             tsch_queue_packet_count(nbr_addr), tsch_queue_global_packet_count(),
-             QUEUEBUF_NUM, p->header_len, queuebuf_datalen(p->qb));
+             tsch_queue_packet_count(nbr_addr), TSCH_QUEUE_NUM_PER_NEIGHBOR,
+             p->header_len, queuebuf_datalen(p->qb));
     }
   }
   if(ret != MAC_TX_DEFERRED) {

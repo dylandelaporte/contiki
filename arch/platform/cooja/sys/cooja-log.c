@@ -111,18 +111,16 @@ int
 printf(const char *fmt, ...)
 {
   int res;
-  static char buf[MAX_LOG_LENGTH];
+  char* buf= simLoggedData + simLoggedLength;
   va_list ap;
-  int i;
 
   va_start(ap, fmt);
-  res = vsnprintf(buf, MAX_LOG_LENGTH, fmt, ap);
+  res = vsnprintf(buf, (MAX_LOG_LENGTH - simLoggedLength), fmt, ap);
   va_end(ap);
 
-  //    simlog(buf);
-  for(i = 0; i < res; i++) {
-    putchar(buf[i]);
-  }
+  simLoggedLength += res;
+  simLoggedFlag = 1;
+
   return res;
 }
 #endif /* IMPLEMENT_PRINTF */
