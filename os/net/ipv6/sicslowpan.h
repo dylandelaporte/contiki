@@ -336,7 +336,13 @@ struct sicslowpan_nh_compressor {
 
 };
 
-int sicslowpan_get_last_rssi(void);
+static inline
+int sicslowpan_get_last_rssi(void)
+{
+  extern int sixlowpan_last_rssi;
+  return sixlowpan_last_rssi;
+}
+
 
 extern const struct network_driver sicslowpan_driver;
 

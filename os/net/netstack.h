@@ -228,7 +228,16 @@ struct netstack_sniffer {
 #define NETSTACK_SNIFFER(name, input_callback, output_callback) \
   static struct netstack_sniffer name = { NULL, input_callback, output_callback }
 
-void netstack_sniffer_add(struct netstack_sniffer *s);
-void netstack_sniffer_remove(struct netstack_sniffer *s);
+static inline
+void netstack_sniffer_add(struct netstack_sniffer *s) {
+    extern struct netstack_sniffer *netstack_sniffer_callback;
+    netstack_sniffer_callback = s;
+}
+
+static inline
+void netstack_sniffer_remove(struct netstack_sniffer *s) {
+    extern struct netstack_sniffer *netstack_sniffer_callback;
+    netstack_sniffer_callback = NULL;
+}
 
 #endif /* NETSTACK_H */
