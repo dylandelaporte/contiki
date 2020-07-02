@@ -1,8 +1,5 @@
 /*
- * slip-config.h
- *
- *  Created on: 9 апр. 2020 г.
- *      Author: netuser
+ *      Author: alexrayne <apexraynepe196@gmail.com>
  */
 
 #ifndef OS_SERVICES_RPL_BORDER_ROUTER_NATIVE_SLIP_CONFIG_H_
