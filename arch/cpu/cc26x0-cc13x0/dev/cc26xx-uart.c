@@ -93,7 +93,7 @@ int cc26xx_uart_bufsend(void /*struct uart_tx_t* buf*/)
     uart_tx_t* tx = &uart_txbuf;
     while (!ringbuf16index_empty(&tx->buf.idx)){
         char tmp = tx->buf.data[tx->buf.idx.get_ptr];
-        if (ti_lib_uart_char_put_non_blocking(UIO_BASE(tx), tmp) == (true) ){
+        if ( ti_lib_uart_char_put_non_blocking(UIO_BASE(tx), tmp) ){
             if ( ringbuf16index_get(&tx->buf.idx) >= 0)
                 {;}
             else
@@ -191,10 +191,14 @@ int cc26xx_uart_write_bufs(/*struct uart_tx_t* buf*/ const void* data, unsigned 
 
 int cc26xx_uart_write_buf(/*struct uart_tx_t* buf*/ char x){
     uart_tx_t* tx = &uart_txbuf;
+    if (ringbuf16index_full(&tx->buf.idx))
+        return 1;
+    /*
     while (ringbuf16index_full(&tx->buf.idx)){
             //volatile uart_tx_t* vtx = (volatile uart_tx_t*)tx;
             while (ringbuf16index_full(&tx->buf.idx)) ;
     }
+    */
 
     unsigned tmp = x;
     return cc26xx_uart_write_bufs(&tmp, 1);
