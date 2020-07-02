@@ -58,8 +58,6 @@ TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERC
 CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
-#CFLAGS += -Wno-unused-const-variable
-
 # try it for cleanup unused code
 ifneq ("$(RELEASE)","")
 CFLAGS += -ffunction-sections
@@ -77,9 +75,14 @@ CFLAGS += -DNDEBUG
 endif
 
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
+#CFLAGS_WERROR += -Wno-error=unused-const-variable
+CFLAGS_WERROR += -Wno-error=unused-function
+
+
 
 ifeq ($(WERROR),1)
  LDFLAGS += $(LDFLAGS_WERROR)
+ CFLAGS += $(CFLAGS_WERROR)
 endif
 
 MODULES += $(CONTIKI_NG_OS_DIR) $(CONTIKI_NG_ARCH_DIR)
