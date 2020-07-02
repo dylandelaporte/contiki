@@ -175,9 +175,6 @@ enum tsch_keepalive_status {
 /* Should we send or schedule a keepalive? */
 static volatile enum tsch_keepalive_status keepalive_status;
 
-/* timer for sending keepalive messages */
-static struct ctimer keepalive_timer;
-
 /* Statistics on the current session */
 unsigned long tx_count;
 unsigned long rx_count;
@@ -284,6 +281,7 @@ tsch_reset(void)
 
 /* TSCH keep-alive functions */
 #if !TSCH_IS_COORDINATOR && (TSCH_MAX_KEEPALIVE_TIMEOUT > 0)
+#define TSCH_HAVE_KEEPALIVE_DAEMON
 
 /* timer for sending keepalive messages */
 static struct ctimer keepalive_timer;
@@ -429,7 +427,9 @@ tsch_keepalive_process_pending(void)
     }
   }
 }
-#endif
+#else
+#define tsch_keepalive_process_pending()
+#endif //#if !TSCH_IS_COORDINATOR && (TSCH_MAX_KEEPALIVE_TIMEOUT > 0)
 /*---------------------------------------------------------------------------*/
 static void
 eb_input(struct input_packet *current_input)
@@ -1186,6 +1186,7 @@ PROCESS_THREAD(tsch_pending_events_process, ev, data)
 #endif
 
     tsch_keepalive_process_pending();
+
 #ifdef TSCH_CALLBACK_SELECT_CHANNELS
     TSCH_CALLBACK_SELECT_CHANNELS();
 #endif
