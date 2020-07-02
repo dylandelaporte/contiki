@@ -203,7 +203,7 @@ tsch_set_coordinator(bool enable)
   tsch_is_coordinator = enable;
 #else
   if (tsch_is_coordinator != enable){
-      PRINTF_FAIL("TCSH: missed coordinator request %d vs hardcoded", enable);
+      LOG_ERR("TCSH: missed coordinator request %d vs hardcoded", enable);
       return;
   }
 #endif
