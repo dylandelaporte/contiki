@@ -253,7 +253,7 @@ tsch_queue_add_packet(const linkaddr_t *addr, mac_callback_t sent, void *ptr)
             ringbufindex_put(&n->tx_ringbuf);
             TSCH_LOGF("TSCH-queue:for %lx is added packet=%p[%u/%u]\n"
                         , TSCH_LOG_ID_FROM_LINKADDR(addr)
-                        , (long)p, put_index
+                        , p, put_index
                         , ringbufindex_elements(&n->tx_ringbuf)
             );
             return p;
