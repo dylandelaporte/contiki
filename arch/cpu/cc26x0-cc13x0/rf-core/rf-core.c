@@ -61,6 +61,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "assert.h"
 /*---------------------------------------------------------------------------*/
 #undef DEBUG
 #define DEBUG 0
@@ -101,27 +102,11 @@ static rfc_radioOp_t *last_radio_op = NULL;
 /* A struct holding pointers to the primary mode's abort() and restore() */
 static const rf_core_primary_mode_t *primary_mode = NULL;
 /*---------------------------------------------------------------------------*/
-/* RAT has 32-bit register, overflows once 18 minutes */
-#define RAT_RANGE  4294967296ull
-/* approximate value */
-#define RAT_OVERFLOW_PERIOD_SECONDS (60 * 18)
-
-/* how often to check for the overflow, as a minimum */
-#define RAT_OVERFLOW_TIMER_INTERVAL (CLOCK_SECOND * RAT_OVERFLOW_PERIOD_SECONDS / 3)
 
 /* Radio timer (RAT) offset as compared to the rtimer counter (RTC) */
 int32_t rat_offset = 0;
 static bool rat_offset_known = false;
 
-/* Value during the last read of the RAT register */
-static uint32_t rat_last_value;
-
-/* For RAT overflow handling */
-static struct ctimer rat_overflow_timer;
-static volatile uint32_t rat_overflow_counter;
-static rtimer_clock_t rat_last_overflow;
-
-static void rat_overflow_check_timer_cb(void *);
 /*---------------------------------------------------------------------------*/
 volatile int8_t rf_core_last_rssi = RF_CORE_CMD_CCA_REQ_RSSI_UNKNOWN;
 volatile uint8_t rf_core_last_corr_lqi = 0;
@@ -574,122 +559,11 @@ rf_core_primary_mode_restore()
 
   return RF_CORE_CMD_ERROR;
 }
+
 /*---------------------------------------------------------------------------*/
-uint8_t
-rf_core_rat_init(void)
-{
-  rat_last_value = HWREG(RFC_RAT_BASE + RATCNT);
-
-  ctimer_set(&rat_overflow_timer, RAT_OVERFLOW_TIMER_INTERVAL,
-             rat_overflow_check_timer_cb, NULL);
-
-  return 1;
-}
-/*---------------------------------------------------------------------------*/
-uint8_t
-rf_core_check_rat_overflow(void)
-{
-  uint32_t rat_current_value;
-  uint8_t interrupts_disabled;
-
-  /* Bail out if the RF is not on */
-  if(primary_mode == NULL || !primary_mode->is_on()) {
-    return 0;
-  }
-
-  interrupts_disabled = ti_lib_int_master_disable();
-
-  rat_current_value = HWREG(RFC_RAT_BASE + RATCNT);
-  if(rat_current_value + RAT_RANGE / 4 < rat_last_value) {
-    /* Overflow detected */
-    rat_last_overflow = RTIMER_NOW();
-    rat_overflow_counter++;
-  }
-  rat_last_value = rat_current_value;
-
-  if(!interrupts_disabled) {
-    ti_lib_int_master_enable();
-  }
-
-  return 1;
-}
-/*---------------------------------------------------------------------------*/
-static void
-rat_overflow_check_timer_cb(void *unused)
-{
-  uint8_t success = 0;
-  uint8_t was_off = 0;
-
-  if(primary_mode != NULL) {
-
-    if(!primary_mode->is_on()) {
-      was_off = 1;
-      if(NETSTACK_RADIO.on() != RF_CORE_CMD_OK) {
-        PRINTF("overflow: on() failed\n");
-        ctimer_set(&rat_overflow_timer, CLOCK_SECOND,
-                   rat_overflow_check_timer_cb, NULL);
-        return;
-      }
-    }
-
-    success = rf_core_check_rat_overflow();
-
-    if(was_off) {
-      NETSTACK_RADIO.off();
-    }
-  }
-
-  if(success) {
-    /* Retry after half of the interval */
-    ctimer_set(&rat_overflow_timer, RAT_OVERFLOW_TIMER_INTERVAL,
-               rat_overflow_check_timer_cb, NULL);
-  } else {
-    /* Retry sooner */
-    ctimer_set(&rat_overflow_timer, CLOCK_SECOND,
-               rat_overflow_check_timer_cb, NULL);
-  }
-}
-/*---------------------------------------------------------------------------*/
-uint32_t
-rf_core_convert_rat_to_rtimer(uint32_t rat_timestamp)
-{
-  uint64_t rat_timestamp64;
-  uint32_t adjusted_overflow_counter;
-  uint8_t was_off = 0;
-
-  if(primary_mode == NULL) {
-    PRINTF("rf_core_convert_rat_to_rtimer: not initialized\n");
-    return 0;
-  }
-
-  if(!primary_mode->is_on()) {
-    was_off = 1;
-    NETSTACK_RADIO.on();
-  }
-
-  rf_core_check_rat_overflow();
-
-  if(was_off) {
-    NETSTACK_RADIO.off();
-  }
-
-  adjusted_overflow_counter = rat_overflow_counter;
-
-  /* if the timestamp is large and the last oveflow was recently,
-     assume that the timestamp refers to the time before the overflow */
-  if(rat_timestamp > (uint32_t)(RAT_RANGE * 3 / 4)) {
-    if(RTIMER_CLOCK_LT(RTIMER_NOW(),
-                       rat_last_overflow + RAT_OVERFLOW_PERIOD_SECONDS * RTIMER_SECOND / 4)) {
-      adjusted_overflow_counter--;
-    }
-  }
-
-  /* add the overflowed time to the timestamp */
-  rat_timestamp64 = rat_timestamp + RAT_RANGE * adjusted_overflow_counter;
-  /* correct timestamp so that it refers to the end of the SFD */
-  rat_timestamp64 += primary_mode->sfd_timestamp_offset;
-
-  return RADIO_TO_RTIMER(rat_timestamp64 - rat_offset);
+uint8_t rf_core_primary_mode_is_on(void){
+    assert( primary_mode != NULL);
+    return primary_mode->is_on();
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(rf_core_process, ev, data)

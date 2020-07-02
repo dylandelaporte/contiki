@@ -585,6 +585,11 @@ void rf_core_primary_mode_abort(void);
 uint8_t rf_core_primary_mode_restore(void);
 
 /**
+ * \brief Abort the currently running primary radio op
+ */
+uint8_t rf_core_primary_mode_is_on(void);
+
+/**
  * \brief Initialize the RAT to RTC conversion machinery
  */
 uint8_t rf_core_rat_init(void);

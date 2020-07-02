@@ -76,8 +76,6 @@ uint64_t      last_timestamp;
 /* approximate value */
 #define RAT_OVERFLOW_PERIOD_SECONDS (60 * 18)
 
-static struct rf_rat_controler rf_control;
-
 rf_rat_time_t rf_rat_now(){
     return HWREG(RFC_RAT_BASE + RATCNT);
 }
@@ -99,7 +97,7 @@ uint_fast8_t rf_rat_check_overflow(bool first_time)
   uint8_t interrupts_disabled;
 
   /* Bail out if the RF is not on */
-  if(!rf_core_is_accessible()) {
+  if(!rf_core_is_accessible()) { //rf_core_primary_mode_is_on()
     return 0;
   }
 
@@ -159,8 +157,12 @@ uint_fast8_t rf_rat_check_overflow(bool first_time)
   return 1;
 }
 
+uint8_t rf_core_check_rat_overflow(void){
+    return rf_rat_check_overflow(false);
+}
+
 /*---------------------------------------------------------------------------*/
-static const clock_time_t RAT_CHECK_PERIOD = RAT_OVERFLOW_PERIOD_SECONDS * CLOCK_SECOND / 6;
+static const clock_time_t RAT_OVERFLOW_TIMER_INTERVAL = RAT_OVERFLOW_PERIOD_SECONDS * CLOCK_SECOND / 6;
 static void
 handle_rat_overflow(void *unused)
 {
@@ -174,7 +176,7 @@ handle_rat_overflow(void *unused)
           , rat_overflow.counter, rat_overflow.last_time);
   }
 
-  ctimer_set(&rat_overflow_timer, RAT_CHECK_PERIOD,
+  ctimer_set(&rat_overflow_timer, RAT_OVERFLOW_TIMER_INTERVAL,
                handle_rat_overflow, NULL);
 }
 
@@ -183,12 +185,9 @@ handle_rat_overflow(void *unused)
  * \brief prepare RAT timer time, for later timestamp evaluate rf_rat_calc_last_packet_rttime
  * \param rat_timestamp - RAT timer value - time of last RF operation
  */
-static
-rf_rat_time_t last_rat;
 void     rf_rat_last_timestamp(rf_rat_time_t rat_timestamp)
 {
     int     adjusted_overflow_counter;
-    last_rat = rat_timestamp;
 
     rf_rat_check_overflow(false);
     adjusted_overflow_counter = rat_overflow.counter;
@@ -214,14 +213,19 @@ uint32_t rf_rat_calc_last_rttime(){
   return RADIO_TO_RTIMER(last_timestamp);
 }
 
-void rf_rat_monitor_init(const struct rf_rat_controler* rf){
-    memcpy(&rf_control, rf, sizeof(rf_control));
+uint32_t rf_core_convert_rat_to_rtimer(uint32_t rat_timestamp){
+    rf_rat_last_timestamp(rat_timestamp);
+    return rf_rat_calc_last_rttime();
+}
+
+uint8_t rf_core_rat_init(void){
     last_timestamp          = 0;
     rat_overflow.last_time  = 0;
     rat_overflow.counter    = 0;
     rf_rat_check_overflow(true);
-    ctimer_set(&rat_overflow_timer, RAT_CHECK_PERIOD,
+    ctimer_set(&rat_overflow_timer, RAT_OVERFLOW_TIMER_INTERVAL,
                handle_rat_overflow, NULL);
+    return 1;
 }
 
 void rf_rat_debug_dump(void){

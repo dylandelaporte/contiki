@@ -49,6 +49,16 @@ typedef uint32_t rf_rat_time_t;
 
 rf_rat_time_t rf_rat_now();
 
+/**
+ * \brief Initialize the RAT to RTC conversion machinery
+ */
+uint8_t rf_core_rat_init(void);
+
+/**
+ * \brief Convert from RAT timestamp to rtimer ticks
+ */
+uint32_t rf_core_convert_rat_to_rtimer(uint32_t rat_timestamp);
+
 #if RF_RAT_STYLE > 0
 /**
  * \brief explicit RAT timer overflow check.
@@ -97,6 +107,9 @@ static inline
 uint32_t rf_rat_calc_last_rttime(void){
     return rf_rat_timestamp;
 }
+
+static inline
+uint8_t rf_core_check_rat_overflow(void){}
 
 #endif
 

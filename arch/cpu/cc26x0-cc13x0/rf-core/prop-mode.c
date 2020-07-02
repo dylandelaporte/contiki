@@ -284,7 +284,6 @@ volatile static uint8_t *rx_read_entry;
 /* XXX: don't know what exactly is this, looks like the time to Tx 3 octets */
 #define TIMESTAMP_OFFSET  -(USEC_TO_RADIO(32 * 3) - 1) /* -95.75 usec */
 
-extern int32_t rat_offset;
 
 
 #if PROP_MODE_RAT_SYNC_STYLE >= PROP_MODE_RAT_SYNC_AGRESSIVE
@@ -725,9 +724,6 @@ static const rf_core_primary_mode_t mode_prop = {
   rf_is_on,
   RAT_TIMESTAMP_OFFSET_SUB_GHZ
 };
-const struct rf_rat_controler rfrat_prop_mode = {
-    &(rf_is_on), &(on), &(off)
-};
 /*---------------------------------------------------------------------------*/
 static int
 init(void)
@@ -757,13 +753,15 @@ init(void)
     PRINTF("init: on() failed\n");
     return RF_CORE_CMD_ERROR;
   }
-  rf_rat_monitor_init(&rfrat_prop_mode);
+
+  rf_core_primary_mode_register(&mode_prop);
+
+  rf_core_rat_init();
+
   //* have probed that RFcore ok, turn it off for power-save
   off();
 
   ENERGEST_ON(ENERGEST_TYPE_LISTEN);
-
-  rf_core_primary_mode_register(&mode_prop);
 
   process_start(&rf_core_process, NULL);
 
@@ -1000,11 +998,17 @@ read_frame(void *buf, unsigned short buf_len)
   rf_core_last_rssi = (int8_t)data_ptr[len];
   rf_core_last_corr_lqi = data_ptr[len + 5];
 
+  /* get the timestamp */
+  uint32_t rat_timestamp;
+#if 1
+  memcpy(&rat_timestamp, data_ptr + len + 1, 4);
+  rat_timestamp += TIMESTAMP_OFFSET;
+#else
   //! TODO in PollMode rx_stats may inconsistent, when ISR looks over multiple IRQs
   /* correct timestamp so that it refers to the end of the SFD */
-  rf_rat_last_timestamp(rx_stats.timeStamp + TIMESTAMP_OFFSET);
-
-  rf_core_last_packet_timestamp = rf_rat_calc_last_rttime();// rf_core_convert_rat_to_rtimer(rat_timestamp);
+  rat_timestamp = rx_stats.timeStamp + TIMESTAMP_OFFSET;
+#endif
+  rf_rat_last_timestamp(rat_timestamp);
 
   if(!rf_core_poll_mode) {
     /* Not in poll mode: packetbuf should not be accessed in interrupt context.
@@ -1657,8 +1661,7 @@ bool rat_sync_validate(rtimer_clock_t stamp){
 int32_t rat_sync_miss(void){
     rf_rat_time_t rat = rf_rat_now();
     rtimer_clock_t now = RTIMER_NOW();
-    rf_rat_last_timestamp(rat);
-    rtimer_clock_t rat_now = rf_rat_calc_last_rttime();
+    rtimer_clock_t rat_now = rf_core_convert_rat_to_rtimer(rat);
     if (rat_now != now){
         PRINTF("rat_sync_validate: RAT[%lu] unsync RT [%lu]\n"
                 , rat_now, now);
