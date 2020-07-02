@@ -74,6 +74,11 @@ LDFLAGS+= --gc-sections,--cref
 CFLAGS += -DNDEBUG
 endif
 
+ifdef NDEBUG
+# turn off asserts
+CFLAGS += -DNDEBUG
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 #CFLAGS_WERROR += -Wno-error=unused-const-variable
 CFLAGS_WERROR += -Wno-error=unused-function

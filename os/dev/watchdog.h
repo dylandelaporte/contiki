@@ -32,6 +32,23 @@
 #ifndef WATCHDOG_H_
 #define WATCHDOG_H_
 
+
+
+/*---------------------------------------------------------------------------*/
+//< Watchdog stall when debugger stop cpu
+#define CONTIKI_WATCHDOG_STALL      2
+//< Watchdog not initate in contiki-main
+#define CONTIKI_WATCHDOG_OFF        0
+//< System without watchdog
+#define CONTIKI_WATCHDOG_NONE       -1
+
+#ifndef CONTIKI_WATCHDOG_CONF
+#define CONTIKI_WATCHDOG_CONF       1
+#endif
+
+/*---------------------------------------------------------------------------*/
+#if (CONTIKI_WATCHDOG_CONF >= 0)
+
 void watchdog_init(void);
 void watchdog_start(void);
 
@@ -40,5 +57,15 @@ void watchdog_periodic(void);
 void watchdog_stop(void);
 
 void watchdog_reboot(void);
+
+#else
+
+#define watchdog_init()
+#define watchdog_start()
+#define watchdog_periodic()
+#define watchdog_stop()
+#define watchdog_reboot()
+
+#endif
 
 #endif /* WATCHDOG_H_ */
