@@ -60,6 +60,11 @@ CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
 CFLAGS += -Wno-unused-const-variable
 
+ifdef NDEBUG
+# turn off asserts
+CFLAGS += -DNDEBUG
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
 ifeq ($(WERROR),1)
