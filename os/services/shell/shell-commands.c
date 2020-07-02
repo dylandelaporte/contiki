@@ -984,7 +984,9 @@ const struct shell_command_t builtin_shell_commands[] = {
 #if NETSTACK_CONF_WITH_IPV6
   { "ip-addr",              cmd_ipaddr,               "'> ip-addr': Shows all IPv6 addresses" },
   { "ip-nbr",               cmd_ip_neighbors,         "'> ip-nbr': Shows all IPv6 neighbors" },
+#if SHELL_COMMANDS_PING
   { "ping",                 cmd_ping,                 "'> ping addr': Pings the IPv6 address 'addr'" },
+#endif
   { "routes",               cmd_routes,               "'> routes': Shows the route entries" },
 #if BUILD_WITH_RESOLV
   { "nslookup",             cmd_resolv,               "'> nslookup': Lookup IPv6 address of host" },
@@ -994,7 +996,9 @@ const struct shell_command_t builtin_shell_commands[] = {
 #endif /* BUILD_WITH_HTTP_SOCKET */
 #endif /* NETSTACK_CONF_WITH_IPV6 */
 #if UIP_CONF_IPV6_RPL
+#if SHELL_COMMANDS_SETROOT
   { "rpl-set-root",         cmd_rpl_set_root,         "'> rpl-set-root 0/1 [prefix]': Sets node as root (1) or not (0). A /64 prefix can be optionally specified." },
+#endif
   { "rpl-local-repair",     cmd_rpl_local_repair,     "'> rpl-local-repair': Triggers a RPL local repair" },
 #if ROUTING_CONF_RPL_LITE
   { "rpl-refresh-routes",   cmd_rpl_refresh_routes,   "'> rpl-refresh-routes': Refreshes all routes through a DTSN increment" },
@@ -1004,8 +1008,12 @@ const struct shell_command_t builtin_shell_commands[] = {
   { "rpl-global-repair",    cmd_rpl_global_repair,    "'> rpl-global-repair': Triggers a RPL global repair" },
 #endif /* UIP_CONF_IPV6_RPL */
 #if MAC_CONF_WITH_TSCH
+#ifndef TSCH_IS_COORDINATOR
   { "tsch-set-coordinator", cmd_tsch_set_coordinator, "'> tsch-set-coordinator 0/1 [0/1]': Sets node as coordinator (1) or not (0). Second, optional parameter: enable (1) or disable (0) security." },
+#endif
+#if SHELL_COMMANDS_TSCH_SCHEDULE
   { "tsch-schedule",        cmd_tsch_schedule,        "'> tsch-schedule': Shows the current TSCH schedule" },
+#endif
   { "tsch-status",          cmd_tsch_status,          "'> tsch-status': Shows a summary of the current TSCH state" },
 #endif /* MAC_CONF_WITH_TSCH */
 #if TSCH_WITH_SIXTOP
