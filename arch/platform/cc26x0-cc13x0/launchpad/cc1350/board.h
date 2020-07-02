@@ -148,6 +148,7 @@
  * @{
  */
 #define PROP_MODE_CONF_TX_POWER_779_930 tx_power_driver_779_930
+#define PROP_MODE_CONF_TX_POWER_431_527 tx_power_driver_431_527
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
