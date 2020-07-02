@@ -131,9 +131,9 @@
 #endif //#define RTIMER_GUARD
 
 #if RTIMER_GUARD > 0
-#if !defined(RTIMER_CONF_ARCH_SECOND)
+#if !defined(RTIMER_ARCH_SECOND)
 #warning "TSCH need RTimer resolution better 8khz, when RTIMER_GUARD > 0 , try setup RTIMER_CONF_ARCH_SECOND"
-#elif RTIMER_CONF_ARCH_SECOND <= 2000
+#elif RTIMER_ARCH_SECOND <= 2000
 #warning "TSCH need RTimer resolution better 8khz, when RTIMER_GUARD > 0 , try setup RTIMER_CONF_ARCH_SECOND"
 #endif
 #endif
