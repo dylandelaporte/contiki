@@ -38,6 +38,7 @@
  *         Yasuyuki Tanaka <yasuyuki.tanaka@inf.ethz.ch>
  */
 
+#include <stdint.h>
 #include "sixp-pkt.h"
 
 typedef struct sixp_nbr sixp_nbr_t;
@@ -67,7 +68,7 @@ void sixp_nbr_free(sixp_nbr_t *nbr);
  * \param nbr The pointer to a neighbor
  * \return A sequence number to use for a next request, -1 on failure
  */
-int16_t sixp_nbr_get_next_seqno(sixp_nbr_t *nbr);
+int sixp_nbr_get_next_seqno(sixp_nbr_t *nbr);
 
 /**
  * \brief Set the specified value to the next sequence number of a neighbor
@@ -95,6 +96,28 @@ int sixp_nbr_increment_next_seqno(sixp_nbr_t *nbr);
  * \brief Initialize 6p Neighbor Table
  */
 int sixp_nbr_init(void);
+
+
+
+//==============================================================================
+typedef struct sixp_nbr {
+  struct sixp_nbr *next;
+  linkaddr_t addr;
+  uint8_t next_seqno;
+} sixp_nbr_t;
+
+/**
+ * Get the first neighbor cache in nbr_table
+ * \return the pointer to the first neighbor cache entry
+ */
+sixp_nbr_t* sixp_nbr_head(void);
+
+/**
+ * Get the next neighbor cache of a specified one
+ * \param nbr the pointer to a neighbor cache
+ * \return the pointer to the next one on success, NULL on failure
+ */
+sixp_nbr_t* sixp_nbr_next(sixp_nbr_t *nbr);
 
 /*---------------------------------------------------------------------------*/
 /** @} */

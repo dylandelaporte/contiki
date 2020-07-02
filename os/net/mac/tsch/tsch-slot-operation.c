@@ -405,7 +405,32 @@ get_packet_and_neighbor_for_link(struct tsch_link *link, struct tsch_neighbor **
         }
       }
     }
+
+    if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
+    if (p == NULL)
+    //if (ringbufindex_elements(&n->tx_ringbuf) > 0) //tsch_queue_packet_count(&link->addr) > 0)
+    {
+        TSCH_LOG_ADD(tsch_log_message,
+                        snprintf(log->message, sizeof(log->message)
+                                , "empty sf.t:%x(%x) ->:%x !%d size[%d] "
+                                , (link->slotframe_handle<<16) | link->timeslot
+                                , link->link_options
+                                , (int)link->addr.u16[0]
+                                , tsch_queue_backoff_expired(n)
+                                , ringbufindex_elements(&n->tx_ringbuf)
+                                )
+                    );
+        if (n != n_broadcast)
+            TSCH_LOG_ADD(tsch_log_message,
+                            snprintf(log->message, sizeof(log->message)
+                                    , "        ->:%x.%x.%x.%x"
+                                    , link->addr.u16[3], link->addr.u16[2]
+                                    , link->addr.u16[1], link->addr.u16[0]
+                                    )
+                        );
+    }
   }
+
   /* return nbr (by reference) */
   if(target_neighbor != NULL) {
     *target_neighbor = n;
@@ -897,6 +922,9 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
       }
     }
 
+#if BUILD_WITH_MSF
+    current_packet->last_tx_timeslot = current_link->timeslot;
+#endif /* BUILD_WITH_MSF */
     current_packet->transmissions++;
     current_packet->ret = mac_tx_status;
 
@@ -1294,6 +1322,18 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
   PT_END(pt);
 }
 /*---------------------------------------------------------------------------*/
+//#include "project-trace.h"
+#ifndef trace_droplink_off
+#define trace_droplink_on()
+#define trace_droplink_off()
+#endif
+#ifndef trace_tx_prio_on
+#define trace_tx_prio_on()
+#define trace_tx_prio_off()
+#endif
+
+
+
 #ifndef TSCH_DESYNC_THRESHOLD_SLOTS
 #define TSCH_DESYNC_THRESHOLD_SLOTS() (100 * TSCH_CLOCK_TO_SLOTS(TSCH_DESYNC_THRESHOLD / 100, tsch_timing[tsch_ts_timeslot_length]))
 #endif
@@ -1342,9 +1382,24 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
           current_link->link_options &= ~LINK_OPTION_SIGNAL_ONCE;
       }
 #endif
+      //trace_backoff_off();
+      trace_tx_prio_off();
 
       /* Get a packet ready to be sent */
       current_packet = get_packet_and_neighbor_for_link(current_link, &current_neighbor);
+
+      if (0)//(current_packet == NULL)
+      if ((current_link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+          trace_droplink_on();
+          TSCH_LOG_ADD(tsch_log_message,
+                          snprintf(log->message, sizeof(log->message)
+                                  , "empty sf.t:%x(%x)"
+                                  , (current_link->slotframe_handle<<16) | current_link->timeslot
+                                  , current_link->link_options
+                                  )
+                      );
+      }
+
       /* There is no packet to send, and this link does not have Rx flag. Instead of doing
        * nothing, switch to the backup link (has Rx flag) if any. */
       if(current_packet == NULL
@@ -1499,6 +1554,7 @@ tsch_slot_operation_start(void)
   rtimer_clock_t time_to_next_active_slot;
   rtimer_clock_t prev_slot_start;
   TSCH_DEBUG_INIT();
+  TSCH_PUTS("tsch_slot_operation_start\n");
   do {
     tsch_slot_offset_t timeslot_diff;
     /* Get next active link */

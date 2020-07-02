@@ -42,6 +42,8 @@
 #ifndef __SIXTOP_CONF_H__
 #define __SIXTOP_CONF_H__
 
+#include "contiki-conf.h"
+
 /**
  * \brief The maximum number of Scheduling Functions in the system.
  */

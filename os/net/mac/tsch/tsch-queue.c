@@ -34,8 +34,8 @@
  * \file
  *         Per-neighbor packet queues for TSCH MAC.
  *         The list of neighbors uses the TSCH lock, but per-neighbor packet array are lock-free.
- *				 Read-only operation on neighbor and packets are allowed from interrupts and outside of them.
- *				 *Other operations are allowed outside of interrupt only.*
+ *         Read-only operation on neighbor and packets are allowed from interrupts and outside of them.
+ *         *Other operations are allowed outside of interrupt only.*
  * \author
  *         Simon Duquennoy <simonduq@sics.se>
  *         Beshr Al Nahas <beshr@sics.se>
@@ -57,11 +57,24 @@
 #include "net/nbr-table.h"
 #include <stdint.h>
 #include <string.h>
+#include "tsch-log.h"
+#if BUILD_WITH_MSF
+#include "services/msf/msf-callback.h"
+#endif
 
 /* Log configuration */
 #include "sys/log.h"
 #define LOG_MODULE "TSCH Queue"
 #define LOG_LEVEL LOG_LEVEL_MAC
+
+#ifndef trace_backoff_off
+#define trace_backoff_on()
+#define trace_backoff_off()
+#endif
+#ifndef trace_tx_prio_on
+#define trace_tx_prio_on()
+#define trace_tx_prio_off()
+#endif
 
 /* Check if TSCH_QUEUE_NUM_PER_NEIGHBOR is power of two */
 #if (TSCH_QUEUE_NUM_PER_NEIGHBOR & (TSCH_QUEUE_NUM_PER_NEIGHBOR - 1)) != 0
@@ -197,8 +210,11 @@ tsch_queue_update_time_source(const linkaddr_t *new_addr)
 void
 tsch_queue_flush_nbr_queue(struct tsch_neighbor *n)
 {
-  while(!tsch_queue_is_empty(n)) {
-    struct tsch_packet *p = tsch_queue_remove_packet_from_queue(n);
+  while(!tsch_queue_is_empty(n) || n->tx_priority) {
+    struct tsch_packet *p;
+    if((p = tsch_queue_remove_packet_from_queue(n)) == NULL) {
+      p = n->tx_priority;
+    }
     if(p != NULL) {
       /* Set return status for packet_sent callback */
       p->ret = MAC_TX_ERR;
@@ -230,6 +246,10 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
       /* Flush queue */
       tsch_queue_flush_nbr_queue(n);
 
+#if BUILD_WITH_MSF
+      msf_callback_tsch_nbr_removed(n);
+#endif /* BUILD_WITH_MSF */
+
       /* Free neighbor */
       tsch_neighbors_remove_item(n);
     }
@@ -257,8 +277,9 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
   if(!tsch_is_locked()) {
     n = tsch_queue_add_nbr(addr);
     if(n != NULL) {
-      put_index = ringbufindex_peek_put(&n->tx_ringbuf);
-      if(put_index != -1) {
+      if((packetbuf_attr(PACKETBUF_ATTR_TSCH_PRIORITY) > 0 &&
+          n->tx_priority == NULL) ||
+         (put_index = ringbufindex_peek_put(&n->tx_ringbuf)) != -1) {
         p = memb_alloc(&packet_memb);
         if(p != NULL) {
           /* Enqueue packet */
@@ -269,14 +290,20 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
             p->ret = MAC_TX_DEFERRED;
             p->transmissions = 0;
             p->max_transmissions = max_transmissions;
-            /* Add to ringbuf (actual add committed through atomic operation) */
-            n->tx_array[put_index] = p;
-            ringbufindex_put(&n->tx_ringbuf);
+            if(put_index == -1) {
+              /* this is a priority frame */
+              n->tx_priority = p;
+              LOG_DBG("packet is added as priority, packet %p\n", p);
+            } else {
+              /* Add to ringbuf (actual add committed through atomic operation) */
+              n->tx_array[put_index] = p;
+              ringbufindex_put(&n->tx_ringbuf);
             TSCH_DBG("TSCH-queue:for %lx is added packet=%p[%u/%u]\n"
                         , TSCH_LOG_ID_FROM_LINKADDR(addr)
                         , p, put_index
                         , ringbufindex_elements(&n->tx_ringbuf)
-            );
+                    );
+            }
             return p;
           } else {
             memb_free(&packet_memb, p);
@@ -360,12 +387,17 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
 
   if(mac_tx_status == MAC_TX_OK) {
     /* Successful transmission */
-    tsch_queue_remove_packet_from_queue(n);
+    if(p == n->tx_priority) {
+      n->tx_priority = NULL;
+    } else {
+      tsch_queue_remove_packet_from_queue(n);
+    }
     in_queue = 0;
 
     /* Update CSMA state in the unicast case */
     if(is_unicast) {
-      if(is_shared_link || tsch_queue_is_empty(n)) {
+      if(is_shared_link ||
+         (tsch_queue_is_empty(n) && n->tx_priority == NULL)) {
         /* If this is a shared link, reset backoff on success.
          * Otherwise, do so only is the queue is empty */
         tsch_queue_backoff_reset(n);
@@ -375,7 +407,11 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
     /* Failed transmission */
     if(p->transmissions >= p->max_transmissions) {
       /* Drop packet */
-      tsch_queue_remove_packet_from_queue(n);
+      if(p == n->tx_priority) {
+        n->tx_priority = NULL;
+      } else {
+        tsch_queue_remove_packet_from_queue(n);
+      }
       in_queue = 0;
       TSCH_DBG("retransmition fail seq%d ->(%p)# %x\n"
                   , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
@@ -467,13 +503,47 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
   if(n != NULL) {
   if(!tsch_is_locked()) {
       int is_shared_link = (link != NULL) && (link->link_options & LINK_OPTION_SHARED);
-      int16_t get_index = ringbufindex_peek_get(&n->tx_ringbuf);
-      if(get_index != -1 &&
-          !(is_shared_link && !tsch_queue_backoff_expired(n))) {    /* If this is a shared link,
-                                                                    make sure the backoff has expired */
+      struct tsch_packet *packet;
+      int16_t get_index;
+
+      if(n->tx_priority != NULL) {
+        packet = n->tx_priority;
+        get_index = -1;
+        trace_tx_prio_on();
+      } else if((get_index = ringbufindex_peek_get(&n->tx_ringbuf)) != -1) {
+        packet = n->tx_array[get_index];
+      } else {
+        return NULL;
+      }
+
+      if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0)
+      {
+          TSCH_DBG("check packets[%d] ->:%x (!%d)\n"
+                                  , (int)get_index
+                                  , ringbufindex_elements(&n->tx_ringbuf)
+                                  , (int)link->addr.u16[0]
+                                  , tsch_queue_backoff_expired(n)
+                      );
+          if ((get_index > 0) && !tsch_queue_backoff_expired(n)){
+              trace_backoff_on();
+          }
+      }
+
+      if(packet != NULL &&
+         !(is_shared_link && !tsch_queue_backoff_expired(n))) {    /* If this is a shared link,
+                                                                      make sure the backoff has expired */
 #if TSCH_WITH_LINK_SELECTOR
-        int packet_attr_slotframe = queuebuf_attr(n->tx_array[get_index]->qb, PACKETBUF_ATTR_TSCH_SLOTFRAME);
-        int packet_attr_timeslot = queuebuf_attr(n->tx_array[get_index]->qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
+        struct queuebuf* qb = n->tx_array[get_index]->qb;
+        int packet_attr_slotframe = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_SLOTFRAME);
+        int packet_attr_timeslot = queuebuf_attr(qb, PACKETBUF_ATTR_TSCH_TIMESLOT);
+
+        if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+            TSCH_DBG("check packet[%d] -> (sf%d:%d)\n"
+                                    , ringbufindex_elements(&n->tx_ringbuf)
+                                    , packet_attr_slotframe, packet_attr_timeslot
+                        );
+        }
+
         if(packet_attr_slotframe != 0xffff && packet_attr_slotframe != link->slotframe_handle) {
           return NULL;
         }
@@ -481,7 +551,11 @@ tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *l
           return NULL;
         }
 #endif
-        return n->tx_array[get_index];
+        if ((link->link_options & LINK_OPTION_TRACE_DROP) != 0){
+            trace_backoff_off();
+        }
+
+        return packet;
       }
     }
   }

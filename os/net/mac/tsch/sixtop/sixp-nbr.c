@@ -44,10 +44,11 @@
 #include "net/nbr-table.h"
 
 #include "sixp.h"
+#include "sixp-nbr.h"
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "6top"
+#define LOG_MODULE "6top nbr"
 #define LOG_LEVEL LOG_LEVEL_6TOP
 
 /**
@@ -57,14 +58,18 @@
  * multiple SFs. It's unclear whether we should use a different generation
  * counter for each SFs.
  */
-typedef struct sixp_nbr {
-  struct sixp_nbr *next;
-  linkaddr_t addr;
-  uint8_t next_seqno;
-} sixp_nbr_t;
 
 NBR_TABLE(sixp_nbr_t, sixp_nbrs);
 
+/*---------------------------------------------------------------------------*/
+
+sixp_nbr_t* sixp_nbr_head(void){
+    return nbr_table_head(sixp_nbrs);
+}
+
+sixp_nbr_t* sixp_nbr_next(sixp_nbr_t *nbr){
+    return nbr_table_next(sixp_nbrs, nbr);
+}
 /*---------------------------------------------------------------------------*/
 sixp_nbr_t *
 sixp_nbr_find(const linkaddr_t *addr)
@@ -93,6 +98,9 @@ sixp_nbr_alloc(const linkaddr_t *addr)
     LOG_ERR_("]\n");
     return NULL;
   }
+  LOG_DBG("sixp_nbr_alloc() [peer_addr:");
+  LOG_DBG_LLADDR((const linkaddr_t *)addr);
+  LOG_DBG_("]\n");
 
   if((nbr = (sixp_nbr_t *)nbr_table_add_lladdr(sixp_nbrs,
                                                addr,
@@ -113,6 +121,9 @@ sixp_nbr_free(sixp_nbr_t *nbr)
 {
   assert(nbr != NULL);
   if(nbr != NULL) {
+      LOG_DBG("sixp_nbr_free() [peer_addr:");
+      LOG_DBG_LLADDR(sixp_nbrs_lladr_item(nbr));
+      LOG_DBG_("]\n");
     (void)sixp_nbrs_remove_item(nbr);
   }
 }

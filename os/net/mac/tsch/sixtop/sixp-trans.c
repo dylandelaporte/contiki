@@ -48,7 +48,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "6top"
+#define LOG_MODULE "6top-trans"
 #define LOG_LEVEL LOG_LEVEL_6TOP
 
 /**
@@ -70,8 +70,8 @@ typedef struct sixp_trans {
   struct ctimer timer;
 } sixp_trans_t;
 
-static void handle_trans_timeout(void *ptr);
-static void process_trans(void *ptr);
+void sixp_handle_trans_timeout(void *ptr);
+void sixp_process_trans(void *ptr);
 static void schedule_trans_process(sixp_trans_t *trans);
 static sixp_trans_mode_t determine_trans_mode(const sixp_pkt_t *req);
 
@@ -79,8 +79,7 @@ MEMB(trans_memb, sixp_trans_t, SIXTOP_MAX_TRANSACTIONS);
 LIST(trans_list);
 
 /*---------------------------------------------------------------------------*/
-static void
-handle_trans_timeout(void *ptr)
+void sixp_handle_trans_timeout(void *ptr)
 {
   sixp_trans_t *trans = (sixp_trans_t *)ptr;
 
@@ -88,6 +87,8 @@ handle_trans_timeout(void *ptr)
   if(trans == NULL) {
     return;
   }
+
+  LOG_DBG("trans(%p) timeout wake\n", trans);
 
   if(trans->sf->timeout != NULL) {
     trans->sf->timeout(trans->cmd,
@@ -100,12 +101,13 @@ handle_trans_timeout(void *ptr)
 static void
 start_trans_timer(sixp_trans_t *trans)
 {
+  LOG_DBG("trans(%p) timeout(%p) %lu\n", trans, &trans->timer
+                          , (unsigned long)trans->sf->timeout_interval);
   ctimer_set(&trans->timer, trans->sf->timeout_interval,
-             handle_trans_timeout, trans);
+          sixp_handle_trans_timeout, trans);
 }
 /*---------------------------------------------------------------------------*/
-static void
-process_trans(void *ptr)
+void sixp_process_trans(void *ptr)
 {
   sixp_trans_t *trans = (sixp_trans_t *)ptr;
 
@@ -116,6 +118,10 @@ process_trans(void *ptr)
 
   /* make sure that the timer is stopped */
   ctimer_stop(&trans->timer);
+
+  LOG_DBG("trans [peer_addr:");
+  LOG_DBG_LLADDR((const linkaddr_t *)&trans->peer_addr);
+  LOG_DBG_(", seqno:%u]... \n", trans->seqno);
 
   /* state-specific operation */
   if(trans->state == SIXP_TRANS_STATE_TERMINATING) {
@@ -159,7 +165,7 @@ schedule_trans_process(sixp_trans_t *trans)
   }
 
   ctimer_stop(&trans->timer);
-  ctimer_set(&trans->timer, 0, process_trans, trans); /* expires immediately */
+  ctimer_set(&trans->timer, 0, sixp_process_trans, trans); /* expires immediately */
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -169,6 +175,8 @@ sixp_trans_free(sixp_trans_t *trans)
   if(trans == NULL) {
     return;
   }
+
+  LOG_INFO("trans %p (state %x) free\n", trans, trans->state);
 
   if (trans->state == SIXP_TRANS_STATE_WAIT_FREE) {
     trans->state = SIXP_TRANS_STATE_UNAVAILABLE;
@@ -190,6 +198,7 @@ sixp_trans_free(sixp_trans_t *trans)
   } else {
     memset(trans, 0, sizeof(sixp_trans_t));
     memb_free(&trans_memb, trans);
+    SIXP_AFTER_TRANS_FREE();
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -227,36 +236,31 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
   int ret_val;
 
   assert(trans != NULL);
-  assert(new_state != SIXP_TRANS_STATE_UNAVAILABLE);
-  /* enforce state transition rules  */
-  if(trans != NULL &&
-     (new_state == SIXP_TRANS_STATE_TERMINATING ||
-      (new_state == SIXP_TRANS_STATE_REQUEST_SENDING &&
-       trans->state == SIXP_TRANS_STATE_INIT) ||
-      (new_state == SIXP_TRANS_STATE_REQUEST_SENT &&
-       trans->state == SIXP_TRANS_STATE_REQUEST_SENDING) ||
-      (new_state == SIXP_TRANS_STATE_REQUEST_RECEIVED &&
-       trans->state == SIXP_TRANS_STATE_INIT) ||
-      (new_state == SIXP_TRANS_STATE_RESPONSE_SENDING &&
-       trans->state == SIXP_TRANS_STATE_REQUEST_RECEIVED) ||
-      (new_state == SIXP_TRANS_STATE_RESPONSE_SENT &&
-       trans->state == SIXP_TRANS_STATE_RESPONSE_SENDING) ||
-      (new_state == SIXP_TRANS_STATE_RESPONSE_RECEIVED &&
-       (trans->state == SIXP_TRANS_STATE_REQUEST_SENDING ||
-        trans->state == SIXP_TRANS_STATE_REQUEST_SENT)) ||
-      (new_state == SIXP_TRANS_STATE_CONFIRMATION_RECEIVED &&
-       (trans->state == SIXP_TRANS_STATE_RESPONSE_SENT ||
-        trans->state == SIXP_TRANS_STATE_RESPONSE_SENDING) &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP) ||
-      (new_state == SIXP_TRANS_STATE_CONFIRMATION_SENDING &&
-       trans->state == SIXP_TRANS_STATE_RESPONSE_RECEIVED &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP) ||
-      (new_state == SIXP_TRANS_STATE_CONFIRMATION_SENT &&
-       trans->state == SIXP_TRANS_STATE_CONFIRMATION_SENDING &&
-       trans->mode == SIXP_TRANS_MODE_3_STEP))) {
-      LOG_INFO("6P-trans: trans %p state changes from %u to %u\n",
-               trans, trans->state, new_state);
+  if(trans == NULL) {
+      /* trans == NULL */
+      LOG_ERR("6top: invalid argument, trans is NULL\n");
+      return -1;
+  }
 
+  assert(new_state != SIXP_TRANS_STATE_UNAVAILABLE);
+  LOG_INFO("trans %p state %x->%x\n", trans, trans->state, new_state);
+
+  /* enforce state transition rules  */
+      bool ok = (new_state == SIXP_TRANS_STATE_TERMINATING);
+      if (!ok){
+          // check that trans direction keep allowed, or comes to final (indirected) state
+          ok = ((new_state & SIXP_TRANS_STATE_IO_Msk) == 0)
+             || ((new_state & SIXP_TRANS_STATE_IO_Msk & trans->state) != 0);
+
+          //check that next sten is successed from current
+          if (ok)
+          ok = ((new_state & SIXP_TRANS_STATE_STEP_Msk)
+                  == ( (trans->state& SIXP_TRANS_STATE_STEP_Msk) + SIXP_TRANS_STATE_STEP1));
+          if (ok)
+          if ((new_state & SIXP_TRANS_STATE_STEP_Msk) >= SIXP_TRANS_STATE_STEP4)
+              ok = (trans->mode == SIXP_TRANS_MODE_3_STEP);
+      }
+  if (ok){
       if(new_state == SIXP_TRANS_STATE_REQUEST_SENT) {
         /* next_seqno should have been updated in sixp_output() */
       } else if(new_state == SIXP_TRANS_STATE_RESPONSE_SENT) {
@@ -274,9 +278,9 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
       trans->state = new_state;
       schedule_trans_process(trans);
       ret_val = 0;
-  } else if (trans != NULL){
+  } else {
     /* invalid transition */
-    LOG_ERR("6P-trans: invalid transition, from %u to %u, on trans %p\n",
+    LOG_ERR("6P-trans: invalid transition, from %x to %x, on trans %p\n",
             trans->state, new_state, trans);
     /* inform the corresponding SF */
     assert(trans->sf != NULL);
@@ -287,11 +291,7 @@ sixp_trans_transit_state(sixp_trans_t *trans, sixp_trans_state_t new_state)
                 sixp_trans_get_peer_addr(trans));
     }
     ret_val = -1;
-  } else {
-    /* trans == NULL */
-    LOG_ERR("6top: invalid argument, trans is NULL\n");
-    ret_val = -1;
-  }
+  }// if (ok)
   return ret_val;
 }
 /*---------------------------------------------------------------------------*/
@@ -359,6 +359,8 @@ sixp_trans_get_peer_addr(sixp_trans_t *trans)
   }
 }
 /*---------------------------------------------------------------------------*/
+sixp_trans_t* sixp_current_trans = NULL;
+
 void
 sixp_trans_invoke_callback(sixp_trans_t *trans, sixp_output_status_t status)
 {
@@ -367,6 +369,7 @@ sixp_trans_invoke_callback(sixp_trans_t *trans, sixp_output_status_t status)
   if(trans == NULL || trans->callback.func == NULL) {
     return;
   }
+  sixp_current_trans = trans;
   trans->callback.func(trans->callback.arg, trans->callback.arg_len,
                        &trans->peer_addr, status);
 }
@@ -402,7 +405,8 @@ sixp_trans_alloc(const sixp_pkt_t *pkt, const linkaddr_t *peer_addr)
     return NULL;
   }
 
-  if(sixp_trans_find(peer_addr) != NULL) {
+  if(0) //this check has alredy evaluated by caller
+  if(sixp_trans_find_for_pkt(peer_addr, pkt) != NULL) {
     LOG_ERR("6P-trans: sixp_trans_alloc() fails because another trans with ");
     LOG_ERR_LLADDR((const linkaddr_t *)peer_addr);
     LOG_ERR_("is in process\n");
@@ -424,9 +428,25 @@ sixp_trans_alloc(const sixp_pkt_t *pkt, const linkaddr_t *peer_addr)
   list_add(trans_list, trans);
   start_trans_timer(trans);
 
+  LOG_DBG("new trans(%p) sf%u [peer_addr:", trans, trans->sf->sfid);
+  LOG_DBG_LLADDR((const linkaddr_t *)&trans->peer_addr);
+  LOG_DBG_(", seqno:%u] code:%x\n", trans->seqno, trans->cmd);
+
   return trans;
 }
 /*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_head(){
+    return list_head(trans_list);
+}
+
+sixp_trans_t *sixp_trans_next(sixp_trans_t* x){
+    return x->next;
+}
+
+bool sixp_trans_any(){
+    return list_head(trans_list) != NULL;
+}
+
 sixp_trans_t *
 sixp_trans_find(const linkaddr_t *peer_addr)
 {
@@ -446,13 +466,100 @@ sixp_trans_find(const linkaddr_t *peer_addr)
    */
   for(trans = list_head(trans_list);
       trans != NULL; trans = trans->next) {
-    if(memcmp(peer_addr, &trans->peer_addr, sizeof(linkaddr_t)) == 0) {
+    if( linkaddr_cmp(peer_addr, &trans->peer_addr) ) {
       return trans;
     }
   }
 
   return NULL;
 }
+
+/*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_find_for_sfid(const linkaddr_t *peer_addr, uint8_t sfid){
+    sixp_trans_t *trans;
+
+    assert(peer_addr != NULL);
+    if(peer_addr == NULL) {
+      return NULL;
+    }
+
+    for(trans = list_head(trans_list);
+        trans != NULL; trans = trans->next) {
+      if( linkaddr_cmp(peer_addr, &trans->peer_addr) )
+      if( trans->sf->sfid == sfid)
+      {
+        return trans;
+      }
+    }
+
+    return NULL;
+}
+
+/*---------------------------------------------------------------------------*/
+sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr
+                                        , const sixp_pkt_t* pkt
+                                        )
+{
+  sixp_trans_t *trans;
+
+  assert(peer_addr != NULL);
+  if(peer_addr == NULL) {
+    return NULL;
+  }
+
+  /*
+   * Here support concurrent 6P transactions which is mentioned in
+   * Section 4.3.3, draft-ietf-6tisch-6top-protocol-03.
+   *
+   * The assumption here is that each SF can have transactions to a single peer and
+   *     one from it
+   */
+  sixp_trans_state_t pkt_back = (~pkt->dir) & SIXP_TRANS_STATE_IO_Msk;
+
+  for(trans = list_head(trans_list); trans != NULL; trans = trans->next)
+  {
+    if ( !linkaddr_cmp(peer_addr, &trans->peer_addr) )   continue;
+
+    assert(trans->sf != NULL);
+    if (trans->sf->sfid != pkt->sfid) continue;
+
+    unsigned dir = trans->state & SIXP_TRANS_STATE_IO_Msk;
+
+    //reserved packet - don`t know how to mutch it
+    assert(pkt->type != SIXP_PKT_TYPE_RESERVED);
+
+    switch (pkt->type){
+        case SIXP_PKT_TYPE_REQUEST:
+        case SIXP_PKT_TYPE_CONFIRMATION:
+            // every request - is a new incomig transaction, or outgoing
+            //  so look for trans that are request-related
+            if (dir == pkt->dir){
+                LOG_DBG("trans(%p)[%x/%u] mutch for %x pkt:%d\n"
+                                , trans, trans->state, trans->seqno
+                                                            , pkt->dir, pkt->type);
+                return trans;
+            }
+            break;
+
+        case SIXP_PKT_TYPE_RESPONSE:
+            // responces comes in for outgoing inrequest, or comes out for incoming
+            if (dir == pkt_back){
+                LOG_DBG("trans(%p)[%x/%u] mutch for %x pkt:%d\n"
+                                 , trans, trans->state, trans->seqno
+                                                            , pkt->dir, pkt->type);
+                return trans;
+            }
+            break;
+
+        case SIXP_PKT_TYPE_RESERVED:
+            //TODO: reserved incoming packets don`t match any transaction?
+            return NULL;
+    }
+  }
+
+  return NULL;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 sixp_trans_terminate(sixp_trans_t *trans)
@@ -478,10 +585,10 @@ sixp_trans_abort(sixp_trans_t *trans)
     sixp_trans_terminate(trans);
     sixp_trans_invoke_callback(trans, SIXP_OUTPUT_STATUS_ABORTED);
     /* process_trans() should be scheduled, which we will be stop */
-    assert(ctimer_expired(&trans->timer) == 0);
+    assert( !ctimer_expired(&trans->timer) );
     ctimer_stop(&trans->timer);
     /* call process_trans() directly*/
-    process_trans((void *)trans);
+    sixp_process_trans((void *)trans);
   }
 }
 /*---------------------------------------------------------------------------*/
