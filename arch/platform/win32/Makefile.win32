@@ -61,6 +61,8 @@ endif
 
 # Set a target-specific variable value
 
+TARGET_IS_POSIX = 1
+
 ${foreach PRG,$(PRGS),${addprefix $(OBJECTDIR)/, \
                       $(${call appname,$(PRG)_src:.c=.o})}}: CFLAGS += -D_USRDLL
 

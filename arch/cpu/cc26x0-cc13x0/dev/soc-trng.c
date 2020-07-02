@@ -40,6 +40,7 @@
 #include "contiki.h"
 #include "lpm.h"
 #include "sys/process.h"
+#include "sys/energest.h"
 #include "dev/soc-trng.h"
 #include "ti-lib.h"
 

@@ -40,6 +40,14 @@
 #include "orchestra.h"
 #include "net/packetbuf.h"
 
+#include "sys/log.h"
+#define LOG_MODULE "ORCHESTRA"
+#ifdef LOG_LEVEL_ORCHESRTA
+#define LOG_LEVEL LOG_LEVEL_ORCHESRTA
+#else
+#define LOG_LEVEL LOG_LEVEL_NONE
+#endif
+
 static uint16_t slotframe_handle = 0;
 static uint16_t channel_offset = 0;
 static struct tsch_slotframe *sf_eb;
@@ -66,6 +74,10 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
     if(timeslot != NULL) {
       *timeslot = get_node_timeslot(&linkaddr_node_addr);
     }
+    LOG_DBG("EB ");
+    if(timeslot != NULL)
+        LOG_INFO_(" -> slot%d", *timeslot);
+    LOG_INFO_(" ch+%d\n", ORCHESTRA_EB_CHANNEL_OFFSET);
     return 1;
   }
   return 0;
@@ -74,8 +86,12 @@ select_packet(uint16_t *slotframe, uint16_t *timeslot, uint16_t *channel_offset)
 static void
 new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new)
 {
-  uint16_t old_ts = old != NULL ? get_node_timeslot(&old->addr) : 0xffff;
-  uint16_t new_ts = new != NULL ? get_node_timeslot(&new->addr) : 0xffff;
+  uint16_t old_ts = old != NULL ? get_node_timeslot(tsch_queue_get_nbr_address(old)) : 0xffff;
+  uint16_t new_ts = new != NULL ? get_node_timeslot(tsch_queue_get_nbr_address(new)) : 0xffff;
+
+  LOG_INFO("change TS to ");
+  LOG_INFO_LLADDR( (new != NULL)? tsch_queue_get_nbr_address(new): &linkaddr_null );
+  LOG_INFO_(" -> slot%d ch+%d\n", new_ts, ORCHESTRA_EB_CHANNEL_OFFSET);
 
   if(new_ts == old_ts) {
     return;
@@ -86,7 +102,7 @@ new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new
     if(old_ts == get_node_timeslot(&linkaddr_node_addr)) {
       /* This was the same timeslot as slot. Reset original link options */
       tsch_schedule_add_link(sf_eb, LINK_OPTION_TX, LINK_TYPE_ADVERTISING_ONLY,
-        &tsch_broadcast_address, old_ts, ORCHESTRA_EB_CHANNEL_OFFSET);
+        &tsch_broadcast_address, old_ts, ORCHESTRA_EB_CHANNEL_OFFSET, 1);
     } else {
       /* Remove slot */
       tsch_schedule_remove_link_by_timeslot(sf_eb, old_ts, ORCHESTRA_EB_CHANNEL_OFFSET);
@@ -100,7 +116,7 @@ new_time_source(const struct tsch_neighbor *old, const struct tsch_neighbor *new
     }
     /* Listen to the time source's EBs */
     tsch_schedule_add_link(sf_eb, link_options, LINK_TYPE_ADVERTISING_ONLY,
-      &tsch_broadcast_address, new_ts, ORCHESTRA_EB_CHANNEL_OFFSET);
+      &tsch_broadcast_address, new_ts, ORCHESTRA_EB_CHANNEL_OFFSET, 1);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -114,7 +130,7 @@ init(uint16_t sf_handle)
   tsch_schedule_add_link(sf_eb,
                          LINK_OPTION_TX,
                          LINK_TYPE_ADVERTISING_ONLY, &tsch_broadcast_address,
-                         get_node_timeslot(&linkaddr_node_addr), ORCHESTRA_EB_CHANNEL_OFFSET);
+                         get_node_timeslot(&linkaddr_node_addr), ORCHESTRA_EB_CHANNEL_OFFSET, 1);
 }
 /*---------------------------------------------------------------------------*/
 struct orchestra_rule eb_per_time_source = {

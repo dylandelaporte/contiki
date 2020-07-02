@@ -47,20 +47,24 @@
 #include <err.h>
 #include "contiki.h"
 
-int slip_config_verbose = 0;
-const char *slip_config_ipaddr;
-int slip_config_flowcontrol = 0;
-int slip_config_timestamp = 0;
-const char *slip_config_siodev = NULL;
-const char *slip_config_host = NULL;
-const char *slip_config_port = NULL;
-char slip_config_tundev[32] = { "" };
-uint16_t slip_config_basedelay = 0;
+#include "slip-config.h"
 
 #ifndef BAUDRATE
 #define BAUDRATE B115200
 #endif
-speed_t slip_config_b_rate = BAUDRATE;
+
+struct SlipConfig slip_config = {
+        0, //verbose
+        0, //flowcontrol
+        0, //timestamp
+        NULL, //ipaddr;
+        NULL, //siodev = NULL;
+        NULL, //host = NULL;
+        NULL, //port = NULL;
+        { "" }, //tundev
+        0, //basedelay
+        BAUDRATE, //b_rate
+};
 
 /*---------------------------------------------------------------------------*/
 int
@@ -70,65 +74,68 @@ slip_config_handle_arguments(int argc, char **argv)
   int c;
   int baudrate = 115200;
 
-  slip_config_verbose = 0;
+  slip_config.verbose = 0;
 
   prog = argv[0];
-  while((c = getopt(argc, argv, "B:H:D:Lhs:t:v::d::a:p:T")) != -1) {
+  while((c = getopt(argc, argv, "B:H::D:Lhs:t:v::d::a:p:T")) != -1) {
     switch(c) {
     case 'B':
       baudrate = atoi(optarg);
       break;
 
     case 'H':
-      slip_config_flowcontrol = 1;
+      slip_config.flowcontrol = 1;
+      if(optarg) {
+          slip_config.flowcontrol = atoi(optarg);
+      }
       break;
 
     case 'L':
-      slip_config_timestamp = 1;
+      slip_config.timestamp = 1;
       break;
 
     case 's':
       if(strncmp("/dev/", optarg, 5) == 0) {
-        slip_config_siodev = optarg + 5;
+        slip_config.siodev = optarg + 5;
       } else {
-        slip_config_siodev = optarg;
+        slip_config.siodev = optarg;
       }
       break;
 
     case 't':
       if(strncmp("/dev/", optarg, 5) == 0) {
-        strncpy(slip_config_tundev, optarg + 5, sizeof(slip_config_tundev));
+        strncpy(slip_config.tundev, optarg + 5, sizeof(slip_config.tundev));
       } else {
-        strncpy(slip_config_tundev, optarg, sizeof(slip_config_tundev));
+        strncpy(slip_config.tundev, optarg, sizeof(slip_config.tundev));
       }
       break;
 
     case 'a':
-      slip_config_host = optarg;
+      slip_config.host = optarg;
       break;
 
     case 'p':
-      slip_config_port = optarg;
+      slip_config.port = optarg;
       break;
 
     case 'd':
-      slip_config_basedelay = 10;
+      slip_config.basedelay = 10;
       if(optarg) {
-        slip_config_basedelay = atoi(optarg);
+        slip_config.basedelay = atoi(optarg);
       }
       break;
 
     case 'v':
-      slip_config_verbose = 2;
+      slip_config.verbose = 2;
       if(optarg) {
-        slip_config_verbose = atoi(optarg);
+        slip_config.verbose = atoi(optarg);
       }
       break;
 
     case '?':
     case 'h':
     default:
-      fprintf(stderr, "usage:  %s [options] ipaddress\n", prog);
+      fprintf(stderr, "usage:  %s [options] [ipaddress]\n", prog);
       fprintf(stderr, "example: border-router.native -L -v2 -s ttyUSB1 fd00::1/64\n");
       fprintf(stderr, "Options are:\n");
 #ifdef linux
@@ -136,7 +143,7 @@ slip_config_handle_arguments(int argc, char **argv)
 #else
       fprintf(stderr, " -B baudrate    9600,19200,38400,57600,115200 (default 115200)\n");
 #endif
-      fprintf(stderr, " -H             Hardware CTS/RTS flow control (default disabled)\n");
+      fprintf(stderr, " -H[style]      Hardware CTS/RTS flow control (default disabled)\n");
       fprintf(stderr, " -L             Log output format (adds time stamps)\n");
       fprintf(stderr, " -s siodev      Serial device (default /dev/ttyUSB0)\n");
       fprintf(stderr, " -a host        Connect via TCP to server at <host>\n");
@@ -166,32 +173,34 @@ slip_config_handle_arguments(int argc, char **argv)
   argc -= optind - 1;
   argv += optind - 1;
 
-  if(argc != 2 && argc != 3) {
-    err(1, "usage: %s [-B baudrate] [-H] [-L] [-s siodev] [-t tundev] [-T] [-v verbosity] [-d delay] [-a serveraddress] [-p serverport] ipaddress", prog);
+  if(argc >= 2) {
+      slip_config.ipaddr = argv[1];
   }
-  slip_config_ipaddr = argv[1];
+  else {
+      slip_config.ipaddr = NULL;
+  }
 
   switch(baudrate) {
   case -2:
     break;			/* Use default. */
   case 9600:
-    slip_config_b_rate = B9600;
+    slip_config.b_rate = B9600;
     break;
   case 19200:
-    slip_config_b_rate = B19200;
+    slip_config.b_rate = B19200;
     break;
   case 38400:
-    slip_config_b_rate = B38400;
+    slip_config.b_rate = B38400;
     break;
   case 57600:
-    slip_config_b_rate = B57600;
+    slip_config.b_rate = B57600;
     break;
   case 115200:
-    slip_config_b_rate = B115200;
+    slip_config.b_rate = B115200;
     break;
 #ifdef linux
   case 921600:
-    slip_config_b_rate = B921600;
+    slip_config.b_rate = B921600;
     break;
 #endif
   default:
@@ -199,9 +208,9 @@ slip_config_handle_arguments(int argc, char **argv)
     break;
   }
 
-  if(*slip_config_tundev == '\0') {
+  if(*slip_config.tundev == '\0') {
     /* Use default. */
-    strcpy(slip_config_tundev, "tun0");
+    strcpy(slip_config.tundev, "tun0");
   }
   return 1;
 }

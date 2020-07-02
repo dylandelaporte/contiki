@@ -49,7 +49,24 @@ frequency hopping for enhanced reliability.
 #include <stdbool.h>
 #include "contiki.h"
 #include "net/mac/mac.h"
+#include "net/linkaddr.h"
+
+#include "net/mac/tsch/tsch-conf.h"
+#include "net/mac/tsch/tsch-const.h"
+#include "net/mac/tsch/tsch-types.h"
+#include "net/mac/tsch/tsch-adaptive-timesync.h"
+#include "net/mac/tsch/tsch-slot-operation.h"
+#include "net/mac/tsch/tsch-queue.h"
+#include "net/mac/tsch/tsch-log.h"
+#include "net/mac/tsch/tsch-packet.h"
 #include "net/mac/tsch/tsch-security.h"
+#include "net/mac/tsch/tsch-schedule.h"
+#include "net/mac/tsch/tsch-stats.h"
+#if UIP_CONF_IPV6_RPL
+#include "net/mac/tsch/tsch-rpl.h"
+#endif /* UIP_CONF_IPV6_RPL */
+
+
 /* Include Arch-Specific conf */
 #ifdef TSCH_CONF_ARCH_HDR_PATH
 #include TSCH_CONF_ARCH_HDR_PATH
@@ -127,6 +144,13 @@ void TSCH_CALLBACK_NEW_TIME_SOURCE(const struct tsch_neighbor *old, const struct
 int TSCH_CALLBACK_PACKET_READY(void);
 #endif
 
+// called by TSCH scheduler every time link is activated, and there is link with
+//  LINK_OPTION_SIGNAL[_XXX] in same time-slot
+//  @arg signaling_link - provided last checked link with signaling request
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+void TSCH_CALLBACK_LINK_SIGNAL(struct tsch_link * signaling_link);
+#endif
+
 /***** External Variables *****/
 
 /* Are we coordinator of the TSCH network? */
@@ -150,8 +174,9 @@ extern const linkaddr_t tsch_eb_address;
 extern struct tsch_asn_t tsch_current_asn;
 extern uint8_t tsch_join_priority;
 extern struct tsch_link *current_link;
-/* If we are inside a slot, this tells the current channel */
+/* If we are inside a slot, these tell the current channel and channel offset */
 extern uint8_t tsch_current_channel;
+extern tsch_ch_offset_t tsch_current_channel_offset;
 /* TSCH channel hopping sequence */
 extern uint8_t tsch_hopping_sequence[TSCH_HOPPING_SEQUENCE_MAX_LEN];
 extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
@@ -187,6 +212,11 @@ void tsch_set_join_priority(uint8_t jp);
  * not be set to exceed TSCH_MAX_EB_PERIOD. Set to 0 to stop sending EBs.
  * Actual transmissions are jittered, spaced by a random number within
  * [period*0.75, period[
+ * If RPL is used, the period will be automatically reset by RPL
+ * equal to the DIO period whenever the DIO period changes.
+ * Hence, calling `tsch_set_eb_period(0)` is NOT sufficient to disable sending EB!
+ * To do that, either configure the node in RPL leaf mode, or
+ * use static config for TSCH (`define TSCH_CONF_EB_PERIOD 0`).
  *
  * \param period The period in Clock ticks.
  */

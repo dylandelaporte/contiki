@@ -79,11 +79,11 @@ extern int tsch_current_burst_count;
  * The offset to the ASN and performs a hopping sequence lookup.
  *
  * \param asn A given ASN
- * \param channel_offset Link's channel offset
- * \param p Packet that can override the link's channel offset
+ * \param channel_offset Given channel offset
  * \return The resulting channel
  */
-uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, uint16_t channel_offset, struct tsch_packet *p);
+uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, tsch_ch_offset_t channel_offset);
+
 /**
  * Set global time before starting slot operation, with a rtimer time and an ASN
  *
@@ -96,7 +96,9 @@ void tsch_slot_operation_sync(rtimer_clock_t next_slot_start,
  * Start actual slot operation
  */
 void tsch_slot_operation_start(void);
+
 void tsch_slot_operation_stop(void);
+
 // \brief Break current slot operation correctrly - in sync state, valid for later
 //  tsch_slot_operation_start invoke.
 //  \arg timeout - time [rtc] to planed next slot, that not breaks.
@@ -107,6 +109,7 @@ void tsch_slot_operation_stop(void);
 //          tsch_slot_operation_start();
 //      }
 bool tsch_slot_operation_break_before(rtimer_clock_t timeout);
+
 // this is a kind of:
 //      if( tsch_slot_operation_break_before(timeout) ){
 //          tsch_slot_operation_start();
@@ -156,7 +159,6 @@ void tsch_release_lock(void);
  * \return 1 if the lock is taken, 0 otherwise
  */
 bool tsch_get_lock(void);
-
 
 #endif /* __TSCH_SLOT_OPERATION_H__ */
 /** @} */

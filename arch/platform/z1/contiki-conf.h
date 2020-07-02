@@ -69,6 +69,10 @@
 #define AES_128_CONF cc2420_aes_128_driver
 #endif /* AES_128_CONF */
 
+#ifndef PACKETBUF_CONF_ATTRS_INLINE
+#define PACKETBUF_CONF_ATTRS_INLINE       1
+#endif
+
 /*---------------------------------------------------------------------------*/
 #include "msp430-conf.h"
 /*---------------------------------------------------------------------------*/

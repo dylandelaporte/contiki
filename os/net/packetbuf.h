@@ -227,6 +227,7 @@ enum {
   PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS,
   PACKETBUF_ATTR_MAC_SEQNO,
   PACKETBUF_ATTR_MAC_ACK,
+  PACKETBUF_ATTR_IS_CREATED_AND_SECURED, //ContikiMAC use it
   PACKETBUF_ATTR_MAC_METADATA,
   PACKETBUF_ATTR_MAC_NO_SRC_ADDR,
   PACKETBUF_ATTR_MAC_NO_DEST_ADDR,
@@ -255,10 +256,6 @@ enum {
         //    ommits default security value
         PACKETBUF_ATTR_SECURITY_LEVEL_DROP = 0x80,
 #endif /* LLSEC802154_USES_AUX_HEADER */
-#if LLSEC802154_USES_EXPLICIT_KEYS
-  PACKETBUF_ATTR_KEY_ID_MODE,
-  PACKETBUF_ATTR_KEY_INDEX,
-#endif /* LLSEC802154_USES_EXPLICIT_KEYS */
 
 #if LLSEC802154_USES_FRAME_COUNTER
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_0_1,
@@ -317,12 +314,7 @@ packetbuf_attr(uint8_t type)
   return packetbuf_attrs[type].val;
 }
 
-static inline int
-packetbuf_set_addr(uint8_t type, const linkaddr_t *addr)
-{
-  linkaddr_copy(&packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr, addr);
-  return 1;
-}
+int               packetbuf_set_addr(uint8_t type, const linkaddr_t *addr);
 
 static inline const linkaddr_t *
 packetbuf_addr(uint8_t type)
@@ -362,6 +354,25 @@ struct packetbuf_attrlist {
   uint8_t type;
   uint8_t len;
 };
+
+
+
+//----------------------------------------------------------------------------
+struct packetbuf_linkselector{
+    uint16_t  sfh;
+    uint16_t  slot;
+    uint16_t  choffs;
+};
+typedef struct packetbuf_linkselector packetbuf_linkselector;
+
+#if TSCH_WITH_LINK_SELECTOR
+void packetbuf_set_linksel(uint16_t  fsh, uint16_t  slot, uint16_t  choffs);
+void packetbuf_linksel_set(const packetbuf_linkselector val);
+void packetbuf_linksel_clear();
+packetbuf_linkselector packetbuf_linksel();
+#endif
+
+
 
 #endif /* PACKETBUF_H_ */
 /** @} */

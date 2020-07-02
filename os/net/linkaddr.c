@@ -48,11 +48,9 @@
 linkaddr_t linkaddr_node_addr;
 #if LINKADDR_SIZE == 2
 const linkaddr_t linkaddr_null = { { 0, 0 } };
-#else /*LINKADDR_SIZE == 2*/
-#if LINKADDR_SIZE == 8
+#elif LINKADDR_SIZE == 8
 const linkaddr_t linkaddr_null = { { 0, 0, 0, 0, 0, 0, 0, 0 } };
-#endif /*LINKADDR_SIZE == 8*/
-#if LINKADDR_SIZE == 6
+#elif LINKADDR_SIZE == 6
 const linkaddr_t linkaddr_null = { { 0, 0, 0, 0, 0, 0 } };
 #elif LINKADDR_SIZE == 4
 const linkaddr_t linkaddr_null = { { 0, 0, 0, 0 } };

@@ -44,7 +44,7 @@
 
 #include "contiki.h"
 #include "sys/rtimer.h"
-#include "net/mac/tsch/tsch-private.h"
+//#include "net/mac/tsch/tsch-private.h"
 // need uip_lladdr_t
 #include "net/ip/uip.h"
 
@@ -75,6 +75,13 @@
 
 #endif /* TSCH_LOG_CONF_LEVEL */
 
+#ifndef DEBUG
+// TSCH_PRINT use net-debug.h debug printer
+// so need to:
+//  #define DEBUG (DEBUG_PRINT)
+//  #include "net/net-debug.h"
+#endif
+
 
 
 /* The length of the log queue, i.e. maximum number postponed log messages */
@@ -88,10 +95,17 @@
 #ifdef TSCH_LOG_CONF_ID_FROM_LINKADDR
 #define TSCH_LOG_ID_FROM_LINKADDR(addr) TSCH_LOG_CONF_ID_FROM_LINKADDR(addr)
 #else /* TSCH_LOG_ID_FROM_LINKADDR */
+#if (LINKADDR_SIZE == 8)
+#define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u32[0] : 0)
+#else
 #define TSCH_LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
+#endif
 #endif /* TSCH_LOG_ID_FROM_LINKADDR */
 
 #if TSCH_LOG_LEVEL < 2 /* For log level 0 or 1, the logging functions do nothing */
+
+#define TSCH_IS_LOG  0
+#define TSCH_IS_PRINT ((DEBUG) & DEBUG_PRINT)
 
 #define tsch_log_init()
 #define tsch_log_process_pending()  0
@@ -101,6 +115,7 @@
 #define TSCH_LOGS(... )
 #define TSCH_LOGF(... )
 #define TSCH_LOGF8(... )
+#define TSCH_DBG(... )
 
 #define TSCH_PUTS(txt)      PRINTF(txt)
 #define TSCH_PRINTF(... )  PRINTF(__VA_ARGS__)
@@ -108,6 +123,9 @@
 #define TSCH_ANNOTATE(... )  ANNOTATE(__VA_ARGS__)
 
 #else /* TSCH_LOG_LEVEL */
+
+#define TSCH_IS_LOG         1
+#define TSCH_IS_PRINT       1
 
 /************ Types ***********/
 
@@ -126,9 +144,11 @@ struct tsch_log_t {
          tsch_log_message
   } type;
   struct tsch_asn_t asn;
-  struct tsch_link *link;
+  tsch_slot_t   timeslot;
+  tsch_sf_h     slotframe_handle;
   uint8_t burst_count;
   uint8_t channel;
+  uint8_t channel_offset;
   union {
     char message[48];
     const char* text;
@@ -209,6 +229,7 @@ void tsch_log_init(void);
 /* Process pending log messages */
 // \return - 0 if no messages printed
 int tsch_log_process_pending(void);
+/**
  * \brief Stop logging module
  */
 void tsch_log_stop(void);
@@ -251,13 +272,15 @@ void tsch_log_printf8(const char* fmt
 #define TSCH_PRINTF( ... ) _TSCH_LOGF4(__VA_ARGS__, 0,0,0,0)
 #define TSCH_PRINTF8( ... ) _TSCH_LOGF8(__VA_ARGS__, 0,0,0,0, 0,0,0,0)
 
+#define TSCH_DBG(... ) do { if(LOG_LEVEL_DBG <= (LOG_LEVEL)) TSCH_LOGF( __VA_ARGS__ ); } while(false)
+
 #define TSCH_ANNOTATE( ... ) do { \
     if ((DEBUG) & DEBUG_ANNOTATE)\
         TSCH_LOGF(__VA_ARGS__, 0,0,0,0); \
     } while(false)
 
 
-#include "net/mac/frame802154.h"
+#include "net/mac/framer/frame802154.h"
 void tsch_log_print_frame(const char* msg, frame802154_t *frame, const void* raw);
 #define TSCH_LOG_FRAME(msg, frame, raw)  tsch_log_print_frame(msg, frame, raw)
 

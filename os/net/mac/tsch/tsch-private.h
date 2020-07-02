@@ -47,36 +47,9 @@
 #include "contiki.h"
 #include "net/linkaddr.h"
 #include "net/mac/tsch/tsch-asn.h"
-#include "net/mac/tsch/tsch-conf.h"
-#if CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64
-#include "lib/simEnvChange.h"
-#include "sys/cooja_mt.h"
-#endif /* CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64 */
+#include "net/mac/tsch/tsch-const.h"
 
 /************ Types ***********/
-
-/* TSCH timeslot timing elements. Used to index timeslot timing
- * of different units, such as rtimer tick or micro-second */
-enum tsch_timeslot_timing_elements {
-  tsch_ts_cca_offset,
-  tsch_ts_cca,
-  tsch_ts_tx_offset,
-  tsch_ts_rx_offset,
-  tsch_ts_rx_ack_delay,
-  tsch_ts_tx_ack_delay,
-  tsch_ts_rx_wait,
-  tsch_ts_ack_wait,
-  tsch_ts_rx_tx,
-  tsch_ts_max_ack,
-  tsch_ts_max_tx,
-  tsch_ts_timeslot_length,
-  tsch_ts_rfon_prepslot_guard,
-  tsch_ts_elements_count, /* Not a timing element */
-  tsch_ts_netwide_count = tsch_ts_timeslot_length, /* Not a timing element */
-};
-
-// TSCH slot frame handle id type
-typedef uint8_t tsch_sf_h;
 
 /***** External Variables *****/
 
@@ -84,55 +57,12 @@ typedef uint8_t tsch_sf_h;
 extern const linkaddr_t tsch_broadcast_address;
 /* The address we use to identify EB queue */
 extern const linkaddr_t tsch_eb_address;
-/* The current Absolute Slot Number (ASN) */
-extern struct tsch_asn_t tsch_current_asn;
-extern struct tsch_asn_t tsch_last_sync_asn;
-extern uint8_t tsch_join_priority;
-extern struct tsch_link *current_link;
-/* TSCH channel hopping sequence */
-extern uint8_t tsch_hopping_sequence[TSCH_HOPPING_SEQUENCE_MAX_LEN];
-extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
-/* TSCH timeslot timing (in rtimer ticks) */
-extern rtimer_clock_t tsch_timing[tsch_ts_elements_count];
-
-/* TSCH processes */
-PROCESS_NAME(tsch_process);
-PROCESS_NAME(tsch_send_eb_process);
-PROCESS_NAME(tsch_pending_events_process);
-
-/********** Functions *********/
 
 /************ Macros **********/
-
-/* Calculate packet tx/rx duration in rtimer ticks based on sent
- * packet len in bytes with 802.15.4 250kbps data rate.
- * One byte = 32us. Add two bytes for CRC and one for len field */
-#ifdef RF_CORE_CONF_BAUD
-#define TSCH_BYTE_US (8000000ul/RF_CORE_CONF_BAUD)
-#else
-#define TSCH_BYTE_US 32
-#endif
-
-#define TSCH_PACKET_DURATION(len) US_TO_RTIMERTICKS(TSCH_BYTE_US * ((len) + 3))
 
 /* Delay between the SFD RSSI detects preamble and it is detected in software. */
 #ifndef RADIO_RSSI_DETECT_DELAY
 #define RADIO_RSSI_DETECT_DELAY TSCH_PACKET_DURATION(0)
 #endif
 
-/* Convert rtimer ticks to clock and vice versa */
-#define TSCH_CLOCK_TO_TICKS(c) (((c) * RTIMER_SECOND) / CLOCK_SECOND)
-#define TSCH_CLOCK_TO_SLOTS(c, timeslot_length) (TSCH_CLOCK_TO_TICKS(c) / timeslot_length)
-
-/* Wait for a condition with timeout t0+offset. */
-#if CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64
-#define BUSYWAIT_UNTIL_ABS(cond, t0, offset) \
-  while(!(cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), (t0) + (offset))) { \
-    simProcessRunValue = 1; \
-    cooja_mt_yield(); \
-  };
-#else
-#define BUSYWAIT_UNTIL_ABS(cond, t0, offset) \
-  while(!(cond) && RTIMER_CLOCK_LT(RTIMER_NOW(), (t0) + (offset))) ;
-#endif /* CONTIKI_TARGET_COOJA || CONTIKI_TARGET_COOJA_IP64 */
 #endif /* __TSCH_PRIVATE_H__ */

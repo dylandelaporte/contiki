@@ -64,6 +64,7 @@
 #define LOG_LEVEL_WARN         2 /* Warnings */
 #define LOG_LEVEL_INFO         3 /* Basic info */
 #define LOG_LEVEL_DBG          4 /* Detailled debug */
+#define LOG_LEVEL_TRACE        5 /* More Detailled debug */
 
 /* Per-module log level */
 

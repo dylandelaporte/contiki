@@ -68,6 +68,11 @@
 /* board.h assumes that basic configuration is done */
 #include "board.h"
 /*---------------------------------------------------------------------------*/
+
+#ifndef PACKETBUF_CONF_ATTRS_INLINE
+#define PACKETBUF_CONF_ATTRS_INLINE       1
+#endif
+
 #endif /* CONTIKI_CONF_H */
 
 /** @} */

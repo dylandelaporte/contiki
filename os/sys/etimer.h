@@ -63,7 +63,9 @@
 #ifndef ETIMER_H_
 #define ETIMER_H_
 
-#include "contiki.h"
+#include "contiki-conf.h"
+#include "sys/timer.h"
+#include "sys/process.h"
 
 /**
  * A timer.
@@ -78,6 +80,7 @@ struct etimer {
   struct etimer *next;
   struct process *p;
 };
+typedef struct etimer etimer_t;
 
 /**
  * \name Functions called from application programs

@@ -144,7 +144,7 @@ add_links_to_schedule(const linkaddr_t *peer_addr, uint8_t link_option,
            peer_addr->u8[7]);
     tsch_schedule_add_link(slotframe,
                            link_option, LINK_TYPE_NORMAL, peer_addr,
-                           cell.timeslot_offset, cell.channel_offset);
+                           cell.timeslot_offset, cell.channel_offset, 1);
     break;
   }
 }
@@ -410,10 +410,12 @@ response_input(sixp_pkt_rc_t rc,
 
   assert(body != NULL && peer_addr != NULL);
 
-  if((nbr = sixp_nbr_find(peer_addr)) == NULL ||
-     (trans = sixp_trans_find(peer_addr)) == NULL) {
+  nbr = sixp_nbr_find(peer_addr);
+  if(nbr == NULL)
+      return;
+  trans = sixp_trans_find(peer_addr);
+  if ( trens == NULL)
     return;
-  }
 
   if(rc == SIXP_PKT_RC_SUCCESS) {
     switch(sixp_trans_get_cmd(trans)) {
@@ -616,5 +618,6 @@ const sixtop_sf_t sf_simple_driver = {
   CLOCK_SECOND,
   NULL,
   input,
+  NULL,
   NULL
 };

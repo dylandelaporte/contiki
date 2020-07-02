@@ -38,4 +38,4 @@ extern uint8_t prefix_set;
 
 void rpl_border_router_init(void);
 void print_local_addresses(void);
-void set_prefix_64(uip_ipaddr_t *prefix_64);
+void set_prefix_64(uip_ip6addr_t *prefix_64);

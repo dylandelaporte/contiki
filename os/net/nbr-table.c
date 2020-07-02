@@ -40,7 +40,23 @@
 #include "lib/list.h"
 #include "net/nbr-table.h"
 
+
+
+/* Log configuration */
+#include "sys/log.h"
+#define LOG_MODULE "NetNbr"
+#ifdef  LOG_CONF_LEVEL_NET
+#define LOG_LEVEL LOG_CONF_LEVEL_NET
+#else
+#define LOG_LEVEL LOG_LEVEL_NONE
+#endif
+
+#if LOG_LEVEL >= LOG_LEVEL_DBG
+#define DEBUG 1
+#else
 #define DEBUG 0
+#endif
+
 #if DEBUG
 #include <stdio.h>
 #include "sys/ctimer.h"
@@ -52,6 +68,12 @@ static void print_table();
 #else
 #define PRINTF(...)
 #endif
+
+// Provide Nbr index ops check that index in table bounds
+#ifndef NBR_CHECK_BOUNDS
+#define NBR_CHECK_BOUNDS DEBUG
+#endif
+
 
 /* This is the callback function that will be called when there is a
  *  nbr-policy active
@@ -83,33 +105,62 @@ static unsigned num_tables;
 MEMB(neighbor_addr_mem, nbr_table_key_t, NBR_TABLE_MAX_NEIGHBORS);
 LIST(nbr_table_keys);
 
+
+
+#if NBR_CHECK_BOUNDS
+#include <assert.h>
+#define ASSERT_NBR( x ) assert( (x) )
+#define IN_MEMB(m, index) (index < m.num)
+#define IN_MAPS(m, index) (index < NBR_TABLE_MAX_NEIGHBORS)
+#define IN_BITMAP(m, index) (index < (8*sizeof(used_map[0])))
+#else
+#define ASSERT_NBR( x )
+#define IN_MEMB(m, index) 1
+#define IN_MAPS(m, index) 1
+#define IN_BITMAP(m, index) 1
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Get a key from a neighbor index */
 static nbr_table_key_t *
-key_from_index(int index)
+key_from_index(nbr_idx_t index)
 {
-  return index != -1 ? &((nbr_table_key_t *)neighbor_addr_mem.mem)[index] : NULL;
+  ASSERT_NBR(IN_MEMB(neighbor_addr_mem, index));
+  if ((index >= 0) && IN_MEMB(neighbor_addr_mem, index))
+      return &((nbr_table_key_t *)neighbor_addr_mem.mem)[index];
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 /* Get an item from its neighbor index */
 static nbr_table_item_t *
-item_from_index(nbr_table_t *table, int index)
+item_from_index(nbr_table_t *table, nbr_idx_t index)
 {
-  return table != NULL && index != -1 ? (char *)table->data + index * table->item_size : NULL;
+  if ((table != NULL) && (index >= 0))
+      return (char *)table->data + index * table->item_size;
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 /* Get the neighbor index of an item */
-static int
+static nbr_idx_t
 index_from_key(nbr_table_key_t *key)
 {
-  return key != NULL ? key - (nbr_table_key_t *)neighbor_addr_mem.mem : -1;
+  if (key != NULL){
+      int idx = key - (nbr_table_key_t *)neighbor_addr_mem.mem;
+      ASSERT_NBR( IN_MEMB(neighbor_addr_mem, idx ));
+      if (IN_MEMB(neighbor_addr_mem, idx))
+          return idx;
+  }
+  return  -1;
 }
 /*---------------------------------------------------------------------------*/
 /* Get the neighbor index of an item */
-static int
+static nbr_idx_t
 index_from_item(nbr_table_t *table, const nbr_table_item_t *item)
 {
-  return table != NULL && item != NULL ? ((int)((char *)item - (char *)table->data)) / table->item_size : -1;
+  if (table != NULL && item != NULL)
+      return ((int)((char *)item - (char *)table->data)) / table->item_size;
+  else
+      return -1;
 }
 /*---------------------------------------------------------------------------*/
 /* Get an item from its key */
@@ -127,7 +178,7 @@ key_from_item(nbr_table_t *table, const nbr_table_item_t *item)
 }
 /*---------------------------------------------------------------------------*/
 /* Get the index of a neighbor from its link-layer address */
-static int
+static nbr_idx_t
 index_from_lladdr(const linkaddr_t *lladdr)
 {
   nbr_table_key_t *key;
@@ -148,24 +199,32 @@ index_from_lladdr(const linkaddr_t *lladdr)
 /*---------------------------------------------------------------------------*/
 /* Get bit from "used" or "locked" bitmap */
 static int
-nbr_get_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item)
+nbr_get_bit_idx(uint8_t *bitmap, nbr_table_t *table, nbr_idx_t item_index)
 {
-  int item_index = index_from_item(table, item);
-  if(table != NULL && item_index != -1) {
+  if(table != NULL && item_index >= 0) {
+    ASSERT_NBR( IN_MAPS(bitmap, item_index) );
+    ASSERT_NBR( IN_BITMAP(bitmap, table->index) );
     return (bitmap[item_index] & (1 << table->index)) != 0;
   } else {
     return 0;
   }
   return 0;
 }
+
+static int
+nbr_get_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item)
+{
+  int item_index = index_from_item(table, item);
+  return nbr_get_bit_idx(bitmap, table, item_index);
+}
 /*---------------------------------------------------------------------------*/
 /* Set bit in "used" or "locked" bitmap */
 static int
-nbr_set_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item, int value)
+nbr_set_bit_idx(uint8_t *bitmap, nbr_table_t *table, nbr_idx_t item_index, int value)
 {
-  int item_index = index_from_item(table, item);
-
-  if(table != NULL && item_index != -1) {
+  if(table != NULL && item_index >= 0) {
+    ASSERT_NBR( IN_MAPS(bitmap, item_index) );
+    ASSERT_NBR( IN_BITMAP(bitmap, table->index) );
     if(value) {
       bitmap[item_index] |= 1 << table->index;
     } else {
@@ -176,6 +235,13 @@ nbr_set_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item, int val
     return 0;
   }
   return 0;
+}
+
+static int
+nbr_set_bit(uint8_t *bitmap, nbr_table_t *table, nbr_table_item_t *item, int value)
+{
+  int item_index = index_from_item(table, item);
+  return nbr_set_bit_idx(bitmap, table, item_index, value);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -197,6 +263,30 @@ remove_key(nbr_table_key_t *least_used_key)
   list_remove(nbr_table_keys, least_used_key);
 }
 /*---------------------------------------------------------------------------*/
+#if defined( __GNUC__ )
+static inline
+int popcount8( unsigned x ){  return __builtin_popcount(x); }
+int popcount( unsigned x ){  return __builtin_popcount(x); }
+#else
+static
+int popcount8(uint8_t n) {
+    n = (n & 0x55u) + ((n >> 1) & 0x55u);
+    n = (n & 0x33u) + ((n >> 2) & 0x33u);
+    n = (n & 0x0fu) + ((n >> 4) & 0x0fu);
+    return n;
+}
+
+static
+int popcount(uint32_t n) {
+    n = (n & 0x55555555u) + ((n >> 1) & 0x55555555u);
+    n = (n & 0x33333333u) + ((n >> 2) & 0x33333333u);
+    n = (n & 0x0f0f0f0fu) + ((n >> 4) & 0x0f0f0f0fu);
+    n = (n & 0x00ff00ffu) + ((n >> 8) & 0x00ff00ffu);
+    n = (n & 0x0000ffffu) + ((n >>16) & 0x0000ffffu);
+    return n;
+}
+#endif
+
 static nbr_table_key_t *
 nbr_table_allocate(nbr_table_reason_t reason, void *data)
 {
@@ -213,19 +303,21 @@ nbr_table_allocate(nbr_table_reason_t reason, void *data)
     lladdr = NBR_TABLE_FIND_REMOVABLE(reason, data);
     if(lladdr == NULL) {
       /* Nothing found that can be deleted - return NULL to indicate failure */
-      PRINTF("*** Not removing entry to allocate new\n");
+      LOG_INFO("*** Not removing entry to allocate new\n");
       return NULL;
     } else {
       /* used least_used_key to indicate what is the least useful entry */
-      int index;
+      nbr_idx_t index;
       int locked = 0;
-      if((index = index_from_lladdr(lladdr)) != -1) {
+      if((index = index_from_lladdr(lladdr)) >= 0) {
         least_used_key = key_from_index(index);
+        ASSERT_NBR( (index >= 0) && IN_MAPS(locked_map, index) );
         locked = locked_map[index];
       }
       /* Allow delete of locked item? */
       if(least_used_key != NULL && locked) {
-        PRINTF("Deleting locked item!\n");
+        LOG_INFO("Deleting locked item!\n");
+        ASSERT_NBR( (index >= 0) && IN_MAPS(locked_map, index) );
         locked_map[index] = 0;
       }
     }
@@ -241,19 +333,18 @@ nbr_table_allocate(nbr_table_reason_t reason, void *data)
       /* Get item from first key */
       key = list_head(nbr_table_keys);
       while(key != NULL) {
-        int item_index = index_from_key(key);
+        nbr_idx_t item_index = index_from_key(key);
+        ASSERT_NBR( (item_index >= 0) && IN_MAPS(locked_map, item_index) );
         int locked = locked_map[item_index];
         /* Never delete a locked item */
         if(!locked) {
           int used = used_map[item_index];
-          int used_count = 0;
-          /* Count how many tables are using this item */
-          while(used != 0) {
-            if((used & 1) == 1) {
-              used_count++;
-            }
-          used >>= 1;
-          }
+          int used_count;
+          if (sizeof(used_map[0]) == 1)
+              used_count = popcount8(used);
+          else
+              used_count = popcount(used);
+
           /* Find least used item */
           if(least_used_key == NULL || used_count < least_used_count) {
             least_used_key = key;
@@ -301,6 +392,7 @@ nbr_table_register(nbr_table_t *table, nbr_table_callback *callback)
     table->index = num_tables++;
     table->callback = callback;
     all_tables[table->index] = table;
+    LOG_DBG("register table %p ->[%u]\n", table, num_tables);
     return 1;
   } else {
     /* Maximum number of tables exceeded */
@@ -312,8 +404,8 @@ nbr_table_register(nbr_table_t *table, nbr_table_callback *callback)
 int
 nbr_table_is_registered(nbr_table_t *table)
 {
-  if(table != NULL && table->index >= 0 && table->index < MAX_NUM_TABLES
-                   && all_tables[table->index] == table) {
+  if(table != NULL && table->index >= 0 && table->index < MAX_NUM_TABLES)
+  if(all_tables[table->index] == table) {
     return 1;
   }
   return 0;
@@ -324,9 +416,12 @@ nbr_table_item_t *
 nbr_table_head(nbr_table_t *table)
 {
   /* Get item from first key */
-  nbr_table_item_t *item = item_from_key(table, list_head(nbr_table_keys));
+  nbr_idx_t idx = index_from_key(list_head(nbr_table_keys));
+  nbr_table_item_t *item = item_from_index(table, idx);
+  if (item == NULL)
+      return NULL;
   /* Item is the first neighbor, now check is it is in the current table */
-  if(nbr_get_bit(used_map, table, item)) {
+  if(nbr_get_bit_idx(used_map, table, idx)) {
     return item;
   } else {
     return nbr_table_next(table, item);
@@ -337,12 +432,14 @@ nbr_table_head(nbr_table_t *table)
 nbr_table_item_t *
 nbr_table_next(nbr_table_t *table, nbr_table_item_t *item)
 {
+  nbr_idx_t idx;
   do {
     void *key = key_from_item(table, item);
     key = list_item_next(key);
     /* Loop until the next item is in the current table */
-    item = item_from_key(table, key);
-  } while(item && !nbr_get_bit(used_map, table, item));
+    idx = index_from_key(key);
+    item = item_from_index(table, idx);
+  } while(item && !nbr_get_bit_idx(used_map, table, idx));
   return item;
 }
 /*---------------------------------------------------------------------------*/
@@ -350,7 +447,7 @@ nbr_table_next(nbr_table_t *table, nbr_table_item_t *item)
 nbr_table_item_t *
 nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_reason_t reason, void *data)
 {
-  int index;
+  nbr_idx_t index;
   nbr_table_item_t *item;
   nbr_table_key_t *key;
 
@@ -370,6 +467,9 @@ nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_rea
 
     /* No space available for new entry */
     if(key == NULL) {
+      LOG_ERR("Not enough mem to alloc ");
+      LOG_ERR_LLADDR(lladdr);
+      LOG_ERR_("\n");
       return NULL;
     }
 
@@ -383,12 +483,16 @@ nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_rea
     linkaddr_copy(&key->lladdr, lladdr);
   }
 
+  LOG_DBG("set nbr ");
+  LOG_DBG_LLADDR(lladdr);
+  LOG_DBG_(" ->[%d]\n", index);
+
   /* Get item in the current table */
   item = item_from_index(table, index);
 
   /* Initialize item data and set "used" bit */
   memset(item, 0, table->item_size);
-  nbr_set_bit(used_map, table, item, 1);
+  nbr_set_bit_idx(used_map, table, index, 1);
 
 #if DEBUG
   print_table();
@@ -400,18 +504,31 @@ nbr_table_add_lladdr(nbr_table_t *table, const linkaddr_t *lladdr, nbr_table_rea
 void *
 nbr_table_get_from_lladdr(nbr_table_t *table, const linkaddr_t *lladdr)
 {
-  void *item = item_from_index(table, index_from_lladdr(lladdr));
-  return nbr_get_bit(used_map, table, item) ? item : NULL;
+  nbr_idx_t idx = index_from_lladdr(lladdr);
+  return nbr_table_get_from_idx(table, idx);
+}
+
+void* nbr_table_get_from_idx(nbr_table_t *table, nbr_idx_t idx){
+    if (idx < 0)
+        return NULL;
+  if (nbr_get_bit_idx(used_map, table, idx))
+      return item_from_index(table, idx);
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 /* Removes a neighbor from the current table (unset "used" bit) */
-int
-nbr_table_remove(nbr_table_t *table, void *item)
+int nbr_table_idx_remove(nbr_table_t *table, nbr_idx_t item_index)
 {
-  int ret = nbr_set_bit(used_map, table, item, 0);
-  nbr_set_bit(locked_map, table, item, 0);
+  int ret = nbr_set_bit_idx(used_map, table, item_index, 0);
+  nbr_set_bit_idx(locked_map, table, item_index, 0);
   return ret;
 }
+
+int nbr_table_remove(nbr_table_t *table, void *item)
+{
+    return nbr_table_idx_remove(table, index_from_item(table, item));
+}
+
 /*---------------------------------------------------------------------------*/
 /* Lock a neighbor for the current table (set "locked" bit) */
 int
@@ -419,7 +536,7 @@ nbr_table_lock(nbr_table_t *table, void *item)
 {
 #if DEBUG
   int i = index_from_item(table, item);
-  PRINTF("*** Lock %d\n", i);
+  LOG_DBG("*** Lock %d\n", i);
 #endif
   return nbr_set_bit(locked_map, table, item, 1);
 }
@@ -430,7 +547,7 @@ nbr_table_unlock(nbr_table_t *table, void *item)
 {
 #if DEBUG
   int i = index_from_item(table, item);
-  PRINTF("*** Unlock %d\n", i);
+  LOG_DBG("*** Unlock %d\n", i);
 #endif
   return nbr_set_bit(locked_map, table, item, 0);
 }
@@ -439,8 +556,15 @@ nbr_table_unlock(nbr_table_t *table, void *item)
 linkaddr_t *
 nbr_table_get_lladdr(nbr_table_t *table, const void *item)
 {
+  // TODO:need check nbr_get_bit( . ) ?
   nbr_table_key_t *key = key_from_item(table, item);
   return key != NULL ? &key->lladdr : NULL;
+}
+
+linkaddr_t *nbr_table_idx_lladdr(nbr_idx_t idx){
+    // TODO:need check nbr_get_bit( . ) ?
+    nbr_table_key_t *key = key_from_index(idx);
+    return key != NULL ? &key->lladdr : NULL;
 }
 /*---------------------------------------------------------------------------*/
 #if DEBUG
@@ -452,7 +576,7 @@ print_table()
   PRINTF("NBR TABLE:\n");
   for(i = 0; i < NBR_TABLE_MAX_NEIGHBORS; i++) {
     if(used_map[i] > 0) {
-      PRINTF(" %02d %02d",i , key_from_index(i)->lladdr.u8[LINKADDR_SIZE - 1]);
+      PRINTF(" %02d %03d",i , key_from_index(i)->lladdr.u8[LINKADDR_SIZE - 1]);
       for(j = 0; j < num_tables; j++) {
         PRINTF(" [%d:%d]", (used_map[i] & (1 << j)) != 0,
                (locked_map[i] & (1 << j)) != 0);

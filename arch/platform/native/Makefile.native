@@ -2,12 +2,22 @@ ifndef CONTIKI
   $(error CONTIKI not defined! You must specify where CONTIKI resides!)
 endif
 
+### Board and BSP selection
+BOARD ?=
+BOARDS = slip-gate
 
 CONTIKI_TARGET_DIRS = . dev
 CONTIKI_TARGET_MAIN = ${addprefix $(OBJECTDIR)/,contiki-main.o}
 
+### Include the board-specific makefile
+ifneq ("$(BOARD)","")
+PLATFORM_ROOT_DIR = $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)
+-include $(PLATFORM_ROOT_DIR)/$(BOARD)/Makefile.$(notdir $(BOARD))
+endif
+
 CONTIKI_TARGET_SOURCEFILES += platform.c clock.c xmem.c
 CONTIKI_TARGET_SOURCEFILES += cfs-posix.c cfs-posix-dir.c buttons.c
+CONTIKI_TARGET_SOURCEFILES += $(BOARD_SOURCEFILES)
 
 ifeq ($(HOST_OS),Windows)
 CONTIKI_TARGET_SOURCEFILES += wpcap-drv.c wpcap.c
@@ -19,6 +29,13 @@ endif
 ifeq ($(HOST_OS),Linux)
 TARGET_LIBFILES += -lrt
 endif
+
+TARGET_IS_POSIX = 1
+
+# looks gcc ld can`t handle weak symbols in archives. 
+# !!!So sure that board.o links out of archive
+
+CFLAGS += -Wno-stringop-truncation
 
 CONTIKI_SOURCEFILES += $(CONTIKI_TARGET_SOURCEFILES)
 

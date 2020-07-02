@@ -73,7 +73,7 @@
  *   operating.  If this value is 0xffff, the device is not
  *   associated.
  */
-static uint16_t mac_pan_id = IEEE802154_PANID;
+uint16_t mac_pan_id = IEEE802154_PANID;
 
 /**
  *  \brief Structure that contains the lengths of the various addressing and security fields
@@ -119,28 +119,11 @@ get_key_id_len(uint8_t key_id_mode)
 }
 #endif /* LLSEC802154_USES_AUX_HEADER && LLSEC802154_USES_EXPLICIT_KEYS */
 /*---------------------------------------------------------------------------*/
-/* Get current PAN ID */
-uint16_t
-frame802154_get_pan_id(void)
-{
-  return mac_pan_id;
-}
-/*---------------------------------------------------------------------------*/
-/* Set current PAN ID */
-void
-frame802154_set_pan_id(uint16_t pan_id)
-{
-  mac_pan_id = pan_id;
-}
-/*----------------------------------------------------------------------------*/
 /* Tells whether a given Frame Control Field indicates a frame with
  * source PANID and/or destination PANID */
 void
 frame802154_has_panid(frame802154_fcf_t *fcf, int *has_src_pan_id, int *has_dest_pan_id)
 {
-  int src_pan_id = 0;
-  int dest_pan_id = 0;
-
   if(fcf == NULL) {
     return;
   }

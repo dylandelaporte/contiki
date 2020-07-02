@@ -33,68 +33,6 @@
 #define CONTIKI_DEFAULT_CONF_H
 
 /*---------------------------------------------------------------------------*/
-/* Netstack configuration
- *
- * The netstack configuration is typically overridden by the platform
- * configuration, as defined in contiki-conf.h
- */
-
-/* NETSTACK_CONF_RADIO specifies the radio driver. The radio driver
-   typically depends on the radio used on the target hardware. */
-#ifndef NETSTACK_CONF_RADIO
-#define NETSTACK_CONF_RADIO nullradio_driver
-/* #define NETSTACK_CONF_RADIO cc2420_driver */
-#endif /* NETSTACK_CONF_RADIO */
-
-/* NETSTACK_CONF_FRAMER specifies the over-the-air frame format used
-   by Contiki radio packets. For IEEE 802.15.4 radios, use the
-   framer_802154 driver. */
-#ifndef NETSTACK_CONF_FRAMER
-#define NETSTACK_CONF_FRAMER framer_nullmac
-/* #define NETSTACK_CONF_FRAMER framer_802154 */
-#endif /* NETSTACK_CONF_FRAMER */
-
-/* NETSTACK_CONF_RDC specifies the Radio Duty Cycling (RDC) layer. The
-   nullrdc_driver never turns the radio off and is compatible with all
-   radios, but consumes a lot of power. The contikimac_driver is
-   highly power-efficent and allows sleepy routers, but is not
-   compatible with all radios. */
-#ifndef NETSTACK_CONF_RDC
-#define NETSTACK_CONF_RDC   nullrdc_driver
-/* #define NETSTACK_CONF_RDC   contikimac_driver */
-#endif /* NETSTACK_CONF_RDC */
-
-/* NETSTACK_CONF_MAC specifies the Medium Access Control (MAC)
-   layer. The nullmac_driver does not provide any MAC
-   functionality. The csma_driver is the default CSMA MAC layer, but
-   is not compatible with all radios. */
-#ifndef NETSTACK_CONF_MAC
-#define NETSTACK_CONF_MAC   nullmac_driver
-/* #define NETSTACK_CONF_MAC   csma_driver */
-#endif /* NETSTACK_CONF_MAC */
-
-/* NETSTACK_CONF_LLSEC specifies the link layer security driver. */
-#ifndef NETSTACK_CONF_LLSEC
-#define NETSTACK_CONF_LLSEC nullsec_driver
-#endif /* NETSTACK_CONF_LLSEC */
-
-/* NETSTACK_CONF_NETWORK specifies the network layer and can be either
-   sicslowpan_driver, for IPv6 networking, or rime_driver, for the
-   custom Rime network stack. */
-#ifndef NETSTACK_CONF_NETWORK
-#define NETSTACK_CONF_NETWORK rime_driver
-/* #define NETSTACK_CONF_NETWORK sicslowpan_driver */
-#endif /* NETSTACK_CONF_NETWORK */
-
-/* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE specifies the channel check
-   rate of the RDC layer. This defines how often the RDC will wake up
-   and check for radio channel activity. A higher check rate results
-   in higher communication performance at the cost of a higher power
-   consumption. */
-#ifndef NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE
-#define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
-#endif /* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE */
-
 /* Link-layer options
  */
 
@@ -111,13 +49,8 @@
  */
 #ifndef IEEE802154_CONF_DEFAULT_CHANNEL
 #define IEEE802154_CONF_DEFAULT_CHANNEL 26
+#endif /* IEEE802154_CONF_DEF_CHANNEL */
 /*---------------------------------------------------------------------------*/
-/* Packet buffer size options.
- *
- * The packet buffer size options can be tweaked on a per-project
- * basis to reduce memory consumption.
- */
-
 /* QUEUEBUF_CONF_NUM specifies the number of queue buffers. Queue
    buffers are used throughout the Contiki netstack but the
    configuration option can be tweaked to save memory. Performance can
@@ -155,7 +88,7 @@
    for the uIP packet buffer. This sets an upper bound on the largest
    IP packet that can be received by the system. */
 #ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE 128
+#define UIP_CONF_BUFFER_SIZE 1280
 #endif /* UIP_CONF_BUFFER_SIZE */
 
 /* UIP_CONF_ROUTER specifies if the IPv6 node should be a router or
@@ -166,14 +99,19 @@
 
 /* UIP_CONF_IPV6_RPL tells whether the RPL routing protocol is running,
     whether implemented as RPL Lite or RPL Classic */
+#if ROUTING_CONF_NULLROUTING
+#undef UIP_CONF_IPV6_RPL
+#define UIP_CONF_IPV6_RPL 0
+#elif !defined(UIP_CONF_IPV6_RPL)
 #define UIP_CONF_IPV6_RPL (ROUTING_CONF_RPL_LITE || ROUTING_CONF_RPL_CLASSIC)
+#endif
 
 /* If RPL is enabled also enable the RPL NBR Policy */
-#if UIP_CONF_IPV6_RPL
 #ifndef NBR_TABLE_FIND_REMOVABLE
+#if UIP_CONF_IPV6_RPL
 #define NBR_TABLE_FIND_REMOVABLE rpl_nbr_policy_find_removable
-#endif /* NBR_TABLE_FIND_REMOVABLE */
 #endif /* UIP_CONF_IPV6_RPL */
+#endif /* NBR_TABLE_FIND_REMOVABLE */
 
 /* UIP_CONF_MAX_ROUTES specifies the maximum number of routes that each
    node will be able to handle. */
@@ -199,12 +137,6 @@
 #define UIP_CONF_UDP_CONNS 8
 #endif /* UIP_CONF_UDP_CONNS */
 
-/* UIP_CONF_MAX_CONNECTIONS specifies the maximum number of
-   simultaneous TCP connections. */
-#ifndef UIP_CONF_MAX_CONNECTIONS
-#define UIP_CONF_MAX_CONNECTIONS 8
-#endif /* UIP_CONF_MAX_CONNECTIONS */
-
 /* UIP_CONF_TCP specifies if TCP support should be included or
    not. Disabling TCP saves memory. */
 #ifndef UIP_CONF_TCP
@@ -227,12 +159,6 @@
 #ifndef UIP_CONF_TCP_SPLIT
 #define UIP_CONF_TCP_SPLIT 0
 #endif /* UIP_CONF_TCP_SPLIT */
-
-/* NBR_TABLE_CONF_MAX_NEIGHBORS specifies the maximum number of neighbors
-   that each node will be able to handle. */
-#ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS 8
-#endif /* NBR_TABLE_CONF_MAX_NEIGHBORS */
 
 /* UIP_CONF_ND6_SEND_RA enables standard IPv6 Router Advertisement.
  * We enable it by default when IPv6 is used without RPL. */
@@ -301,41 +227,11 @@
 #define SICSLOWPAN_CONF_FRAG 1
 #endif /* SICSLOWPAN_CONF_FRAG */
 
-/* SICSLOWPAN_CONF_MAC_MAX_PAYLOAD is the maximum available size for
-   frame headers, link layer security-related overhead,  as well as
-   6LoWPAN payload. By default, SICSLOWPAN_CONF_MAC_MAX_PAYLOAD is
-   127 bytes (MTU of 802.15.4) - 2 bytes (Footer of 802.15.4). */
-#ifndef SICSLOWPAN_CONF_MAC_MAX_PAYLOAD
-#define SICSLOWPAN_CONF_MAC_MAX_PAYLOAD (127 - 2)
-#endif /* SICSLOWPAN_CONF_MAC_MAX_PAYLOAD */
-
-/* SICSLOWPAN_CONF_COMPRESSION_THRESHOLD sets a lower threshold for
-   when packets should not be compressed. This is used by ContikiMAC,
-   which requires packets to be larger than a given minimum size. */
-#ifndef SICSLOWPAN_CONF_COMPRESSION_THRESHOLD
-#define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 0
-/* #define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 63 */
-#endif /* SICSLOWPAN_CONF_COMPRESSION_THRESHOLD */
-
 /* SICSLOWPAN_CONF_COMPRESSION specifies what 6lowpan compression
    mechanism to be used. 6lowpan hc06 is the default in Contiki. */
 #ifndef SICSLOWPAN_CONF_COMPRESSION
-#define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_HC06
+#define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_IPHC
 #endif /* SICSLOWPAN_CONF_COMPRESSION */
-
-/*---------------------------------------------------------------------------*/
-/* ContikiMAC configuration options.
- *
- * These are typically configured on a per-platform basis.
- */
-
-/* CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION specifies if ContikiMAC
-   should optimize for the phase of neighbors. The phase optimization
-   may reduce power consumption but is not compatible with all timer
-   settings and is therefore off by default. */
-#ifndef CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION
-#define CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION 0
-#endif /* CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION */
 
 
 #endif /* CONTIKI_DEFAULT_CONF_H */

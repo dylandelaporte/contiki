@@ -135,6 +135,7 @@ phase_update(const linkaddr_t *neighbor, rtimer_clock_t time,
   }
 }
 /*---------------------------------------------------------------------------*/
+#ifdef NETSTACK_RDC
 static void
 send_packet(void *ptr)
 {
@@ -243,6 +244,7 @@ phase_wait(const linkaddr_t *neighbor, rtimer_clock_t cycle_time,
   }
   return PHASE_UNKNOWN;
 }
+#endif // NETSTACK_RDC
 /*---------------------------------------------------------------------------*/
 void
 phase_init(void)

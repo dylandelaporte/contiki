@@ -55,14 +55,7 @@
 #include "net/packetbuf.h"
 #include "cmd.h"
 #include "border-router-cmds.h"
-
-extern int slip_config_verbose;
-extern int slip_config_flowcontrol;
-extern const char *slip_config_siodev;
-extern const char *slip_config_host;
-extern const char *slip_config_port;
-extern uint16_t slip_config_basedelay;
-extern speed_t slip_config_b_rate;
+#include "slip-config.h"
 
 #ifdef SLIP_DEV_CONF_SEND_DELAY
 #define SEND_DELAY SLIP_DEV_CONF_SEND_DELAY
@@ -162,7 +155,7 @@ void
 slip_packet_input(unsigned char *data, int len)
 {
   packetbuf_copyfrom(data, len);
-  if(slip_config_verbose > 0) {
+  if(slip_config.verbose > 0) {
     printf("Packet input over SLIP: %d\n", len);
   }
   NETSTACK_MAC.input();
@@ -216,13 +209,13 @@ after_fread:
       } else if(inbuf[0] == DEBUG_LINE_MARKER) {
         fwrite(inbuf + 1, inbufptr - 1, 1, stdout);
       } else if(is_sensible_string(inbuf, inbufptr)) {
-        if(slip_config_verbose == 1) {   /* strings already echoed below for verbose>1 */
+        if(slip_config.verbose == 1) {   /* strings already echoed below for verbose>1 */
           fwrite(inbuf, inbufptr, 1, stdout);
         }
       } else {
-        if(slip_config_verbose > 2) {
+        if(slip_config.verbose > 2) {
           printf("Packet from SLIP of length %d - write TUN\n", inbufptr);
-          if(slip_config_verbose > 4) {
+          if(slip_config.verbose > 4) {
 #if WIRESHARK_IMPORT_FORMAT
             printf("0000");
             for(i = 0; i < inbufptr; i++) {
@@ -271,11 +264,11 @@ after_fread:
 
     /* Echo lines as they are received for verbose=2,3,5+ */
     /* Echo all printable characters for verbose==4 */
-    if(slip_config_verbose == 4) {
+    if(slip_config.verbose == 4) {
       if(c == 0 || c == '\r' || c == '\n' || c == '\t' || (c >= ' ' && c <= '~')) {
         fwrite(&c, 1, 1, stdout);
       }
-    } else if(slip_config_verbose >= 2) {
+    } else if(slip_config.verbose >= 2) {
       if(c == '\n' && is_sensible_string(inbuf, inbufptr)) {
         fwrite(inbuf, inbufptr, 1, stdout);
         inbufptr = 0;
@@ -364,13 +357,13 @@ write_to_serial(int outfd, const uint8_t *inbuf, int len)
   const uint8_t *p = inbuf;
   int i;
 
-  if(slip_config_verbose > 2) {
+  if(slip_config.verbose > 2) {
 #ifdef __CYGWIN__
     printf("Packet from WPCAP of length %d - write SLIP\n", len);
 #else
     printf("Packet from TUN of length %d - write SLIP\n", len);
 #endif
-    if(slip_config_verbose > 4) {
+    if(slip_config.verbose > 4) {
 #if WIRESHARK_IMPORT_FORMAT
       printf("0000");
       for(i = 0; i < len; i++) {
@@ -429,7 +422,7 @@ static void
 stty_telos(int fd)
 {
   struct termios tty;
-  speed_t speed = slip_config_b_rate;
+  speed_t speed = slip_config.b_rate;
   int i;
 
   if(tcflush(fd, TCIOFLUSH) == -1) {
@@ -445,7 +438,7 @@ stty_telos(int fd)
   /* Nonblocking read. */
   tty.c_cc[VTIME] = 0;
   tty.c_cc[VMIN] = 0;
-  if(slip_config_flowcontrol) {
+  if(slip_config.flowcontrol) {
     tty.c_cflag |= CRTSCTS;
   } else {
     tty.c_cflag &= ~CRTSCTS;
@@ -514,22 +507,22 @@ slip_init(void)
 {
   setvbuf(stdout, NULL, _IOLBF, 0); /* Line buffered output. */
 
-  if(slip_config_host != NULL) {
-    if(slip_config_port == NULL) {
-      slip_config_port = "60001";
+  if(slip_config.host != NULL) {
+    if(slip_config.port == NULL) {
+      slip_config.port = "60001";
     }
-    slipfd = connect_to_server(slip_config_host, slip_config_port);
+    slipfd = connect_to_server(slip_config.host, slip_config.port);
     if(slipfd == -1) {
-      err(1, "can't connect to ``%s:%s''", slip_config_host, slip_config_port);
+      err(1, "can't connect to ``%s:%s''", slip_config.host, slip_config.port);
     }
-  } else if(slip_config_siodev != NULL) {
-    if(strcmp(slip_config_siodev, "null") == 0) {
+  } else if(slip_config.siodev != NULL) {
+    if(strcmp(slip_config.siodev, "null") == 0) {
       /* Disable slip */
       return;
     }
-    slipfd = devopen(slip_config_siodev, O_RDWR | O_NONBLOCK);
+    slipfd = devopen(slip_config.siodev, O_RDWR | O_NONBLOCK);
     if(slipfd == -1) {
-      err(1, "can't open siodev ``/dev/%s''", slip_config_siodev);
+      err(1, "can't open siodev ``/dev/%s''", slip_config.siodev);
     }
   } else {
     static const char *siodevs[] = {
@@ -537,8 +530,8 @@ slip_init(void)
     };
     int i;
     for(i = 0; i < 3; i++) {
-      slip_config_siodev = siodevs[i];
-      slipfd = devopen(slip_config_siodev, O_RDWR | O_NONBLOCK);
+      slip_config.siodev = siodevs[i];
+      slipfd = devopen(slip_config.siodev, O_RDWR | O_NONBLOCK);
       if(slipfd != -1) {
         break;
       }
@@ -550,11 +543,11 @@ slip_init(void)
 
   select_set_callback(slipfd, &slip_callback);
 
-  if(slip_config_host != NULL) {
-    fprintf(stderr, "********SLIP opened to ``%s:%s''\n", slip_config_host,
-            slip_config_port);
+  if(slip_config.host != NULL) {
+    fprintf(stderr, "********SLIP opened to ``%s:%s''\n", slip_config.host,
+            slip_config.port);
   } else {
-    fprintf(stderr, "********SLIP started on ``/dev/%s''\n", slip_config_siodev);
+    fprintf(stderr, "********SLIP started on ``/dev/%s''\n", slip_config.siodev);
     stty_telos(slipfd);
   }
 

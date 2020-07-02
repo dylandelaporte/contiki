@@ -40,8 +40,11 @@
 
 #include "contiki.h"
 #include "contiki-net.h"
-#include "net/ip/uip-split.h"
 #include "net/ip/uip-packetqueue.h"
+
+#if UIP_CONF_TCP_SPLIT
+#include "net/ip/uip-split.h"
+#endif
 
 #if NETSTACK_CONF_WITH_IPV6
 #include "net/ipv6/uip-nd6.h"
@@ -52,11 +55,6 @@
 #include "net/linkaddr.h"
 #include "net/routing/routing.h"
 
-#if UIP_CONF_IPV6_RPL
-#include "net/rpl/rpl.h"
-#include "net/rpl/rpl-private.h"
-#endif
-
 #include <string.h>
 
 /* Log configuration */
@@ -66,10 +64,6 @@
 
 #ifdef UIP_FALLBACK_INTERFACE
 extern struct uip_fallback_interface UIP_FALLBACK_INTERFACE;
-#endif
-
-#if UIP_CONF_IPV6_RPL
-#include "rpl/rpl.h"
 #endif
 
 process_event_t tcpip_event;
