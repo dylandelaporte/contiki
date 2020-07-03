@@ -1,6 +1,5 @@
 /*
  * uip.h
-#include <uip-hton.h>
  *
  *  Created on: 17 ���. 2020 �.
  *      Author: alexrayne

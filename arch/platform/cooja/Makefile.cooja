@@ -67,13 +67,6 @@ SOURCE_EXCLUDE      += stack-check.c
 
 TARGET_IS_POSIX ?= 1
 
-### Default to use os/lib/dbg-io unless configured to do otherwise
-MAKE_WITH_LIB_DBG_IO ?= 1
-
-ifeq ($(MAKE_WITH_LIB_DBG_IO),1)
-  MODULES += os/lib/dbg-io
-endif
-
 .SUFFIXES:
 
 CLEAN += COOJA.log
