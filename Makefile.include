@@ -79,6 +79,10 @@ ifdef NDEBUG
 CFLAGS += -DNDEBUG
 endif
 
+ifdef GCCTEMPS
+CFLAGS += -save-temps=obj
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 #CFLAGS_WERROR += -Wno-error=unused-const-variable
 CFLAGS_WERROR += -Wno-error=unused-function
@@ -211,7 +215,7 @@ endif
 ifeq ($(CONTIKI_WITH_RPL),1)
     CFLAGS += -DUIP_CONF_IPV6_RPL=1
     MAKE_ROUTING ?= MAKE_ROUTING_RPL_LITE
-else ifeq($(CONTIKI_WITH_RPL),0)
+else ifeq ($(CONTIKI_WITH_RPL),0)
     CFLAGS += -DUIP_CONF_IPV6_RPL=0
 endif
 
