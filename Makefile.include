@@ -65,6 +65,10 @@ ifdef NDEBUG
 CFLAGS += -DNDEBUG
 endif
 
+ifdef GCCTEMPS
+CFLAGS += -save-temps=obj
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
 ifeq ($(WERROR),1)
