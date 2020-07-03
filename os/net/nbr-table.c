@@ -263,7 +263,8 @@ remove_key(nbr_table_key_t *least_used_key)
   list_remove(nbr_table_keys, least_used_key);
 }
 /*---------------------------------------------------------------------------*/
-#if defined( __GNUC__ )
+#if defined( __GNUC__ ) && !defined(__MSP430__)
+/* FIX: GCC for MSP430 have missed __builtin_popcount */
 static inline
 int popcount8( unsigned x ){  return __builtin_popcount(x); }
 static inline
