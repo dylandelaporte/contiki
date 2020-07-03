@@ -32,6 +32,7 @@
 #ifndef WATCHDOG_H_
 #define WATCHDOG_H_
 
+#include <contiki-conf.h>
 
 
 /*---------------------------------------------------------------------------*/
