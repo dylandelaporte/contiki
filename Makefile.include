@@ -79,6 +79,10 @@ ifdef NDEBUG
 CFLAGS += -DNDEBUG
 endif
 
+ifdef GCCTEMPS
+CFLAGS += -save-temps=obj
+endif
+
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 #CFLAGS_WERROR += -Wno-error=unused-const-variable
 CFLAGS_WERROR += -Wno-error=unused-function
