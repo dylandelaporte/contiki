@@ -113,18 +113,6 @@
 #endif /* UIP_CONF_IPV6_RPL */
 #endif /* NBR_TABLE_FIND_REMOVABLE */
 
-/* UIP_CONF_MAX_ROUTES specifies the maximum number of routes that each
-   node will be able to handle. */
-#ifndef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES 20
-#endif /* UIP_CONF_MAX_ROUTES */
-
-/* RPL_NS_CONF_LINK_NUM specifies the maximum number of links a RPL root
- * will maintain in non-storing mode. */
-#ifndef RPL_NS_CONF_LINK_NUM
-#define RPL_NS_CONF_LINK_NUM 20
-#endif /* RPL_NS_CONF_LINK_NUM */
-
 /* UIP_CONF_UDP specifies if UDP support should be included or
    not. Disabling UDP saves memory but breaks a lot of stuff. */
 #ifndef UIP_CONF_UDP
