@@ -90,7 +90,7 @@
 #include "net/ip/uipopt.h"
 #include "net/ip/uipbuf.h"
 #include "net/linkaddr.h"
-#include "uip-hton.h"
+#include <uip-hton.h>
 
 /* For memcmp */
 #include <string.h>
