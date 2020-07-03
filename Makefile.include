@@ -206,15 +206,12 @@ endif
 
 ifeq ($(CONTIKI_WITH_IPV6),1)
   MAKE_NET ?= MAKE_NET_IPV6
-  ifneq ($(CONTIKI_WITH_RPL),0)
-  	CONTIKI_WITH_RPL ?= 1
-  endif
 endif
 
 ifeq ($(CONTIKI_WITH_RPL),1)
     CFLAGS += -DUIP_CONF_IPV6_RPL=1
     MAKE_ROUTING ?= MAKE_ROUTING_RPL_LITE
-else
+else ifeq($(CONTIKI_WITH_RPL),0)
     CFLAGS += -DUIP_CONF_IPV6_RPL=0
 endif
 
