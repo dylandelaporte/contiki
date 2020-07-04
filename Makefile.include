@@ -64,14 +64,7 @@ CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 ifneq ("$(RELEASE)","")
 CFLAGS += -ffunction-sections
 CFLAGS += -fdata-sections
-LDFLAGS+= --gc-sections,--cref
-endif
-
-# try it for cleanup unused code
-ifneq ("$(RELEASE)","")
-CFLAGS += -ffunction-sections
-CFLAGS += -fdata-sections
-LDFLAGS+= --gc-sections,--cref
+LDFLAGS+= -Wl,-gc-sections,--cref
 # turn off asserts
 CFLAGS += -DNDEBUG
 endif
