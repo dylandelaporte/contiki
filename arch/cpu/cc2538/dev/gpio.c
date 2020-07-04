@@ -36,7 +36,6 @@
  * Implementation of the cc2538 GPIO controller
  */
 #include "contiki.h"
-#include "sys/energest.h"
 #include "dev/leds.h"
 #include "dev/gpio-hal.h"
 #include "dev/gpio.h"
