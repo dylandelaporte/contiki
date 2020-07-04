@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef OS_NET_IP_UIP_HTON_H_
-#define OS_NET_IP_UIP_HTON_H_
+#ifndef OS_NET_UIP_HTON_H_
+#define OS_NET_UIP_HTON_H_
 
 /**
  * \addtogroup uip
@@ -129,4 +129,4 @@ uint32_t uip_htonl(uint32_t val);
 
 /** @} */
 
-#endif /* OS_NET_IP_UIP_HTON_H_ */
+#endif /* OS_NET_UIP_HTON_H_ */
