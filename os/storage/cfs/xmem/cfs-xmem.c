@@ -33,6 +33,8 @@
  */
 
 #include "cfs/cfs.h"
+#include "cfs/cfs-coffee.h"
+#include "cfs-coffee-arch.h"
 #include "dev/xmem.h"
 
 struct filestate {
@@ -52,8 +54,10 @@ struct filestate {
 /* Note the CFS_XMEM_CONF_SIZE must be a tuple of XMEM_ERASE_UNIT_SIZE */
 #ifdef CFS_XMEM_CONF_SIZE
 #define CFS_XMEM_SIZE CFS_XMEM_CONF_SIZE
-#else
+#elif defined(XMEM_ERASE_UNIT_SIZE)
 #define CFS_XMEM_SIZE XMEM_ERASE_UNIT_SIZE
+#else
+#define CFS_XMEM_SIZE COFFEE_SECTOR_SIZE
 #endif
 
 static struct filestate file;
