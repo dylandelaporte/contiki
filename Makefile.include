@@ -329,6 +329,9 @@ endif
 
 ifdef MODULES
 
+MODULEDIRS = $(MODULES_REL) ${addprefix $(CONTIKI)/, $(MODULES)}
+UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
+
 include $(CONTIKI)/Makefile.modules_inspect
 
 ### Perform an immediate expansion of MODULES_INCLUDES and store it in a
