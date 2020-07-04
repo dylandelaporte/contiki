@@ -335,15 +335,8 @@ ifdef APPS
 endif
 
 ifdef MODULES
-  $(info modules: $(MODULES))
-  MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(MODULES)}}
-  UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
-  MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
-  MODULES_SOURCES += ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.cpp}}}
-  CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
 
-# Include module-specific makefiles
-MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${notdir $(d)}}}
+include $(CONTIKI)/Makefile.modules_inspect
 
 ### Perform an immediate expansion of MODULES_INCLUDES and store it in a
 ### variable. This will allow us to subsequently filter-out module Makefiles
@@ -352,6 +345,7 @@ MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${not
 MODULES_INCLUDED_FIRST_PASS := $(MODULES_INCLUDES)
 include $(MODULES_INCLUDED_FIRST_PASS)
 $(info modules 1st pass $(MODULES_INCLUDED_FIRST_PASS) )
+include $(CONTIKI)/Makefile.modules_inspect
 
 # Iterate once more: include the modules added from the previous include.
 # Only works with one level of nested module inclusion.
@@ -359,6 +353,7 @@ MODULES_INCLUDED_SECOND_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
                                              , $(MODULES_INCLUDES) )
 include $(MODULES_INCLUDED_SECOND_PASS)
 $(info modules 2nd pass  $(MODULES_INCLUDED_SECOND_PASS) )
+include $(CONTIKI)/Makefile.modules_inspect
 
 # Iterate once more: include the modules added from the previous include.
 # Only works with one level of nested module inclusion.
@@ -367,6 +362,7 @@ MODULES_INCLUDED_3_PASS := $(filter-out $(MODULES_INCLUDED_FIRST_PASS) \
                                              ,$(MODULES_INCLUDES) )
 include $(MODULES_INCLUDED_3_PASS)
 $(info modules 3rd pass $(MODULES_INCLUDED_3_PASS) )
+include $(CONTIKI)/Makefile.modules_inspect
 
 # C-include module-specific macros using -imacros
 MODULES_IMACROS = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/module-macros.h}}
@@ -596,6 +592,12 @@ $(BUILD_DIR_BOARD)/%.$(TARGET): $(OBJECTDIR)/%.o $$(PROJECT_OBJECTFILES) $$(PROJ
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) $(TARGET_STARTFILES) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(TARGET_LIBFILES) -o $@
+
+ifeq ($(V),1)
+$(info contiki:$(CONTIKI_SOURCEFILES))
+$(info proj:$(PROJECT_SOURCEFILES))
+$(info obj:$(PROJECT_OBJECTFILES))
+endif
 
 # this objects need for debuger, and need for quick rebuild
 .PRECIOUS: $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) 
