@@ -43,6 +43,8 @@
 #ifndef _SIXTOP_6P_PACKET_H_
 #define _SIXTOP_6P_PACKET_H_
 
+#include <stdint.h>
+
 #define SIXP_PKT_VERSION  0x00
 
 /* typedefs for code readability */
@@ -53,7 +55,6 @@ typedef uint8_t sixp_pkt_reserved_t;
 typedef uint16_t sixp_pkt_metadata_t;
 typedef uint16_t sixp_pkt_max_num_cells_t;
 typedef uint16_t sixp_pkt_offset_t;
-typedef uint32_t sixp_pkt_cell_t;
 typedef uint16_t sixp_pkt_total_num_cells_t;
 
 /**
@@ -115,6 +116,21 @@ typedef enum {
   SIXP_PKT_CELL_OPTION_SHARED = 0x04  /**< SHARED Cell */
 } sixp_pkt_cell_option_t;
 
+//typedef uint32_t sixp_pkt_cell_t;
+//an application structure
+union sixp_cell {
+    uint32_t    raw;
+    uint8_t     bytes[4];
+    struct __attribute__((packed)) cell_t {
+        uint16_t    slot;
+        uint16_t    chanel;
+    }           field;
+};
+typedef union sixp_cell sixp_cell_t;
+
+// an packet structure
+typedef union sixp_cell sixp_pkt_cell_t __attribute__((aligned (1)));
+
 /**
  * \brief 6top IE Structure
  */
@@ -124,8 +140,12 @@ typedef struct {
   sixp_pkt_code_t code;       /**< Code */
   uint8_t sfid;               /**< SFID */
   uint8_t seqno;              /**< SeqNum */
-  const uint8_t *body;        /**< Other Fields... */
+  /**< Pkt Direction recv/outgoing @sa sixp_trans_state_t:
+   *        SIXP_TRANS_STATE_IN_REQ/SIXP_TRANS_STATE_OUT_REQ
+   * */
+  uint8_t dir;
   uint16_t body_len;          /**< The length of Other Fields */
+  const uint8_t *body;        /**< Other Fields... */
 } sixp_pkt_t;
 
 /**
@@ -470,6 +490,23 @@ int sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
                     uint8_t sfid, uint8_t seqno,
                     const uint8_t *body, uint16_t body_len,
                     sixp_pkt_t *pkt);
+
+
+// initates pkt for outgoing request
+void sixp_pkt_init(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
+
+//  same as sixp_pkt_init, but init for incoming request
+void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid);
+
+// sixp_pkt_create demcoposed as -> sixp_pkt_init + sixp_pkt_build
+int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
+                    const uint8_t *body, uint16_t body_len );
+
+
+//-----------------------------------------------------------------------------
+const char* sixp_pkt_cell_option_name(sixp_pkt_cell_option_t x);
+const char* sixp_pkt_cell_options_str(sixp_pkt_cell_options_t x);
+
 
 #endif /* !_SIXP_PKT_H_ */
 /** @} */

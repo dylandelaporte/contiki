@@ -40,24 +40,74 @@
 
 #include "sixp.h"
 #include "sixp-pkt.h"
+#include <stdbool.h>
+#include "sixtop.h"
 
 /**
  * \brief 6P Transaction States (for internal use)
  */
 typedef enum {
   SIXP_TRANS_STATE_UNAVAILABLE = 0,
-  SIXP_TRANS_STATE_INIT,
-  SIXP_TRANS_STATE_REQUEST_SENDING,
-  SIXP_TRANS_STATE_REQUEST_SENT,
-  SIXP_TRANS_STATE_REQUEST_RECEIVED,
-  SIXP_TRANS_STATE_RESPONSE_SENDING,
-  SIXP_TRANS_STATE_RESPONSE_SENT,
-  SIXP_TRANS_STATE_RESPONSE_RECEIVED,
-  SIXP_TRANS_STATE_CONFIRMATION_SENDING,
-  SIXP_TRANS_STATE_CONFIRMATION_SENT,
-  SIXP_TRANS_STATE_CONFIRMATION_RECEIVED,
+  SIXP_TRANS_STATE_REQ_INIT,
+  SIXP_TRANS_STATE_REQ_SENDING,
+  SIXP_TRANS_STATE_REQ_SENT,
+  SIXP_TRANS_STATE_REQ_RECEIVED,
+  SIXP_TRANS_STATE_RESP_SENDING,
+  SIXP_TRANS_STATE_RESP_SENT,
+  SIXP_TRANS_STATE_RESP_RECEIVED,
+  SIXP_TRANS_STATE_CONFIRM_SENDING,
+  SIXP_TRANS_STATE_CONFIRM_SENT,
+  SIXP_TRANS_STATE_CONFIRM_RECEIVED,
   SIXP_TRANS_STATE_TERMINATING,
   SIXP_TRANS_STATE_WAIT_FREE,
+
+  // transactions can concurent for incomin/outgoing requests. This field helps
+  // denote - wich direction is state of transaction
+  SIXP_TRANS_STATE_IN_REQ  = 0x40,
+  SIXP_TRANS_STATE_OUT_REQ = 0x80,
+  SIXP_TRANS_STATE_IO_Msk  = SIXP_TRANS_STATE_IN_REQ | SIXP_TRANS_STATE_OUT_REQ,
+
+  // transaction sub-step, is sequences steps for in/out req
+  SIXP_TRANS_STATE_STEP0   = 0,
+  SIXP_TRANS_STATE_STEP1   = 0x100,
+  SIXP_TRANS_STATE_STEP2   = 0x200,
+  SIXP_TRANS_STATE_STEP3   = 0x300,
+  SIXP_TRANS_STATE_STEP4   = 0x400,
+  SIXP_TRANS_STATE_STEP5   = 0x500,
+  SIXP_TRANS_STATE_STEP_Msk= 0xf00,
+
+  SIXP_TRANS_STATE_INIT                 = SIXP_TRANS_STATE_REQ_INIT
+                                        | SIXP_TRANS_STATE_IN_REQ
+                                        | SIXP_TRANS_STATE_OUT_REQ,
+  SIXP_TRANS_STATE_REQUEST_SENDING  = SIXP_TRANS_STATE_REQ_SENDING
+                                        | SIXP_TRANS_STATE_STEP1
+                                        | SIXP_TRANS_STATE_OUT_REQ,
+  SIXP_TRANS_STATE_REQUEST_SENT     = SIXP_TRANS_STATE_REQ_SENT
+                                        | SIXP_TRANS_STATE_STEP2
+                                        | SIXP_TRANS_STATE_OUT_REQ,
+  SIXP_TRANS_STATE_RESPONSE_RECEIVED= SIXP_TRANS_STATE_RESP_RECEIVED
+                                        | SIXP_TRANS_STATE_STEP3
+                                        | SIXP_TRANS_STATE_OUT_REQ,
+  SIXP_TRANS_STATE_CONFIRMATION_SENDING = SIXP_TRANS_STATE_CONFIRM_SENDING
+                                        | SIXP_TRANS_STATE_STEP4
+                                        | SIXP_TRANS_STATE_OUT_REQ,
+  SIXP_TRANS_STATE_CONFIRMATION_SENT    = SIXP_TRANS_STATE_CONFIRM_SENT
+                                        | SIXP_TRANS_STATE_STEP5
+                                        | SIXP_TRANS_STATE_OUT_REQ,
+
+  SIXP_TRANS_STATE_REQUEST_RECEIVED = SIXP_TRANS_STATE_REQ_RECEIVED
+                                        | SIXP_TRANS_STATE_STEP1
+                                        | SIXP_TRANS_STATE_IN_REQ,
+  SIXP_TRANS_STATE_RESPONSE_SENDING = SIXP_TRANS_STATE_RESP_SENDING
+                                        | SIXP_TRANS_STATE_STEP2
+                                        | SIXP_TRANS_STATE_IN_REQ,
+  SIXP_TRANS_STATE_RESPONSE_SENT    = SIXP_TRANS_STATE_RESP_SENT
+                                        | SIXP_TRANS_STATE_STEP3
+                                        | SIXP_TRANS_STATE_IN_REQ,
+  SIXP_TRANS_STATE_CONFIRMATION_RECEIVED= SIXP_TRANS_STATE_CONFIRM_RECEIVED
+                                        | SIXP_TRANS_STATE_STEP4
+                                        | SIXP_TRANS_STATE_IN_REQ,
+
 } sixp_trans_state_t;
 
 /**
@@ -66,7 +116,7 @@ typedef enum {
 typedef enum {
   SIXP_TRANS_MODE_UNAVAILABLE = 0,
   SIXP_TRANS_MODE_2_STEP,
-  SIXP_TRANS_MODE_3_STEP
+  SIXP_TRANS_MODE_3_STEP,
 } sixp_trans_mode_t;
 
 typedef struct sixp_trans sixp_trans_t;
@@ -131,6 +181,12 @@ const linkaddr_t *sixp_trans_get_peer_addr(sixp_trans_t *trans);
 void sixp_trans_invoke_callback(sixp_trans_t *trans,
                                 sixp_output_status_t status);
 
+static inline
+sixp_trans_t* sixp_trans_now(){
+    extern sixp_trans_t* sixp_current_trans;
+    return sixp_current_trans;
+}
+
 /**
  * \brief Set an output callback to a specified transaction
  * \param trans The pointer to a transaction
@@ -179,11 +235,33 @@ void sixp_trans_free(sixp_trans_t *trans);
  */
 sixp_trans_t *sixp_trans_find(const linkaddr_t *peer_addr);
 
+/* \brief Find a transaction for pkt - mutch by fsid, type, sequm
+ * */
+sixp_trans_t *sixp_trans_find_for_pkt(const linkaddr_t *peer_addr, const sixp_pkt_t* pkt);
+
+sixp_trans_t *sixp_trans_find_for_sfid(const linkaddr_t *peer_addr, uint8_t sfid);
+
+// @brief checks that have any active transaction
+// @return true - some transaction are active
+bool    sixp_trans_any();
+
 /**
  * \brief Initialize Memory and List for 6P transactions
  * This function removes and frees existing transactions.
  */
 int sixp_trans_init(void);
 
+
+
 /*---------------------------------------------------------------------------*/
+
+/* callbacks */
+#ifdef SIXP_AFTER_TRANS_FREE
+void SIXP_AFTER_TRANS_FREE(void);
+#else
+#define SIXP_AFTER_TRANS_FREE(...)
+#endif
+
+/*---------------------------------------------------------------------------*/
+
 /** @} */

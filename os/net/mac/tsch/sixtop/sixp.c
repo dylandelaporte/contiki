@@ -40,10 +40,12 @@
 
 #include "contiki-lib.h"
 #include "lib/assert.h"
+#include <stdbool.h>
 
 #include "sixtop.h"
 #include "sixp-nbr.h"
 #include "sixp-pkt.h"
+#include "sixp-pkt-ex.h"
 #include "sixp-trans.h"
 
 /* Log configuration */
@@ -108,6 +110,7 @@ mac_callback(void *ptr, int status, int transmissions)
      * confirmation, the same transaction will be used for retransmission as
      * long as it doesn't have timeout.
      */
+    LOG_ERR("6P: mac_callback() fail status %d / %d\n", status, transmissions);
     if(current_state == SIXP_TRANS_STATE_REQUEST_SENDING) {
       /* request case */
       new_state = SIXP_TRANS_STATE_TERMINATING;
@@ -136,17 +139,23 @@ static int
 send_back_error(sixp_pkt_type_t type, sixp_pkt_rc_t rc,
                 const sixp_pkt_t *pkt, const linkaddr_t *dest_addr)
 {
-  sixp_trans_t *trans;
+  sixp_trans_t *trans = NULL;
 
   assert(pkt != NULL);
   assert(dest_addr != NULL);
 
-  if((rc == SIXP_PKT_RC_ERR_VERSION) ||
-     (rc == SIXP_PKT_RC_ERR_SFID) ||
-     (rc == SIXP_PKT_RC_ERR_BUSY) ||
-     (rc == SIXP_PKT_RC_ERR_SEQNUM &&
-      (trans = sixp_trans_find(dest_addr)) != NULL &&
-      sixp_trans_get_state(trans) != SIXP_TRANS_STATE_REQUEST_RECEIVED)) {
+  bool no_new_trans = (rc == SIXP_PKT_RC_ERR_VERSION)
+                      || (rc == SIXP_PKT_RC_ERR_SFID)
+                      || (rc == SIXP_PKT_RC_ERR_BUSY)
+                      || (rc == SIXP_PKT_RC_ERR_SEQNUM);
+  if (no_new_trans){
+      trans = sixp_trans_find_for_pkt(dest_addr, pkt);
+      if (trans != NULL)
+          no_new_trans = sixp_trans_get_state(trans) != SIXP_TRANS_STATE_REQUEST_RECEIVED;
+      else
+          no_new_trans = false;
+  }
+  if( no_new_trans ) {
     /* create a 6P packet within packetbuf */
     if(sixp_pkt_create(type, (sixp_pkt_code_t)(uint8_t)rc,
                        pkt->sfid, pkt->seqno, NULL, 0, NULL) < 0) {
@@ -208,7 +217,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
   sixp_trans_t *trans;
   sixp_nbr_t *nbr;
   const sixtop_sf_t *sf;
-  int16_t seqno;
+  int_fast16_t seqno;
   int ret;
 
   assert(buf != NULL && src_addr != NULL);
@@ -252,25 +261,33 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
   }
 
   /* Transaction Management */
-  trans = sixp_trans_find(src_addr);
+  trans = sixp_trans_find_for_pkt(src_addr, &pkt);
+  if (trans!= NULL)
+      seqno = sixp_trans_get_seqno(trans);
+  else
+      seqno = -1;
 
+  nbr = NULL;
   if(pkt.type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
-      if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
-         ((pkt.seqno == 0 && sixp_trans_get_seqno(trans) != 0) ||
-          (pkt.seqno != 0 && sixp_trans_get_seqno(trans) == 0))) {
+      // CLEAR command MUST NOT rejects on seq mismutch
+      if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR) {
+      if (  (pkt.seqno == 0 && (seqno >0) )
+         || (pkt.seqno != 0 && (seqno == 0)) )
+      {
         /*
          * seems the peer had power-cycle; we're going to send back
          * RC_ERR_SEQNUM. in this case, we don't want to allocate
          * another transaction for this new request.
          */
+        LOG_DBG("seq break: %u expects %u\n", pkt.seqno, seqno);
         handle_schedule_inconsistency(sf, (const sixp_pkt_t *)&pkt, src_addr);
         return;
       } else {
         /* Error: not supposed to have another transaction with the peer. */
         LOG_ERR("6P: sixp_input() fails because another request [peer_addr:");
         LOG_ERR_LLADDR((const linkaddr_t *)src_addr);
-        LOG_ERR_(" seqno:%u] is in process\n", sixp_trans_get_seqno(trans));
+        LOG_ERR_(" seqno:%u] is in process\n", seqno);
         /*
          * Although RFC 8480 says in Section 3.4.3 that we MUST send
          * RC_RESET back in this case, we use RC_ERR_BUSY
@@ -285,11 +302,21 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
           LOG_ERR("6P: sixp_input() fails to return an error response");
         }
         return;
+      }// seq check
+      }//if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR)
+      else {
+          /* looks that transaction have aborted, and CLEAR sent after that.
+           * so abort transaction too.
+           * */
+          LOG_INFO("sixp_input() abort trans(%p) by CLEAR Request\n", trans);
+          sixp_trans_abort(trans);
+          trans = NULL;
       }
-    }
+    }//if(trans != NULL)
 
-    if((pkt.code.cmd == SIXP_PKT_CMD_CLEAR) &&
-       (nbr = sixp_nbr_find(src_addr)) != NULL) {
+    nbr = sixp_nbr_find(src_addr);
+    if((pkt.code.cmd == SIXP_PKT_CMD_CLEAR) && (nbr != NULL) )
+    {
       LOG_INFO("6P: sixp_input() reset nbr's next_seqno by CLEAR Request\n");
       sixp_nbr_reset_next_seqno(nbr);
     }
@@ -304,12 +331,13 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
     }
 
     /* Inconsistency Management */
-    if(pkt.code.cmd != SIXP_PKT_CMD_CLEAR &&
-       (((nbr = sixp_nbr_find(src_addr)) == NULL &&
-         (pkt.seqno != 0)) ||
-        ((nbr != NULL) &&
-         (sixp_nbr_get_next_seqno(nbr) != 0) &&
-         pkt.seqno == 0))) {
+    // CLEAR command MUST NOT rejects on seq mismutch
+    if (pkt.code.cmd != SIXP_PKT_CMD_CLEAR)
+    if ( ( (pkt.seqno != 0) && (nbr == NULL) )
+       ||( (pkt.seqno == 0) && (nbr != NULL) && (sixp_nbr_get_next_seqno(nbr) > 0))
+       )
+    {
+      LOG_DBG("seq break: %u vs expected %d\n", pkt.seqno, sixp_nbr_get_next_seqno(nbr) );
       if(trans != NULL) {
         sixp_trans_transit_state(trans,
                                  SIXP_TRANS_STATE_REQUEST_RECEIVED);
@@ -326,8 +354,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
       LOG_ERR_LLADDR((const linkaddr_t *)src_addr);
       LOG_ERR_("]\n");
       return;
-    } else if((seqno = sixp_trans_get_seqno(trans)) < 0 ||
-              seqno != pkt.seqno) {
+    } else if( seqno != pkt.seqno ) {
       LOG_ERR("6P: sixp_input() fails because of invalid seqno [seqno:%u, %u]\n",
               seqno, pkt.seqno);
       /*
@@ -339,6 +366,13 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
        */
       return;
     }
+    nbr = sixp_nbr_find(src_addr);
+  }
+
+  if (nbr == NULL)
+  if ((nbr = sixp_nbr_alloc(src_addr)) == NULL) {
+    LOG_ERR("6P: sixp_input() fails because of no memory for another nbr\n");
+    return;
   }
 
   /* state transition */
@@ -380,13 +414,14 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
 {
   sixp_trans_t *trans;
   sixp_nbr_t *nbr;
-  int16_t seqno;
+  int_fast16_t seqno;
   sixp_pkt_t pkt;
 
   assert(dest_addr != NULL);
+  sixp_pkt_init(&pkt, type, code, sfid);
 
   /* validate the state of a transaction with a specified peer */
-  trans = sixp_trans_find(dest_addr);
+  trans = sixp_trans_find_for_pkt(dest_addr, &pkt);
   if(type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
       LOG_ERR("6P: sixp_output() fails because another trans for [peer_addr:");
@@ -403,8 +438,7 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
       LOG_ERR_LLADDR((const linkaddr_t *)dest_addr);
       LOG_ERR_("]\n");
       return -1;
-    } else if(sixp_trans_get_state(trans) !=
-              SIXP_TRANS_STATE_REQUEST_RECEIVED) {
+    } else if(sixp_trans_get_state(trans) != SIXP_TRANS_STATE_REQUEST_RECEIVED) {
       LOG_ERR("6P: sixp_output() fails because of invalid transaction state\n");
       return -1;
     } else {
@@ -416,8 +450,7 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
       LOG_ERR_LLADDR((const linkaddr_t *)dest_addr);
       LOG_ERR_("]\n");
       return -1;
-    } else if(sixp_trans_get_state(trans) !=
-              SIXP_TRANS_STATE_RESPONSE_RECEIVED) {
+    } else if(sixp_trans_get_state(trans) != SIXP_TRANS_STATE_RESPONSE_RECEIVED) {
       LOG_ERR("6P: sixp_output() fails because of invalid transaction state\n");
       return -1;
     } else {
@@ -441,16 +474,17 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
      type == SIXP_PKT_TYPE_RESPONSE &&
      sixp_trans_get_cmd(trans) != SIXP_PKT_CMD_CLEAR &&
      code.value != SIXP_PKT_RC_ERR_VERSION &&
-     code.value != SIXP_PKT_RC_ERR_SFID &&
-     (nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
+     code.value != SIXP_PKT_RC_ERR_SFID
+     )
+  if ((nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
     LOG_ERR("6P: sixp_output() fails because of no memory for another nbr\n");
     return -1;
   }
 
   /* set SeqNum */
   if(type == SIXP_PKT_TYPE_REQUEST) {
-    if(nbr == NULL &&
-       (nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
+    if(nbr == NULL)
+    if((nbr = sixp_nbr_alloc(dest_addr)) == NULL) {
       LOG_ERR("6P: sixp_output() fails because it fails to allocate a nbr\n");
       return -1;
     }
@@ -467,10 +501,7 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
   }
 
   /* create a 6P packet within packetbuf */
-  if(sixp_pkt_create(type, code, sfid,
-                     (uint8_t)seqno,
-                     body, body_len,
-                     type == SIXP_PKT_TYPE_REQUEST ? &pkt : NULL) < 0) {
+  if( sixp_pkt_build(&pkt, (uint8_t)seqno, body, body_len) < 0 ) {
     LOG_ERR("6P: sixp_output() fails to create a 6P packet\n");
     return -1;
   }
@@ -526,6 +557,15 @@ sixp_output(sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid,
   }
 
   return 0;
+}
+/*---------------------------------------------------------------------------*/
+#include "sixp-pkt-ex.h"
+int
+sixp_pkt_output(SIXPeerHandle* peer, uint8_t sfid,
+            sixp_sent_callback_t func, void *arg, uint16_t arg_len){
+    return sixp_output(peer->h.type, peer->h.code, sfid
+                       , peer->h.body, peer->h.body_len, peer->addr
+                       , func, arg, arg_len);
 }
 /*---------------------------------------------------------------------------*/
 void

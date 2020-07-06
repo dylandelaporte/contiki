@@ -85,9 +85,7 @@ static void input(sixp_pkt_type_t type, sixp_pkt_code_t code,
 static void request_input(sixp_pkt_cmd_t cmd,
                           const uint8_t *body, uint16_t body_len,
                           const linkaddr_t *peer_addr);
-static void response_input(sixp_pkt_rc_t rc,
-                           const uint8_t *body, uint16_t body_len,
-                           const linkaddr_t *peer_addr);
+static void response_input(sixp_pkt_t* pkt,  const linkaddr_t *peer_addr);
 
 /*
  * scheduling policy:
@@ -366,12 +364,17 @@ input(sixp_pkt_type_t type, sixp_pkt_code_t code,
       const uint8_t *body, uint16_t body_len, const linkaddr_t *src_addr)
 {
   assert(body != NULL && body != NULL);
+  sixp_pkt_t pkt;
+  sixp_pkt_init_in(&pkt, type, code, SF_SIMPLE_SFID);
+  pkt.body = body;
+  pkt.body_len = body_len;
+
   switch(type) {
     case SIXP_PKT_TYPE_REQUEST:
       request_input(code.cmd, body, body_len, src_addr);
       break;
     case SIXP_PKT_TYPE_RESPONSE:
-      response_input(code.cmd, body, body_len, src_addr);
+      response_input(&pkt, src_addr);
       break;
     default:
       /* unsupported */
@@ -399,9 +402,7 @@ request_input(sixp_pkt_cmd_t cmd,
   }
 }
 static void
-response_input(sixp_pkt_rc_t rc,
-               const uint8_t *body, uint16_t body_len,
-               const linkaddr_t *peer_addr)
+response_input(sixp_pkt_t* pkt, const linkaddr_t *peer_addr)
 {
   const uint8_t *cell_list;
   uint16_t cell_list_len;
@@ -411,11 +412,13 @@ response_input(sixp_pkt_rc_t rc,
   assert(body != NULL && peer_addr != NULL);
 
   nbr = sixp_nbr_find(peer_addr);
-  if(nbr == NULL)
+  if( nbr == NULL )
       return;
-  trans = sixp_trans_find(peer_addr);
-  if ( trens == NULL)
+
+  trans = sixp_trans_find_for_pkt(peer_addr, pkt);
+  if ( trans == NULL) {
     return;
+  }
 
   if(rc == SIXP_PKT_RC_SUCCESS) {
     switch(sixp_trans_get_cmd(trans)) {

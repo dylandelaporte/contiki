@@ -68,6 +68,13 @@
 #if TSCH_WITH_SIXTOP
 #include "net/mac/tsch/sixtop/sixtop.h"
 #endif
+#if BUILD_WITH_MSF
+#include "services/msf/msf-callback.h"
+#endif
+
+#if BUILD_WITH_MSF
+#include "services/msf/msf.h"
+#endif /* BUILD_WITH_MSF */
 
 #if FRAME802154_VERSION < FRAME802154_IEEE802154_2015
 #error TSCH: FRAME802154_VERSION must be at least FRAME802154_IEEE802154_2015
@@ -198,13 +205,16 @@ void
 tsch_set_coordinator(bool enable)
 {
 #ifndef TSCH_IS_COORDINATOR
+  if(tsch_is_coordinator != enable) {
+      tsch_disassociate();
+  }
   tsch_is_coordinator = enable;
 #else
   if (tsch_is_coordinator != enable){
       LOG_ERR("TCSH: missed coordinator request %d vs hardcoded", enable);
       return;
   }
-#endif
+#endif /* BUILD_WITH_MSF */
   if (tsch_current_eb_period <= 0)
   tsch_set_eb_period(TSCH_EB_PERIOD);
 }
@@ -581,6 +591,14 @@ int tsch_rx_process_pending()
     } else if(is_eb) {
       eb_input(current_input);
     }
+    else
+        return 0;
+
+#if BUILD_WITH_MSF
+    msf_callback_packet_recv(&current_input->rx_asn,
+                             (const linkaddr_t *)frame.src_addr);
+#endif /* BUILD_WITH_MSF */
+
     return 1;
   }
   return 0;
@@ -603,6 +621,10 @@ int tsch_tx_process_pending()
       packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO), p->ret, p->transmissions);
     /* Call packet_sent callback */
     mac_call_sent_callback(p->sent, p->ptr, p->ret, p->transmissions);
+#if BUILD_WITH_MSF
+    msf_callback_packet_sent(p->last_tx_timeslot, p->ret, p->transmissions,
+                             packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
+#endif /* BUILD_WITH_MSF */
     /* Free packet queuebuf */
     tsch_queue_free_packet(p);
     /* Free all unused neighbors */

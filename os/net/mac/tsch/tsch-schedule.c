@@ -198,6 +198,9 @@ print_link_options(uint16_t link_options)
   if(link_options & LINK_OPTION_SHARED) {
     strcat(buffer, "Sh|");
   }
+  if(link_options & LINK_OPTION_RESERVED_LINK) {
+    strcat(buffer, "(Rsvd)");
+  }
   length = strlen(buffer);
   if(length > 0) {
     buffer[length - 1] = '\0';
@@ -337,7 +340,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
       if(l == current_link) {
         current_link = NULL;
       }
-      TSCH_PRINTF8("TSCH-schedule: remove_link %u %u %u %u %x\n",
+      TSCH_PRINTF8("TSCH-schedule: remove_link sf%u $%x %u+%u %x\n",
              slotframe->handle, l->link_options, l->timeslot, l->channel_offset,
              TSCH_LOG_ID_FROM_LINKADDR(&l->addr));
 
@@ -360,6 +363,7 @@ tsch_schedule_remove_link(struct tsch_slotframe *slotframe, struct tsch_link *l)
 /*---------------------------------------------------------------------------*/
 void tsch_schedule_link_addr_aqure(struct tsch_link *l){
     struct tsch_neighbor *n;
+    if((l->link_options & LINK_OPTION_RESERVED_LINK) == 0)
     if(l->link_options & LINK_OPTION_TX) {
       n = tsch_queue_add_nbr(&l->addr);
       /* We have a tx link to this neighbor, update counters */
@@ -374,6 +378,7 @@ void tsch_schedule_link_addr_aqure(struct tsch_link *l){
 
 void tsch_schedule_link_addr_release(uint8_t link_options, const linkaddr_t* addr){
     /* This was a tx link to this neighbor, update counters */
+    if((link_options & LINK_OPTION_LINK_TO_DELETE) == 0)
     if(link_options & LINK_OPTION_TX) {
       struct tsch_neighbor *n = tsch_queue_add_nbr(addr);
       if(n != NULL) {
@@ -465,6 +470,11 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
   if(!linkaddr_cmp(&a->addr, &b->addr)) {
     struct tsch_neighbor *an = tsch_queue_get_nbr(&a->addr);
     struct tsch_neighbor *bn = tsch_queue_get_nbr(&b->addr);
+
+    // wins that have priority packet
+    if ((an->tx_priority != NULL) != (an->tx_priority != NULL))
+        return (an->tx_priority != NULL)? a:b;
+
     int a_packet_count = an ? ringbufindex_elements(&an->tx_ringbuf) : 0;
     int b_packet_count = bn ? ringbufindex_elements(&bn->tx_ringbuf) : 0;
     /* Compare the number of packets in the queue */
@@ -474,6 +484,14 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
   /* Same neighbor address; simply return the first link */
   return a;
 }
+
+
+
+//#include "project-trace.h"
+#ifndef trace_droplink_off
+#define trace_droplink_on()
+#define trace_droplink_off()
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Returns the next active link after a given ASN, and a backup link (for the same ASN, with Rx flag) */
@@ -497,6 +515,7 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
   turns out useless when the time comes. For instance, for a Tx-only link, if there is
   no outgoing packet in queue. In that case, run the backup link instead. The backup link
   must have Rx flag set. */
+  trace_droplink_off();
   if(!tsch_is_locked()) {
     struct tsch_slotframe *sf = list_head(slotframe_list);
     /* For each slotframe, look for the earliest occurring link */
@@ -512,6 +531,10 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
           // plan point is not avoidable
           if ((l->link_options & (LINK_OPTION_DISABLE)) != 0)
               continue;
+          if(l->link_options & LINK_OPTION_RESERVED_LINK) {
+            /* this link is not effective; skip it */
+            continue;
+          }
           if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER){
           if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX|LINK_OPTION_PLANPOINT)) == 0)
               // when link ton transfers, skip it
@@ -532,6 +555,7 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
           time_to_curr_best = time_to_timeslot;
           best_frame        = sf;
           curr_best = l;
+          trace_droplink_off();
 #ifdef TSCH_CALLBACK_LINK_SIGNAL
           if ( (l->link_options & (LINK_OPTION_SIGNAL|LINK_OPTION_SIGNAL_ONCE)) != 0) {
               signaling_link = l;
@@ -571,6 +595,36 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
             if(new_best != curr_best && (curr_best->link_options & LINK_OPTION_RX)) { /* Does curr_best have Rx flag? */
               curr_backup = curr_best;
             }
+          }
+
+          if ( (new_best != NULL) )
+          {
+              if ( new_best != curr_best )
+              if ((curr_best->link_options & LINK_OPTION_TRACE_DROP) != 0) {
+              trace_droplink_on();
+              TSCH_LOG_ADD(tsch_log_message,
+                              snprintf(log->message, sizeof(log->message)
+                                      , "override sf.t:%x(%x)/ sf.t:%x(%x)"
+                                      , (curr_best->slotframe_handle<<16) | curr_best->timeslot
+                                      , curr_best->link_options
+                                      , (new_best->slotframe_handle<<16) | new_best->timeslot
+                                      , new_best->link_options
+                                      )
+                          );
+              }
+          }
+          else if ((l->link_options & LINK_OPTION_TRACE_DROP) != 0)
+          {
+              trace_droplink_on();
+              TSCH_LOG_ADD(tsch_log_message,
+                              snprintf(log->message, sizeof(log->message)
+                                      , "miss sf.t:%x(%x)/ sf.t:%x(%x)"
+                                      , (l->slotframe_handle<<16) | l->timeslot
+                                      , l->link_options
+                                      , (curr_best->slotframe_handle<<16) | curr_best->timeslot
+                                      , curr_best->link_options
+                                      )
+                          );
           }
 
           /* Maintain curr_best */

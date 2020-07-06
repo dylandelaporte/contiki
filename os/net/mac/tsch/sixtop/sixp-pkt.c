@@ -48,10 +48,12 @@
 
 #include "sixp.h"
 #include "sixp-pkt.h"
+#include "sixp-pkt-ex.h"
+#include "sixp-trans.h"
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "6top"
+#define LOG_MODULE "6top pkt"
 #define LOG_LEVEL LOG_LEVEL_6TOP
 
 static int32_t get_metadata_offset(sixp_pkt_type_t type, sixp_pkt_code_t code);
@@ -370,7 +372,7 @@ sixp_pkt_get_num_cells(sixp_pkt_type_t type, sixp_pkt_code_t code,
   }
 
   /* NumCells is an 8-bit unsigned integer */
-  memcpy(num_cells, body + offset, sizeof(uint8_t));
+  memcpy(num_cells, body + offset, sizeof(*num_cells));
 
   return 0;
 }
@@ -595,7 +597,8 @@ sixp_pkt_set_cell_list(sixp_pkt_type_t type, sixp_pkt_code_t code,
     LOG_ERR("6P-pkt: cannot set cell_list; body is too short\n");
     return -1;
   } else if((cell_list_len % sizeof(sixp_pkt_cell_t)) != 0) {
-    LOG_ERR("6P-pkt: cannot set cell_list; invalid {body, cell_list}_len\n");
+    LOG_ERR("6P-pkt: cannot set cell_list; invalid {body, cell_list}_len=%u\n"
+            , cell_list_len);
     return -1;
   }
 
@@ -967,6 +970,7 @@ sixp_pkt_parse(const uint8_t *buf, uint16_t len,
   pkt->code.value = buf[1];
   pkt->sfid = buf[2];
   pkt->seqno = buf[3];
+  pkt->dir   = SIXP_TRANS_STATE_IN_REQ;
 
   if(pkt->version != SIXP_PKT_VERSION) {
     /* invalid version; stop parsing */
@@ -1087,6 +1091,22 @@ sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
                 uint8_t sfid, uint8_t seqno,
                 const uint8_t *body, uint16_t body_len, sixp_pkt_t *pkt)
 {
+    sixp_pkt_t tmp;
+    if (pkt == NULL){
+        pkt = &tmp;
+        sixp_pkt_init(pkt, type, code, sfid);
+    }
+    return sixp_pkt_build(pkt, seqno, body, body_len);
+}
+
+int sixp_pkt_build(sixp_pkt_t *pkt, uint8_t seqno,
+                    const uint8_t *body, uint16_t body_len )
+{
+    assert(pkt != NULL);
+    pkt->seqno = seqno;
+    pkt->body = body;
+    pkt->body_len = body_len;
+
   uint8_t *hdr;
 
   assert((body == NULL && body_len == 0) || (body != NULL && body_len > 0));
@@ -1112,9 +1132,9 @@ sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
   }
   hdr = packetbuf_hdrptr();
   /* header: write the 6top IE header, 4 octets */
-  hdr[0] = (type << 4) | SIXP_PKT_VERSION;
-  hdr[1] = code.value;
-  hdr[2] = sfid;
+  hdr[0] = (pkt->type << 4) | SIXP_PKT_VERSION;
+  hdr[1] = pkt->code.value;
+  hdr[2] = pkt->sfid;
   hdr[3] = seqno;
 
   /* data: write body */
@@ -1123,18 +1143,172 @@ sixp_pkt_create(sixp_pkt_type_t type, sixp_pkt_code_t code,
     packetbuf_set_datalen(body_len);
   }
 
-  /* copy information of a sending packet into pkt if necessary */
-  if(pkt != NULL) {
-    pkt->type = type;
-    pkt->code = code;
-    pkt->sfid = sfid;
-    pkt->seqno = seqno;
-    pkt->body = body;
-    pkt->body_len = body_len;
-  }
-
   /* packetbuf is ready to be sent */
   return 0;
 }
+
+void sixp_pkt_init(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid){
+    pkt->type = type;
+    pkt->code = code;
+    pkt->sfid = sfid;
+    pkt->dir   = SIXP_TRANS_STATE_OUT_REQ;
+    pkt->seqno  = 0;
+    pkt->body   = NULL;
+    pkt->body_len = 0;
+}
+
+//  same as sixp_pkt_init, but init for incoming
+void sixp_pkt_init_in(sixp_pkt_t *pkt, sixp_pkt_type_t type, sixp_pkt_code_t code, uint8_t sfid){
+    sixp_pkt_init(pkt, type, code, sfid);
+    pkt->dir   = SIXP_TRANS_STATE_IN_REQ;
+}
+
+
+
+//==============================================================================
 /*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+// like memcopy(dst, h->body+offset, len) with packet strick bounds
+static
+SIXPError sixp_pkt_load(SIXPHandle* h, void* dst, unsigned offset, unsigned len){
+    assert(h != NULL && dst != NULL);
+    assert(h->body != NULL);
+
+    if(h->body_len < (offset + len)) {
+      LOG_ERR("copy: too short packet(%d:%u) body[%u+%u]\n"
+              , h->type, h->code.value, offset, len
+              );
+      return -1;
+    }
+
+    memcpy(dst, h->body + offset, len);
+
+    return sixpOK;
+}
+
+static
+SIXPError sixp_pkt_parse_cell_options(SIXPHandle* h,
+                                    sixp_pkt_cell_options_t *cell_options)
+{
+    int offset;
+    if((offset = get_cell_options_offset(h->type, h->code)) < 0) {
+      LOG_ERR("6P-pkt: cannot get cell_options [type=%u, code=%u]",
+              h->type, h->code.value);
+      LOG_ERR_("invalid type\n");
+      return sixpFAIL;
+    }
+    return sixp_pkt_load(h, cell_options, offset, sizeof(*cell_options));
+}
+
+static
+SIXPError sixp_pkt_parse_num_cells(SIXPHandle* h,
+                       sixp_pkt_num_cells_t *num_cells )
+{
+    int offset;
+    if((offset = get_num_cells_offset(h->type, h->code)) < 0) {
+      LOG_ERR("cannot set num_cells; ");
+      LOG_ERR_("packet [type=%u, code=%u] won't have NumCells\n",
+              h->type, h->code.value);
+      return sixpFAIL;
+    }
+    return sixp_pkt_load(h, num_cells, offset, sizeof(*num_cells));
+}
+
+SIXPError sixp_pkt_parse_cell_list(SIXPHandle* h, SIXPCellsHandle* dst){
+    int offset;
+
+    if((offset = get_cell_list_offset(h->type, h->code)) < 0) {
+      LOG_ERR("cannot get cell_list; ");
+      LOG_ERR_("packet [type=%u, code=%u] won't have CellList\n",
+              h->type, h->code.value);
+      return sixpFAIL;
+    }
+
+    if (sixp_pkt_parse_num_cells(h, &dst->num_cells) < 0)
+        return sixpFAIL;
+
+    unsigned len = dst->num_cells * sizeof(sixp_pkt_cell_t);
+    unsigned lim = (h->body_len - offset);
+
+    if(h->body_len < offset) {
+      LOG_ERR("cannot parse cell_list; body is too short\n");
+      return sixpFAIL;
+    } else if ( len > lim) {
+      LOG_ERR("cannot parse cell_list; invalid {body, cell_list}_len=%u\n", len);
+      return sixpFAIL;
+    }
+
+    dst->cell_list      = (sixp_pkt_cell_t*)(h->body + offset);
+    dst->cell_list_len  = len;
+    return sixpOK;
+}
+
+SIXPError sixp_pkt_parse_cells(SIXPHandle* h, SIXPCellsHandle* dst){
+    if (sixp_pkt_parse_cell_list(h, dst) < 0)
+        return sixpFAIL;
+    if(sixp_pkt_parse_cell_options(h, &(dst->cell_options)) < 0)
+        return sixpFAIL;
+    memcpy(&dst->meta, h->body, sizeof(dst->meta) );
+    return sixpOK;
+}
+
+// steps h body to position after dst cells
+SIXPError sixp_pkt_after_cells(SIXPHandle* h, SIXPCellsHandle* dst){
+    assert(dst->cell_list != NULL);
+    const uint8_t* next = (const uint8_t*)dst->cell_list;
+    next += dst->num_cells*sizeof(dst->cell_list[0]);
+    if ((next - h->body) >= h->body_len){
+        return sixpFAIL;
+    }
+
+    h->body_len -=(next - h->body);
+    h->body     = next;
+    return sixpOK;
+}
+
+SIXPError sixp_pkt_parse_next_cells(SIXPHandle* h, SIXPCellsHandle* dst){
+    SIXPError ok;
+    ok = sixp_pkt_after_cells(h, dst);
+    if (ok == sixpOK){
+        return sixp_pkt_parse_cells(h, dst);
+    }
+    return ok;
+}
+
+bool sixp_pkt_cells_have(SIXPCellsPkt* pkt, sixp_cell_t x){
+    for (int i = 0; i < pkt->head.num_cells; ++i)
+        if (pkt->cells[i].raw == x.raw)
+            return true;
+    return false;
+}
+
+//==============================================================================
+const char* sixp_pkt_cell_option_name(sixp_pkt_cell_option_t x){
+    switch (x){
+        case SIXP_PKT_CELL_OPTION_TX: return "TX";
+        case SIXP_PKT_CELL_OPTION_RX: return "RX";
+        case SIXP_PKT_CELL_OPTION_SHARED:return "SH";
+        default: return "xx";
+    }
+}
+
+const char* sixp_pkt_cell_options_str(sixp_pkt_cell_options_t x){
+    if (x == SIXP_PKT_CELL_OPTION_TX)
+        return "TX";
+    else if (x == SIXP_PKT_CELL_OPTION_RX)
+        return "RX";
+    else
+        return "xx";
+}
+
+void sixp_pkt_cells_dump(SIXPCellsPkt* pkt){
+    printf("{%d:", pkt->head.num_cells);
+    for (int i = 0; i < pkt->head.num_cells; ++i){
+        sixp_cell_t* x = pkt->cells+i;
+        printf("[%u+%u] ", x->field.slot, x->field.chanel);
+    }
+    printf("}");
+}
+
+
 /** @} */
