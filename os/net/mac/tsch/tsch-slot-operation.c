@@ -829,6 +829,10 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                 if(tsch_packet_parse_eack(ackbuf, ack_len, seqno,
                     &frame, &ack_ies, &ack_hdrlen) == 0) {
                   ack_len = 0;
+                  mac_tx_status = MAC_TX_BADACK;
+                  TSCH_LOG_ADD(tsch_log_message,
+                      snprintf(log->message, sizeof(log->message),
+                      "!failed to parse ACK"));
                 }
 
 #if LLSEC802154_ENABLED
@@ -842,14 +846,13 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                         snprintf(log->message, sizeof(log->message),
                         "!failed to authenticate ACK"));
                     ack_len = 0;
+                    mac_tx_status = MAC_TX_ERR_SECACK;
                   }
-                } else {
-                  TSCH_LOG_ADD(tsch_log_message,
-                      snprintf(log->message, sizeof(log->message),
-                      "!failed to parse ACK"));
                 }
 #endif /* LLSEC802154_ENABLED */
               }
+              else
+                  mac_tx_status = MAC_TX_NOACK;
 
               if(ack_len != 0) {
                 if(is_time_source) {
@@ -882,8 +885,6 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                 if(burst_link_requested) {
                   burst_link_scheduled = 1;
                 }
-              } else {
-                mac_tx_status = MAC_TX_NOACK;
               }
             } else {
               mac_tx_status = MAC_TX_OK;
