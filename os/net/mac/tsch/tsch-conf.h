@@ -544,7 +544,8 @@ by default, useful in case of duplicate seqno */
 #ifdef TSCH_CONF_HW_FRAME_FILTERING
 #define TSCH_HW_FRAME_FILTERING TSCH_CONF_HW_FRAME_FILTERING
 #else /* TSCH_CONF_HW_FRAME_FILTERING */
-#define TSCH_HW_FRAME_FILTERING 1
+// at present TSCH not use ADRESS filtering.
+#define TSCH_HW_FRAME_FILTERING 0
 #endif /* TSCH_CONF_HW_FRAME_FILTERING */
 
 /* HW issues, that TSCH should handle  */

@@ -854,6 +854,12 @@ tsch_associate(const struct input_packet *input_eb, rtimer_clock_t timestamp)
       TSCH_CALLBACK_JOINING_NETWORK();
 #endif
 
+#if TSCH_HW_FRAME_FILTERING
+      radio_value_t radio_rx_mode;
+      NETSTACK_RADIO.get_value(RADIO_PARAM_RX_MODE, &radio_rx_mode);
+      NETSTACK_RADIO.set_value(RADIO_PARAM_RX_MODE, radio_rx_mode | RADIO_RX_MODE_ADDRESS_FILTER );
+#endif /* TSCH_HW_FRAME_FILTERING */
+
       tsch_association_count++;
       LOG_INFO("association done (%u), sec %u, PAN ID %x, asn-%x.%lx, jp %u, timeslot id %u, hopping id %u, slotframe len %u with %u links, from ",
              tsch_association_count,
@@ -899,6 +905,12 @@ PT_THREAD(tsch_scan(struct pt *pt))
   PT_BEGIN(pt);
 
   TSCH_ASN_INIT(tsch_current_asn, 0, 0);
+
+#if TSCH_HW_FRAME_FILTERING
+    radio_value_t radio_rx_mode;
+    NETSTACK_RADIO.get_value(RADIO_PARAM_RX_MODE, &radio_rx_mode);
+    NETSTACK_RADIO.set_value(RADIO_PARAM_RX_MODE, radio_rx_mode & (~RADIO_RX_MODE_ADDRESS_FILTER));
+#endif /* TSCH_HW_FRAME_FILTERING */
 
   const unsigned poll_period = CLOCK_SECOND / TSCH_ASSOCIATION_POLL_FREQUENCY;
 
