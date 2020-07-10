@@ -138,7 +138,7 @@ typedef unsigned long clock_time_t;
 #define GPIO_HAL_CONF_ARCH_HDR_PATH      "dev/gpio-hal-arch.h"
 #define GPIO_HAL_CONF_ARCH_SW_TOGGLE     1
 #define GPIO_HAL_CONF_PORT_PIN_NUMBERING 0
-#define GPIO_HAL_CONF_PIN_COUNT          4
+//#define GPIO_HAL_CONF_PIN_COUNT          8
 
 /* Virtual LED pins 0, 1, 2 (Green, Red, Yellow) */
 #define COOJA_LED_GREEN_PIN              0
