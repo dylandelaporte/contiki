@@ -849,14 +849,16 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               ack_start_time = tx_start_time + tx_duration;
 #endif
               /* Unicast: wait for ack after tx: sleep until ack time */
-              RTIMER_BUSYWAIT_UNTIL_ABS(0, ack_start_time
+              TSCH_SCHEDULE_AND_YIELD(pt, t
+                  , ack_start_time
                   , tsch_timing[tsch_ts_rx_ack_delay] - RADIO_DELAY_BEFORE_RX
-                  ); //"TxBeforeAck"
-              TSCH_DEBUG_TX_EVENT();
+                  , "TxBeforeAck");
               ack_start_time +=  tsch_timing[tsch_ts_rx_ack_delay];
+
+              TSCH_DEBUG_TX_EVENT();
               tsch_radio_on(TSCH_RADIO_CMD_ON_WITHIN_TIMESLOT);
+
               /* Wait for ACK to come */
-#if 1 //TSCH_RESYNC_WITH_SFD_TIMESTAMPS
               // rely that ACK time more then tsch_ts_ack_wait, so
               //    for moment Tack_start+ack_delay+ack_wait ACK is receiving
               //    or there is no ACK
@@ -866,16 +868,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                   , "TxWaitAck");
               TSCH_DEBUG_TX_EVENT();
               ack_start_time += tsch_timing[tsch_ts_ack_wait];
-#else
-              BUSYWAIT_UNTIL_ABS(NETSTACK_RADIO.receiving_packet()
-                   , ack_start_time
-                   , tsch_timing[tsch_ts_ack_wait]
-                     + RADIO_DELAY_BEFORE_DETECT + RADIO_RSSI_DETECT_DELAY);
-              TSCH_DEBUG_TX_EVENT();
 
-              ack_start_time = RTIMER_NOW() - RADIO_DELAY_BEFORE_DETECT;
-
-#endif
               /* Wait for ACK to finish */
               RTIMER_BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet() ),
                                  ack_start_time, tsch_timing[tsch_ts_max_ack]+ RADIO_DELAY_BEFORE_RX);
@@ -1338,9 +1331,10 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
                 rx_end_time = rx_start_time + packet_duration;
 #endif
                 /* Wait for time to ACK and transmit ACK */
-                RTIMER_BUSYWAIT_UNTIL_ABS(0, rx_end_time
-                         , tsch_timing[tsch_ts_tx_ack_delay] - RADIO_DELAY_BEFORE_TX
-                         ); //"RxBeforeAck"
+                TSCH_SCHEDULE_AND_YIELD(pt, t
+                    , rx_end_time
+                    , tsch_timing[tsch_ts_tx_ack_delay] - RADIO_DELAY_BEFORE_RX
+                    , "RxBeforeAck");
                 TSCH_DEBUG_RX_EVENT();
                 NETSTACK_RADIO.transmit(ack_len);
                 tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
