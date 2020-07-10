@@ -70,12 +70,14 @@
 #define RADIO_BYTE_AIR_TIME  (1000000 / (RADIO_BIT_RATE / 8))
 
 /* Delay between GO signal and SFD */
-#define RADIO_DELAY_BEFORE_TX ((unsigned)US_TO_RTIMERTICKS(RADIO_PHY_HEADER_LEN * RADIO_BYTE_AIR_TIME))
+#define RADIO_DELAY_BEFORE_TX 0
 /* Delay between GO signal and start listening.
  * This value is so small because the radio is constantly on within each timeslot. */
 #define RADIO_DELAY_BEFORE_RX ((unsigned)US_TO_RTIMERTICKS(15))
 /* Delay between the SFD finishes arriving and it is detected in software. */
 #define RADIO_DELAY_BEFORE_DETECT ((unsigned)US_TO_RTIMERTICKS(352))
+/* Delay between GO signal and receiving() Detect */
+#define RADIO_DELAY_SFD_RX ((unsigned)US_TO_RTIMERTICKS(RADIO_PHY_HEADER_LEN * RADIO_BYTE_AIR_TIME))
 
 /* Timer conversion; radio is running at 4 MHz */
 #define RADIO_TIMER_SECOND   4000000u
@@ -95,6 +97,13 @@
 #ifndef TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS
 #define TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS 1
 #define TSCH_CONF_TIMESYNC_REMOVE_JITTER 0
+#endif
+
+#ifndef TSCH_RADIODELAY_PREFETCH_TX
+// HARDCODE: there is biiig preamble for RADIO_PHY_HEADER_LEN, need early detection
+#   if RADIO_BIT_RATE < 150000
+#   define TSCH_RADIODELAY_PREFETCH_TX TSCH_RADIODELAY_PREFETCH_TX_NO
+#   endif
 #endif
 
 #ifndef TSCH_CONF_BASE_DRIFT_PPM

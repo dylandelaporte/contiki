@@ -604,6 +604,74 @@ void tsch_cleanup_pendings(void){
 }
 
 /*---------------------------------------------------------------------------*/
+/* tsch_radiodelay_prefetch_tx provide distinguish for 2 slot layouts:
+ * A) Simple detection - with prefetched by BEFORE_TX transmitionstart:
+ *                                                 |Txoffs
+ *    |<----< CCA > ->Tx|<---BEFORE_TX|------------|------------
+ *                                    |    RX  guard window     |
+ *    |<-----------|Rxofs-------------|<- RX wait/2|RX wait/2 ->|
+ *                 ^                                 received?
+ *                RX_offset allows BEFORE_TX+RX wait/2
+ *            and CCA allows BEFORE_TX
+ *    This layout targets to place detection by receiving() point into RX guard window
+ *
+ * B) Early detection - when have no prefetch time, use 2 step detecting:
+ *         by chanel_clear in RXguarding, and by received() check after it
+ *                               Tx|Txoffs
+ *    |<----< CCA > <--------------|-------SFD_RX-------->|
+ *                    |      RX  guard window   |
+ *    |<------|Rxofs--|<- RX wait/2|RX wait/2 ->|-------->|-------
+ *                 ^                chanel_clear?      received?
+ *                RX_offset allows SFD_RX+RX wait/2
+ *
+ *    This layout try early detect frame, since have no time for prefetch
+ *
+ * */
+//< use RADIO_DELAY_SFD_RX for prefetching
+#define TSCH_RADIODELAY_PREFETCH_TX_BEFORE  1
+//< no prefetching, use early detection
+#define TSCH_RADIODELAY_PREFETCH_TX_NO      0
+//< style of prefetching detects from TSCH slot layout at tsch starting
+#define TSCH_RADIODELAY_PREFETCH_TX_EVAL   -1
+
+#if ( TSCH_RADIODELAY_PREFETCH_TX < 0 )
+static int tsch_radiodelay_prefetch_tx = 0;
+static
+void eval_radiodelay_before_tx(void) {
+    tsch_radiodelay_prefetch_tx = 0;
+    int txdly = RADIO_DELAY_SFD_RX;
+    if (txdly <= 0)
+        return;
+
+    int rx_gap = tsch_timing[tsch_ts_tx_offset] - tsch_timing[tsch_ts_rx_offset]
+               - tsch_timing[tsch_ts_rx_wait]/2;
+    if ( rx_gap < txdly )
+        return;
+
+#if TSCH_CCA_ENABLED
+    int send_limit = tsch_timing[tsch_ts_tx_offset]
+                   - (tsch_timing[tsch_ts_cca_offset] + tsch_timing[tsch_ts_cca]);
+    if ( send_limit < txdly )
+        return;
+#endif
+
+    TSCH_DBG("tsch:prefetching eval... to %d\n", txdly);
+    tsch_radiodelay_prefetch_tx = txdly;
+}
+#elif defined(TSCH_RADIODELAY_PREFETCH_TX) && (TSCH_RADIODELAY_PREFETCH_TX == TSCH_RADIODELAY_PREFETCH_TX_NO)
+#define tsch_radiodelay_prefetch_tx 0
+#define eval_radiodelay_before_tx()
+#elif (TSCH_RADIODELAY_PREFETCH_TX == TSCH_RADIODELAY_PREFETCH_TX_BEFORE)
+#define tsch_radiodelay_prefetch_tx RADIO_DELAY_SFD_RX
+static void eval_radiodelay_before_tx(){
+    TSCH_DBG("tsch:prefetching=%d\n", tsch_radiodelay_prefetch_tx);
+}
+#else
+#define tsch_radiodelay_prefetch_tx 0
+#define eval_radiodelay_before_tx()
+#endif
+
+/*---------------------------------------------------------------------------*/
 #if ((TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING)!=0)
 #define TSCH_HW_RECV_BY_PENDING 1
 #else
@@ -738,7 +806,11 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 #endif /* TSCH_CCA_ENABLED */
         {
           /* delay before TX */
-          TSCH_SCHEDULE_AND_YIELD(pt, t, current_slot_start, tsch_timing[tsch_ts_tx_offset] - RADIO_DELAY_BEFORE_TX, "TxBeforeTx");
+          TSCH_SCHEDULE_AND_YIELD(pt, t, current_slot_start
+                                      , tsch_timing[tsch_ts_tx_offset]
+                                       - RADIO_DELAY_BEFORE_TX
+                                       - tsch_radiodelay_prefetch_tx
+                                      , "TxBeforeTx");
           TSCH_DEBUG_TX_EVENT();
           /* send packet already in radio tx buffer */
           mac_tx_status = NETSTACK_RADIO.transmit(packet_len);
@@ -1011,22 +1083,44 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
     /* Start radio for at least guard time */
     tsch_radio_on(TSCH_RADIO_CMD_ON_WITHIN_TIMESLOT);
 
+    packet_seen = 0;
+
 #if TSCH_RESYNC_WITH_SFD_TIMESTAMPS
-    TSCH_SCHEDULE_AND_YIELD(pt, t, current_slot_start
-                            , tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_RX
-                            , "RxWait");
-    packet_seen = NETSTACK_RADIO.receiving_packet();
-    const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_RX;
-    const unsigned wait_limit = pend_limit + tsch_timing[tsch_ts_max_tx];
+    /* when radio-packet Sync len not prefetched, use early radio detection via channel_clear
+     *  Prefetchig provided only when transmit have enough time to RADIO_DELAY_BEFORE_TX
+     */
+    //if (RADIO_DELAY_SFD_RX > 0) //Sync time sufficient, so use early detection
+    if ( tsch_radiodelay_prefetch_tx <= 0 )
+    {
+        const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset]
+                                  + tsch_timing[tsch_ts_rx_wait];
+        if(tsch_schedule_slot_operation(t, current_slot_start
+                                        , pend_limit + RADIO_DELAY_BEFORE_DETECT
+                                        , "RXSyncWait"))
+        {
+          PT_YIELD(pt);
+        }
+
+        /*  use Radio detection via channel_clear since it is at least faster vs
+         *  receiving_packet - in some implementation, it signals at sync complete
+         *  Sync may add about 1ms (for cc13 50kbps/GPSK2) to final packet signaling
+        */
+        packet_seen = (NETSTACK_RADIO.channel_clear() == 0);
+        if( packet_seen )
+            packet_seen = NETSTACK_RADIO.receiving_packet();
+        else
+            current_input = NULL;
+   }
+
 #else
+    {
     const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait];
-    const unsigned wait_limit = pend_limit + tsch_timing[tsch_ts_max_tx];
 
     //need to take accurate packet rx time
     packet_seen = NETSTACK_RADIO.receiving_packet();
     if(!packet_seen) {
       /* Check if receiving within guard time */
-      RTIMER_BUSYWAIT_UNTIL_ABS((packet_seen = (NETSTACK_RADIO.receiving_packet() || NETSTACK_RADIO.pending_packet())),
+      RTIMER_BUSYWAIT_UNTIL_ABS((packet_seen = (NETSTACK_RADIO.channel_clear() == 0)),
           current_slot_start, pend_limit + RADIO_DELAY_BEFORE_DETECT);
       if (packet_seen){
       rx_start_time = RTIMER_NOW() - RADIO_DELAY_BEFORE_DETECT;
@@ -1036,10 +1130,35 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       TSCH_DEBUG_RX_EVENT();
       // sure that packet receives till rx wait time. this should help filter out
       // false receiving detection before packet actualy starts receive
-      RTIMER_BUSYWAIT_UNTIL_ABS(!(packet_seen = NETSTACK_RADIO.receiving_packet()),
+      RTIMER_BUSYWAIT_UNTIL_ABS(!(packet_seen = (NETSTACK_RADIO.channel_clear() == 0)),
           current_slot_start, pend_limit);
     }
+    if(packet_seen)
+        packet_seen = NETSTACK_RADIO.receiving_packet();
+    else
+        current_input = NULL;
+
+    }
+
 #endif
+
+    if (current_input != NULL)
+    if(!packet_seen) {
+        /* Check if receiving within guard time */
+        const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset]
+                                  + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_DETECT
+                                  + RADIO_DELAY_SFD_RX /* +Sync len*/
+                                  ;
+        if(tsch_schedule_slot_operation(t, current_slot_start, pend_limit, "RxWait"))
+        {
+          PT_YIELD(pt);
+        }
+        packet_seen = NETSTACK_RADIO.receiving_packet();
+    }
+
+    const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset] + tsch_timing[tsch_ts_rx_wait];
+    const unsigned wait_limit = pend_limit + tsch_timing[tsch_ts_max_tx] + RADIO_DELAY_BEFORE_RX;
+
     if (!packet_seen)
         packet_seen = NETSTACK_RADIO.pending_packet();
     if(!packet_seen) {
@@ -1049,11 +1168,8 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       TSCH_DEBUG_RX_EVENT();
 
       /* Wait until packet is received, turn radio off */
-      RTIMER_BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet()
-#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
-                              || (NETSTACK_RADIO.pending_packet() > 0)
-#endif
-                              ), current_slot_start, wait_limit);
+      RTIMER_BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet() )
+                                  , current_slot_start, wait_limit);
         rx_end_time = RTIMER_NOW();
 
       TSCH_DEBUG_RX_EVENT();
@@ -1506,6 +1622,7 @@ tsch_slot_operation_start(void)
   rtimer_clock_t time_to_next_active_slot;
   rtimer_clock_t prev_slot_start;
   TSCH_DEBUG_INIT();
+  eval_radiodelay_before_tx();
   do {
     tsch_slot_offset_t timeslot_diff;
     /* Get next active link */
