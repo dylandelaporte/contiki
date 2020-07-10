@@ -65,6 +65,9 @@
 /*---------------------------------------------------------------------------*/
 rtimer_clock_t rtimer_arch_now(void);
 
+typedef uint64_t rtimer64_clock_t;
+rtimer64_clock_t rtimer64_now(void);
+
 /* HW oscillator frequency is 32 kHz, not 64 kHz and RTIMER_NOW() never returns
  * an odd value; so US_TO_RTIMERTICKS always rounds to the nearest even number.
  */

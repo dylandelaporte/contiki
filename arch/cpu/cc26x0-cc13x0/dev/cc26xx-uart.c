@@ -322,6 +322,10 @@ enable_interrupts(void)
   ti_lib_int_enable(INT_UART0_COMB);
 }
 /*---------------------------------------------------------------------------*/
+#ifndef BOARD_UART_CONF_STOP
+#define BOARD_UART_CONF_STOP UART_CONFIG_STOP_ONE
+#endif
+
 static void
 configure(void)
 {
@@ -343,7 +347,7 @@ configure(void)
   /* Configure the UART for 115,200, 8-N-1 operation. */
   ti_lib_uart_config_set_exp_clk(UART0_BASE, ti_lib_sys_ctrl_clock_get(),
                                  CC26XX_UART_CONF_BAUD_RATE,
-                                 (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
+                                 (UART_CONFIG_WLEN_8 | BOARD_UART_CONF_STOP |
                                   UART_CONFIG_PAR_NONE));
 
   /*
