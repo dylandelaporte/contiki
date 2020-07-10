@@ -87,5 +87,11 @@ rtimer_arch_now()
 {
   return ti_lib_aon_rtc_current_compare_value_get();
 }
+
+rtimer64_clock_t
+rtimer64_now()
+{
+  return ti_lib_aon_rtc_current_64_bit_value_get() >> 16;
+}
 /*---------------------------------------------------------------------------*/
 /** @} */
