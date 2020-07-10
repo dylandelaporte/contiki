@@ -579,6 +579,7 @@ bool tsch_next_timeslot_far(rtimer_clock_t slot_start){
     return (timeout > time_gap);
 }
 
+static
 unsigned tsch_next_slot_prefetched_time(unsigned timeout){
     if (tsch_rf_state == tsch_rfOFF){
         if (timeout > tsch_timing[tsch_ts_rfon_prepslot_guard])
