@@ -589,6 +589,20 @@ unsigned tsch_next_slot_prefetched_time(unsigned timeout){
     }
     return timeout;
 }
+
+static
+void tsch_cleanup_pendings(void){
+#if TSCH_RADIO_ON_DURING_TIMESLOT
+      // clenup receiving buffer from packets that have ocasionaly received not
+      //  in this time-slot
+      if (tsch_timing[tsch_ts_rfon_prepslot_guard] > 0)
+      while (NETSTACK_RADIO.pending_packet()){
+          //WARN: RADIOdriver.read MUST be tolerant vs NULL dst pointer
+          NETSTACK_RADIO.read(NULL, 0);
+      }
+#endif
+}
+
 /*---------------------------------------------------------------------------*/
 #if ((TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING)!=0)
 #define TSCH_HW_RECV_BY_PENDING 1
@@ -741,13 +755,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               uint8_t ack_hdrlen;
               frame802154_t frame;
 
-#if TSCH_RADIO_ON_DURING_TIMESLOT
-              // clenup receiving buffer from packets that have ocasionaly received not
-              //  in this time-slot
-              while (NETSTACK_RADIO.pending_packet()){
-                  NETSTACK_RADIO.read(NULL, 0);
-              }
-#endif
+              tsch_cleanup_pendings();
 
 #if TSCH_HW_FRAME_FILTERING
               radio_value_t radio_rx_mode;
@@ -992,13 +1000,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 
     current_input = &input_array[input_index];
 
-    // clenup receiving buffer from packets that have ocasionaly received not
-    //  in this time-slot
-#if TSCH_RADIO_ON_DURING_TIMESLOT
-    while (NETSTACK_RADIO.pending_packet()){
-        NETSTACK_RADIO.read(NULL, 0);
-    }
-#endif
+    tsch_cleanup_pendings();
 
     /* Wait before starting to listen */
     TSCH_SCHEDULE_AND_YIELD(pt, t, current_slot_start
