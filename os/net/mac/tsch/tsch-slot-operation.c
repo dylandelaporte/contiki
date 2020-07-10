@@ -1020,7 +1020,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
     packet_seen = NETSTACK_RADIO.receiving_packet();
     if(!packet_seen) {
       /* Check if receiving within guard time */
-      RTIMER_BUSYWAIT_UNTIL_ABS((packet_seen = NETSTACK_RADIO.receiving_packet()),
+      RTIMER_BUSYWAIT_UNTIL_ABS((packet_seen = (NETSTACK_RADIO.receiving_packet() || NETSTACK_RADIO.pending_packet())),
           current_slot_start, pend_limit + RADIO_DELAY_BEFORE_DETECT);
       if (packet_seen){
       rx_start_time = RTIMER_NOW() - RADIO_DELAY_BEFORE_DETECT;
