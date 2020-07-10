@@ -772,10 +772,11 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               ack_start_time = tx_start_time + tx_duration;
 #endif
               /* Unicast: wait for ack after tx: sleep until ack time */
-              TSCH_SCHEDULE_AND_YIELD(pt, t
-                  , ack_start_time
+              if(tsch_schedule_slot_operation(t, ack_start_time
                   , tsch_timing[tsch_ts_rx_ack_delay] - RADIO_DELAY_BEFORE_RX
-                  , "TxBeforeAck");
+                      , "TxBeforeAck"))
+              { PT_YIELD(pt); }
+
               ack_start_time +=  tsch_timing[tsch_ts_rx_ack_delay];
 
               TSCH_DEBUG_TX_EVENT();
@@ -785,10 +786,11 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               // rely that ACK time more then tsch_ts_ack_wait, so
               //    for moment Tack_start+ack_delay+ack_wait ACK is receiving
               //    or there is no ACK
-              TSCH_SCHEDULE_AND_YIELD(pt, t
-                  , ack_start_time
+              if( tsch_schedule_slot_operation(t, ack_start_time
                   , tsch_timing[tsch_ts_ack_wait] + RADIO_DELAY_BEFORE_RX
-                  , "TxWaitAck");
+                      , "TxWaitAck") )
+              { PT_YIELD(pt); }
+
               TSCH_DEBUG_TX_EVENT();
               ack_start_time += tsch_timing[tsch_ts_ack_wait];
 
@@ -811,8 +813,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               /* Wait for ACK to finish */
               rx_wait_limit = ack_start_time + tsch_timing[tsch_ts_max_ack]+ RADIO_DELAY_BEFORE_RX
                             - current_slot_start;
-              PT_WAIT_UNTIL(pt
-                      , ( ack_len = tsch_receive(t, ackbuf, sizeof(ackbuf))
+              PT_WAIT_UNTIL(pt, ( ack_len = tsch_receive(t, ackbuf, sizeof(ackbuf))
                           , (ack_len >= 0 )
                          ) );
 
@@ -996,9 +997,10 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
     current_input = &input_array[input_index];
 
     /* Wait before starting to listen */
-    TSCH_SCHEDULE_AND_YIELD(pt, t, current_slot_start
+    if(tsch_schedule_slot_operation(t, current_slot_start
                             , tsch_timing[tsch_ts_rx_offset] - RADIO_DELAY_BEFORE_RX
-                            , "RxBeforeListen");
+            , "RxBeforeListen"))
+    { PT_YIELD(pt); }
     TSCH_DEBUG_RX_EVENT();
 
     /* Start radio for at least guard time */
