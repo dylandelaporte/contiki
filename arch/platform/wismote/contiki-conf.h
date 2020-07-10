@@ -83,6 +83,12 @@
 
 #endif /* NETSTACK_CONF_WITH_IPV6 */
 
+// CC2520 radio driver still not provides SFT timestamps from get_object
+#ifdef TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS
+#define TSCH_CONF_RESYNC_WITH_SFD_TIMESTAMPS    0
+#endif
+
+
 #define PACKETBUF_CONF_ATTRS_INLINE 1
 
 #ifndef RF_CHANNEL
