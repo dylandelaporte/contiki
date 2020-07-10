@@ -452,5 +452,35 @@ by default, useful in case of duplicate seqno */
 #define TSCH_CONF_RX_WAIT 2200
 #endif /* TSCH_CONF_RX_WAIT */
 
+/* tsch_radiodelay_prefetch_tx provide distinguish for 2 slot layouts:
+ * A) Simple detection - with prefetched by BEFORE_TX transmitionstart:
+ *                                                 |Txoffs
+ *    |<----< CCA > ->Tx|<---BEFORE_TX|------------|------------
+ *                                    |    RX  guard window     |
+ *    |<-----------|Rxofs-------------|<- RX wait/2|RX wait/2 ->|
+ *                 ^                                 received?
+ *                RX_offset allows BEFORE_TX+RX wait/2
+ *            and CCA allows BEFORE_TX
+ *
+ * B) Early detection - when have no prefetch time, use 2 step detecting:
+ *         by chanel_clear in RXguarding, and by received() check after it
+ *                               Tx|Txoffs
+ *    |<----< CCA > <--------------|----BEFORE_TX-------->|
+ *                    |      RX  guard window   |
+ *    |<------|Rxofs--|<- RX wait/2|RX wait/2 ->|-------->|-------
+ *                 ^                chanel_clear?      received?
+ *                RX_offset allows BEFORE_TX+RX wait/2
+ *
+ *
+ * */
+//< use RADIO_DELAY_BEFORE_TX for prefetching (default style)
+#define TSCH_RADIODELAY_PREFETCH_TX_BEFORE  1
+//< no prefetching, use early detection
+#define TSCH_RADIODELAY_PREFETCH_TX_NO      0
+//< style of prefetching detects from TSCH slot layout at tsch starting
+#define TSCH_RADIODELAY_PREFETCH_TX_EVAL   -1
+
+//#define TSCH_RADIODELAY_PREFETCH_TX TSCH_RADIODELAY_PREFETCH_TX_BEFORE
+
 #endif /* __TSCH_CONF_H__ */
 /** @} */
