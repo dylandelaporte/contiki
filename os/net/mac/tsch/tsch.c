@@ -1096,6 +1096,7 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
   static struct etimer eb_timer;
 
   PROCESS_BEGIN();
+  while(1) {
 
   /* Wait until association */
   etimer_set(&eb_timer, CLOCK_SECOND / 10);
@@ -1112,10 +1113,10 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
   }
 
 
-  while(1) {
+  while(tsch_is_associated) {
     unsigned long delay;
 
-    if(tsch_is_associated && tsch_current_eb_period > 0
+    if(tsch_current_eb_period > 0
 #ifdef TSCH_RPL_CHECK_DODAG_JOINED
       /* Implementation section 6.3 of RFC 8180 */
       && TSCH_RPL_CHECK_DODAG_JOINED()
@@ -1156,7 +1157,8 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
     }
     etimer_set(&eb_timer, delay);
     PROCESS_WAIT_UNTIL(etimer_expired(&eb_timer));
-  }
+  }//while(tsch_is_associated)
+  }//while(1)
   PROCESS_END();
 }
 
