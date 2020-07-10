@@ -597,6 +597,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               radio_value_t radio_rx_mode;
               /* Entering promiscuous mode so that the radio accepts the enhanced ACK */
               NETSTACK_RADIO.get_value(RADIO_PARAM_RX_MODE, &radio_rx_mode);
+              if (radio_rx_mode & RADIO_RX_MODE_ADDRESS_FILTER)
               NETSTACK_RADIO.set_value(RADIO_PARAM_RX_MODE, radio_rx_mode & (~RADIO_RX_MODE_ADDRESS_FILTER));
 #endif /* TSCH_HW_FRAME_FILTERING */
               /* Unicast: wait for ack after tx: sleep until ack time */
@@ -620,6 +621,7 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 #if TSCH_HW_FRAME_FILTERING
               /* Leaving promiscuous mode */
               NETSTACK_RADIO.get_value(RADIO_PARAM_RX_MODE, &radio_rx_mode);
+              if (!(radio_rx_mode & RADIO_RX_MODE_ADDRESS_FILTER))
               NETSTACK_RADIO.set_value(RADIO_PARAM_RX_MODE, radio_rx_mode | RADIO_RX_MODE_ADDRESS_FILTER);
 #endif /* TSCH_HW_FRAME_FILTERING */
 
