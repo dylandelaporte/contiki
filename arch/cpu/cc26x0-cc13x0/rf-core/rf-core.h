@@ -133,6 +133,36 @@
 #define RF_CORE_PENDING     RF_CORE_PENDING_RECEIVED
 #endif
 
+/*---------------------------------------------------------------------------*/
+/* RF-Front End receining() detection style:
+ *  0 :    receive meets by chanel_clear
+ *  1 :    receive starts by sync words detected, and finished when pending new packet.
+ *         This is more robust, vs chanel_clear, BUT:
+ *         !!! Under CSMA operation, there is no immediately straightforward logic as to
+ *              when it's OK to clear the MDMSOFT interrupt flag:
+ *   - We cannot re-use the same logic as above, since CSMA may bail out of
+ *     frame TX immediately after a single call this function here. In this
+ *     scenario, is_receiving_packet would remain equal to one and we would
+ *     therefore erroneously signal ongoing RX in subsequent calls to this
+ *     function here, even _after_ reception has completed.
+ *   - We can neither clear inside read_frame() nor inside the RX frame
+ *     interrupt handler (remember, we are not in poll mode under CSMA),
+ *     since we risk clearing MDMSOFT after we have seen a sync word for the
+ *     _next_ frame. If this happens, this function here would incorrectly
+ *     return 0 during RX of this next frame.
+ *  -  prefer use it with TSCH
+ * */
+#define RF_CORE_RECV_BY_CLEAR      0
+#define RF_CORE_RECV_BY_SYNC       1
+#ifdef RF_CORE_CONF_RECV_STYLE
+#define RF_CORE_RECV_STYLE    RF_CORE_CONF_RECV_STYLE
+#else
+#if MAC_CONF_WITH_TSCH
+#define RF_CORE_RECV_STYLE    RF_CORE_RECV_BY_SYNC
+#else
+#define RF_CORE_RECV_STYLE    RF_CORE_RECV_BY_CLEAR
+#endif
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* RF-Front End RAT resyncing strategy provides mechanisms for RAT sync monitoring
