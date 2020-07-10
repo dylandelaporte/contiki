@@ -822,7 +822,9 @@ PT_THREAD(tsch_scan(struct pt *pt))
           LOG_WARN("scan: dropping packet, timestamp too far from current time %u %u\n",
             (unsigned)t0,
             (unsigned)t1
-        );
+          );
+          //turn radio off to try sync rat
+          NETSTACK_RADIO.off();
         }
       }
     }
