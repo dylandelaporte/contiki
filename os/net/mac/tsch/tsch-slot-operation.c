@@ -590,6 +590,12 @@ unsigned tsch_next_slot_prefetched_time(unsigned timeout){
     return timeout;
 }
 /*---------------------------------------------------------------------------*/
+#if ((TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING)!=0)
+#define TSCH_HW_RECV_BY_PENDING 1
+#else
+#define TSCH_HW_RECV_BY_PENDING 0
+#endif
+
 #if (TSCH_HW_FEATURE & TSCH_HW_FEATURE_SPUROUS_RX) != 0
 #define TSCH_HW_SPUROUS_RX 1
 #else
@@ -791,13 +797,10 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 
 #endif
               /* Wait for ACK to finish */
-              RTIMER_BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet()
-#if TSCH_HW_FEATURE & TSCH_HW_FEATURE_RECV_BY_PENDING
-                                  || NETSTACK_RADIO.pending_packet()
-#endif
-                                  ),
+              RTIMER_BUSYWAIT_UNTIL_ABS(( !NETSTACK_RADIO.receiving_packet() ),
                                  ack_start_time, tsch_timing[tsch_ts_max_ack]+ RADIO_DELAY_BEFORE_RX);
               ack_len = 0;
+              if (TSCH_HW_RECV_BY_PENDING && !NETSTACK_RADIO.pending_packet())
               if (NETSTACK_RADIO.receiving_packet()){
                   TSCH_LOGF("tx ack: tooo long\n");
                   ack_len = -1;
