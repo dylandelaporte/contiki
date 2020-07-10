@@ -47,6 +47,10 @@
 #include "net/mac/tsch/tsch-asn.h"
 #include "lib/list.h"
 #include "lib/ringbufindex.h"
+#include "net/linkaddr.h"
+#include "net/mac/mac.h"
+#include "net/mac/tsch/tsch-conf.h"
+#include "net/mac/tsch/tsch-const.h"
 
 /********** Data types **********/
 

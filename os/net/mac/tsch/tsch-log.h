@@ -44,6 +44,7 @@
 
 #include "contiki.h"
 #include "sys/rtimer.h"
+#include "net/mac/tsch/tsch-types.h"
 
 /******** Configuration *******/
 
