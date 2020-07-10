@@ -106,7 +106,9 @@
 #ifdef TSCH_CONF_TIMESYNC_REMOVE_JITTER
 #define TSCH_TIMESYNC_REMOVE_JITTER TSCH_CONF_TIMESYNC_REMOVE_JITTER
 #else
-#define TSCH_TIMESYNC_REMOVE_JITTER TSCH_RESYNC_WITH_SFD_TIMESTAMPS
+// if have hw SFD stamps - measure errors miserable, so save a few codesize,
+//      by ommiting jitter threshold.
+#define TSCH_TIMESYNC_REMOVE_JITTER (!TSCH_RESYNC_WITH_SFD_TIMESTAMPS)
 #endif
 
 /* Base drift value.
