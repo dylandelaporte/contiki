@@ -113,7 +113,7 @@ uint_fast8_t rf_rat_check_overflow(bool first_time)
     rtc64_t now = rtc64_now();
     if (now < (RAT_OVERFLOW_PERIOD_RT - OVERFLOW_GAP)){
     rat_overflow.counter = 0;
-    rat_overflow.last_time = now;
+        rat_overflow.last_time_gate = 0;//now;
     if ( last_value <= (RAT_RANGE / GAP_RATE) )
             rat_overflow.last_time_gate += OVERFLOW_GAP;
         PRINTF("rat: init =0 , now=$%lx rat=$%lx\n", now, last_value);
