@@ -924,6 +924,8 @@ PT_THREAD(tsch_scan(struct pt *pt))
     /* Hop to any channel offset */
     static uint8_t current_channel = 0;
 
+  const unsigned poll_period = CLOCK_SECOND / TSCH_ASSOCIATION_POLL_FREQUENCY;
+
   PT_BEGIN(pt);
 
   TSCH_ASN_INIT(tsch_current_asn, 0, 0);
@@ -933,8 +935,6 @@ PT_THREAD(tsch_scan(struct pt *pt))
     NETSTACK_RADIO.get_value(RADIO_PARAM_RX_MODE, &radio_rx_mode);
     NETSTACK_RADIO.set_value(RADIO_PARAM_RX_MODE, radio_rx_mode & (~RADIO_RX_MODE_ADDRESS_FILTER));
 #endif /* TSCH_HW_FRAME_FILTERING */
-
-  const unsigned poll_period = CLOCK_SECOND / TSCH_ASSOCIATION_POLL_FREQUENCY;
 
   if (poll_period > 0)
   etimer_set(&scan_timer, poll_period);

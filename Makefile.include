@@ -49,9 +49,11 @@ BUILD_DIR_FULL = $(BUILD_DIR_TARGET_BOARD:/=)/$(BUILD_DIR_CONFIG)
 # Ditto if BUILD_DIR_CONFIG was empty
 BUILD_DIR_BOARD = $(BUILD_DIR_FULL:/=)
 OBJECTDIR = $(BUILD_DIR_BOARD)/obj
-ifdef OBJECTVARIANT
+ifdef OBJVARIANT
 # provide suffix to obj dir, so that we can different variantsin same target of build 
-OBJECTDIR +=.$(OBJECTVARIANT)
+OBJECTDIR = $(BUILD_DIR_BOARD)/obj.$(OBJVARIANT)
+else
+OBJECTDIR = $(BUILD_DIR_BOARD)/obj
 endif
 
 CONTIKI_NG_TARGET_LIB = $(BUILD_DIR_BOARD)/contiki-ng-$(TARGET).a
