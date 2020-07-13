@@ -105,7 +105,9 @@ PROCESS_THREAD(border_router_process, ev, data)
 
   PROCESS_PAUSE();
 
+#if BUILD_WITH_SHELL
   process_start(&border_router_cmd_process, NULL);
+#endif
 
   LOG_INFO("RPL-Border router started\n");
 
