@@ -123,8 +123,9 @@
 
 static int8_t rssi_threshold = PROP_MODE_RSSI_THRESHOLD;
 /*---------------------------------------------------------------------------*/
-#if MAC_CONF_WITH_TSCH
-static volatile uint8_t is_receiving_packet;
+#if (RF_CORE_RECV_STYLE == RF_CORE_RECV_BY_SYNC)
+// receving packer rfCore entry
+static volatile rfc_dataEntry_t * is_receiving_packet;
 #endif
 /*---------------------------------------------------------------------------*/
 static int on(void);
@@ -508,6 +509,11 @@ rx_on_prop(void)
     return RF_CORE_CMD_OK;
   }
 
+#if (RF_CORE_RECV_STYLE == RF_CORE_RECV_BY_SYNC)
+  /* Make sure the flag is reset */
+  is_receiving_packet = 0;
+#endif
+
   /* Put CPE in RX using the currently configured parameters */
   ret = rf_cmd_prop_rx();
 
@@ -528,6 +534,11 @@ rx_off_prop(void)
   if(!rf_is_on()) {
     return RF_CORE_CMD_OK;
   }
+
+#if (RF_CORE_RECV_STYLE == RF_CORE_RECV_BY_SYNC)
+  /* Make sure the flag is reset */
+  is_receiving_packet = 0;
+#endif
 
   /* Wait for ongoing ACK TX to finish */
   RTIMER_BUSYWAIT_UNTIL(!transmitting(), RF_CORE_TX_FINISH_TIMEOUT);
@@ -842,7 +853,7 @@ read_frame(void *buf, unsigned short buf_len)
   int is_found = 0;
   /* Go through all RX buffers and check their status */
   do {
-    if(entry->status == DATA_ENTRY_STATUS_FINISHED
+    if( entry->status >= DATA_ENTRY_STATUS_FINISHED
         || entry->status == DATA_ENTRY_STATUS_BUSY) {
       is_found = 1;
       break;
@@ -863,7 +874,7 @@ read_frame(void *buf, unsigned short buf_len)
   while(entry->status == DATA_ENTRY_STATUS_BUSY
       && RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + (RTIMER_SECOND / 50)));
 
-#if MAC_CONF_WITH_TSCH
+#if (RF_CORE_RECV_STYLE == RF_CORE_RECV_BY_SYNC)
   /* Make sure the flag is reset */
   is_receiving_packet = 0;
 #endif
@@ -981,7 +992,7 @@ receiving_packet(void)
     return 0;
   }
 
-#if MAC_CONF_WITH_TSCH
+#if (RF_CORE_RECV_STYLE == RF_CORE_RECV_BY_SYNC)
   /*
    * Under TSCH operation, we rely on "hints" from the MDMSOFT interrupt
    * flag. This flag is set by the radio upon sync word detection, but it is
@@ -989,23 +1000,25 @@ receiving_packet(void)
    * first call. The assumption is that the TSCH code will keep calling us
    * until frame reception has completed, at which point we can clear MDMSOFT.
    */
-  if(!is_receiving_packet) {
+  if(is_receiving_packet == NULL) {
     /* Look for the modem synchronization word detection interrupt flag.
      * This flag is raised when the synchronization word is received.
      */
     if(HWREG(RFC_DBELL_BASE + RFC_DBELL_O_RFHWIFG) & RFC_DBELL_RFHWIFG_MDMSOFT) {
-      is_receiving_packet = 1;
+      is_receiving_packet = (rfc_dataEntry_t *)rx_data_queue.pCurrEntry;;
     }
   } else {
     /* After the start of the packet: reset the Rx flag once the channel gets clear */
-    is_receiving_packet = (channel_clear() == RF_CORE_CCA_BUSY);
-    if(!is_receiving_packet) {
-      /* Clear the modem sync flag */
-      ti_lib_rfc_hw_int_clear(RFC_DBELL_RFHWIFG_MDMSOFT);
+    //if (channel_clear() != RF_CORE_CCA_BUSY)
+    if (is_receiving_packet->status >= DATA_ENTRY_STATUS_FINISHED)
+    {
+        is_receiving_packet = NULL;
+        /* Clear the modem sync flag */
+        ti_lib_rfc_hw_int_clear(RFC_DBELL_RFHWIFG_MDMSOFT);
     }
   }
 
-  return is_receiving_packet;
+  return is_receiving_packet != NULL;
 #else
   /*
    * Under CSMA operation, there is no immediately straightforward logic as to
@@ -1044,7 +1057,7 @@ pending_packet(void)
 
   /* Go through all RX buffers and check their status */
   do {
-    if(entry->status == DATA_ENTRY_STATUS_FINISHED
+    if(entry->status >= DATA_ENTRY_STATUS_FINISHED
         || entry->status == DATA_ENTRY_STATUS_BUSY) {
       rv = 1;
       if(!rf_core_poll_mode) {
