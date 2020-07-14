@@ -513,7 +513,7 @@ distclean:
 
 -include $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.customrules-$(TARGET)
 
-fdef GCCTEMPS
+ifdef GCCTEMPS
 define DUMP_GCCCPP
 $(Q)$(CC) $(CFLAGS) -E -c $< -o ${patsubst %.o,%.ip, $@}
 endef
