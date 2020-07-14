@@ -79,7 +79,7 @@ CFLAGS += -DNDEBUG
 endif
 
 ifdef GCCTEMPS
-CFLAGS += -save-temps=obj
+CFLAGS += -save-temps=obj -dD
 endif
 
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
@@ -513,32 +513,47 @@ distclean:
 
 -include $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.customrules-$(TARGET)
 
+fdef GCCTEMPS
+define DUMP_GCCCPP
+$(Q)$(CC) $(CFLAGS) -E -c $< -o ${patsubst %.o,%.ip, $@}
+endef
+else
+define DUMP_GCCCPP
+endef
+endif
+
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
 $(info custom object/rule to $(OBJECTDIR))
 $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -MMD -c $< -o $@
 	@$(FINALIZE_DEPENDENCY)
+	@${DUMP_GCCCPP}
 
 $(OBJECTDIR)/%.o: %.cpp | $(OBJECTDIR)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -MMD -c $< -o $@
 	@$(FINALIZE_DEPENDENCY)
+	@${DUMP_GCCCPP}
 endif
 
 ifndef CUSTOM_RULE_S_TO_OBJECTDIR_O
 $(OBJECTDIR)/%.o: %.S | $(OBJECTDIR)
 	$(TRACE_AS)
 	$(Q)$(AS) $(ASFLAGS) -o $@ $<
+	@${DUMP_GCCCPP}
+
 $(OBJECTDIR)/%.o: %.s | $(OBJECTDIR)
 	$(TRACE_AS)
 	$(Q)$(AS) $(ASFLAGS) -o $@ $<
+	@${DUMP_GCCCPP}
 endif
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_S
 $(OBJECTDIR)/%.s: %.c | $(OBJECTDIR)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -S $< -o $@
+	@${DUMP_GCCCPP}
 endif
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_E
@@ -551,10 +566,12 @@ ifndef CUSTOM_RULE_C_TO_O
 %.o: %.c | $(BUILD_DIR_BOARD)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+	@${DUMP_GCCCPP}
 
 %.o: %.cpp | $(BUILD_DIR_BOARD)
 	$(TRACE_CCX)
 	$(Q)$(CCX) $(CPPFLAGS) -c $< -o $@
+	@${DUMP_GCCCPP}
 endif
 
 ifndef CUSTOM_RULE_C_TO_S
