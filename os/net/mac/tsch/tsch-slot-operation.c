@@ -573,7 +573,7 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
             return 0;
         }
 
-        rtimer_clock_t timeout = US_TO_RTIMERTICKS(TSCH_TIMING_POLL_RX);
+        rtimer_clock_t timeout = US_TO_RTIMERTICKS(TSCH_TIMING_POLL_RX_US);
         rtimer_clock_t next = t->time + timeout;
         rtimer_clock_t now = RTIMER_NOW();
         rtimer_clock_t next_th = now+MAX( (timeout/2 + 1), RTIMER_GUARD);

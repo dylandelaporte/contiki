@@ -442,10 +442,10 @@ by default, useful in case of duplicate seqno */
  *      if > 0, receive waits compete by polling with defined period. Or IDLE waits for complete.
  *      This releases CPU from ISR to main program during receives
  * */
-#ifdef TSCH_CONF_TIMING_POLL_RX
-#define TSCH_TIMING_POLL_RX TSCH_CONF_TIMING_POLL_RX
+#ifdef TSCH_CONF_TIMING_POLL_RX_US
+#define TSCH_TIMING_POLL_RX_US TSCH_CONF_TIMING_POLL_RX_US
 #else
-#define TSCH_TIMING_POLL_RX 0
+#define TSCH_TIMING_POLL_RX_US 0
 #endif
 
 /* TSCH timeslot timing template */
