@@ -44,7 +44,7 @@
 
 #include "contiki.h"
 #include "sys/rtimer.h"
-//#include "net/mac/tsch/tsch-private.h"
+#include "net/mac/tsch/tsch-types.h"
 // need uip_lladdr_t
 #include "net/ip/uip.h"
 
