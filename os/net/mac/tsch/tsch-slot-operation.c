@@ -709,6 +709,7 @@ static void eval_radiodelay_before_tx(){
 #define TSCH_HW_SPUROUS_RX 0
 #endif
 
+
 /*---------------------------------------------------------------------------*/
 static rtimer_clock_t rx_end_time;
 static rtimer_clock_t rx_wait_limit;
@@ -724,7 +725,7 @@ static
 int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 
  /* Wait until packet is received, turn radio off */
-#if TSCH_TIMING_POLL_RX <= 0
+#if TSCH_TIMING_POLL_RX <= RTIMER_GUARD
 
     RTIMER_BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet() )
                             , current_slot_start, rx_wait_limit);
@@ -732,8 +733,7 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 
 #else
 
-    for (; NETSTACK_RADIO.receiving_packet()
-         ;)
+    for (; NETSTACK_RADIO.receiving_packet() ;)
     {
 
         if (RTIMER_CLOCK_LT(current_slot_start+rx_wait_limit, t->time)){
@@ -742,11 +742,11 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
             return 0;
         }
 
-        rtimer_clock_t timeout = US_TO_RTIMERTICKS(TSCH_TIMING_POLL_RX);
+        rtimer_clock_t timeout = US_TO_RTIMERTICKS(TSCH_TIMING_POLL_RX_US);
         rtimer_clock_t next = t->time + timeout;
         rtimer_clock_t now = RTIMER_NOW();
-        if (RTIMER_CLOCK_LT(next, now+timeout/2 )){
-            trace_tsch_rx_poll_twist();
+        rtimer_clock_t next_th = now+MAX( (timeout/2 + 1), RTIMER_GUARD);
+        if ( RTIMER_CLOCK_LT(next, next_th) ){
             next = now + timeout;
         }
 

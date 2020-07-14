@@ -111,7 +111,9 @@
 #ifdef TSCH_CONF_TIMESYNC_REMOVE_JITTER
 #define TSCH_TIMESYNC_REMOVE_JITTER TSCH_CONF_TIMESYNC_REMOVE_JITTER
 #else
-#define TSCH_TIMESYNC_REMOVE_JITTER TSCH_RESYNC_WITH_SFD_TIMESTAMPS
+// if have hw SFD stamps - measure errors miserable, so save a few codesize,
+//      by ommiting jitter threshold.
+#define TSCH_TIMESYNC_REMOVE_JITTER (!TSCH_RESYNC_WITH_SFD_TIMESTAMPS)
 #endif
 
 /* Base drift value.
@@ -598,10 +600,10 @@ by default, useful in case of duplicate seqno */
  *      if > 0, receive waits compete by polling with defined period. Or IDLE waits for complete.
  *      This releases CPU from ISR to main program during receives
  * */
-#ifdef TSCH_CONF_TIMING_POLL_RX
-#define TSCH_TIMING_POLL_RX TSCH_CONF_TIMING_POLL_RX
+#ifdef TSCH_CONF_TIMING_POLL_RX_US
+#define TSCH_TIMING_POLL_RX_US TSCH_CONF_TIMING_POLL_RX_US
 #else
-#define TSCH_TIMING_POLL_RX 0
+#define TSCH_TIMING_POLL_RX_US 0
 #endif
 
 /* TSCH timeslot timing template */
@@ -649,7 +651,7 @@ by default, useful in case of duplicate seqno */
 /* Configurable guard time [us] for turn on radio, before slot activity */
 #ifndef TSCH_CONF_RFON_GUARD_TIME
 #define TSCH_CONF_RFON_GUARD_TIME 0
-#endif /* TSCH_CONF_RX_WAIT */
+#endif
 
 #endif /* __TSCH_CONF_H__ */
 /** @} */
