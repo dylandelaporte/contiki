@@ -604,10 +604,10 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
               trace_droplink_on();
               TSCH_LOG_ADD(tsch_log_message,
                               snprintf(log->message, sizeof(log->message)
-                                      , "override sf.t:%x(%x)/ sf.t:%x(%x)"
-                                      , (curr_best->slotframe_handle<<16) | curr_best->timeslot
+                                      , "override sf.t:%lx(%x)/ sf.t:%lx(%x)"
+                                      , ((unsigned long)(curr_best->slotframe_handle)<<16) | curr_best->timeslot
                                       , curr_best->link_options
-                                      , (new_best->slotframe_handle<<16) | new_best->timeslot
+                                      , ((unsigned long)(new_best->slotframe_handle)<<16) | new_best->timeslot
                                       , new_best->link_options
                                       )
                           );
@@ -618,10 +618,10 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
               trace_droplink_on();
               TSCH_LOG_ADD(tsch_log_message,
                               snprintf(log->message, sizeof(log->message)
-                                      , "miss sf.t:%x(%x)/ sf.t:%x(%x)"
-                                      , (l->slotframe_handle<<16) | l->timeslot
+                                      , "miss sf.t:%lx(%x)/ sf.t:%lx(%x)"
+                                      , ((unsigned long)(l->slotframe_handle)<<16) | l->timeslot
                                       , l->link_options
-                                      , (curr_best->slotframe_handle<<16) | curr_best->timeslot
+                                      , ((unsigned long)(curr_best->slotframe_handle)<<16) | curr_best->timeslot
                                       , curr_best->link_options
                                       )
                           );

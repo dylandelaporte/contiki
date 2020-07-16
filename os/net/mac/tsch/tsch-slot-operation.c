@@ -412,8 +412,8 @@ get_packet_and_neighbor_for_link(struct tsch_link *link, struct tsch_neighbor **
     {
         TSCH_LOG_ADD(tsch_log_message,
                         snprintf(log->message, sizeof(log->message)
-                                , "empty sf.t:%x(%x) ->:%x !%d size[%d] "
-                                , (link->slotframe_handle<<16) | link->timeslot
+                                , "empty sf.t:%lx(%x) ->:%x !%d size[%d] "
+                                , ((unsigned long)link->slotframe_handle<<16) | link->timeslot
                                 , link->link_options
                                 , (int)link->addr.u16[0]
                                 , tsch_queue_backoff_expired(n)
@@ -1580,8 +1580,8 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
           trace_droplink_on();
           TSCH_LOG_ADD(tsch_log_message,
                           snprintf(log->message, sizeof(log->message)
-                                  , "empty sf.t:%x(%x)"
-                                  , (current_link->slotframe_handle<<16) | current_link->timeslot
+                                  , "empty sf.t:%lx(%x)"
+                                  , ((unsigned long)current_link->slotframe_handle<<16) | current_link->timeslot
                                   , current_link->link_options
                                   )
                       );
