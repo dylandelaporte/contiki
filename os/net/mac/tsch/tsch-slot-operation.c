@@ -107,6 +107,10 @@
 #error TSCH_DEQUEUED_ARRAY_SIZE must be power of two
 #endif
 
+#ifndef RADIO_DELAY_SFD_RX
+#define RADIO_DELAY_SFD_RX 0
+#endif
+
 /* Truncate received drift correction information to maximum half
  * of the guard time (one fourth of TSCH_DEFAULT_TS_RX_WAIT) */
 #define SYNC_IE_BOUND ((int32_t)US_TO_RTIMERTICKS(tsch_timing_us[tsch_ts_rx_wait] / 4))
