@@ -94,7 +94,8 @@
 typedef ChipType_t chip_type_t;
 /*---------------------------------------------------------------------------*/
 /* Remember the last Radio Op issued to the radio */
-static rfc_radioOp_t *last_radio_op = NULL;
+rfc_radioOp_t* rf_core_last_radio_op = NULL;
+#define last_radio_op   rf_core_last_radio_op
 /*---------------------------------------------------------------------------*/
 /* A struct holding pointers to the primary mode's abort() and restore() */
 static const rf_core_primary_mode_t *primary_mode = NULL;
@@ -126,7 +127,9 @@ volatile uint8_t rf_core_last_corr_lqi = 0;
 volatile uint32_t rf_core_last_packet_timestamp = 0;
 /*---------------------------------------------------------------------------*/
 /* Are we currently in poll mode? */
+#ifndef RF_CORE_POLL_MODE
 uint8_t rf_core_poll_mode = 0;
+#endif
 /*---------------------------------------------------------------------------*/
 /* Buffer full flag */
 volatile bool rf_core_rx_is_full = false;
@@ -528,12 +531,6 @@ rf_core_cmd_done_dis(void)
 {
   const uint32_t enabled_irqs = rf_core_poll_mode ? ENABLED_IRQS_POLL_MODE : ENABLED_IRQS;
   HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIEN) = enabled_irqs;
-}
-/*---------------------------------------------------------------------------*/
-rfc_radioOp_t *
-rf_core_get_last_radio_op()
-{
-  return last_radio_op;
 }
 /*---------------------------------------------------------------------------*/
 void

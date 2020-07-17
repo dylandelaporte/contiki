@@ -361,7 +361,11 @@ extern volatile uint8_t rf_core_last_corr_lqi;
 extern volatile uint32_t rf_core_last_packet_timestamp;
 /*---------------------------------------------------------------------------*/
 /* Are we currently in poll mode? */
+#ifndef RF_CORE_POLL_MODE
 extern uint8_t rf_core_poll_mode;
+#else
+#define rf_core_poll_mode RF_CORE_POLL_MODE
+#endif
 /*---------------------------------------------------------------------------*/
 /**
  * \brief Check whether the RF core is accessible
@@ -523,7 +527,11 @@ void rf_core_cmd_done_dis(void);
  * This assumes that all commands will be sent to the radio using
  * rf_core_send_cmd()
  */
-rfc_radioOp_t *rf_core_get_last_radio_op(void);
+static inline
+rfc_radioOp_t *rf_core_get_last_radio_op(void){
+    extern rfc_radioOp_t* rf_core_last_radio_op;
+    return rf_core_last_radio_op;
+}
 
 /**
  * \brief Prepare a buffer to host a Radio Op

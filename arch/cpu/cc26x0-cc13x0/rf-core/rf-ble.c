@@ -77,7 +77,8 @@
 #define BLE_UUID_SIZE               16
 /*---------------------------------------------------------------------------*/
 static unsigned char ble_params_buf[32] CC_ALIGN(4);
-static uint8_t ble_mode_on = RF_BLE_IDLE;
+uint8_t rf_ble_mode_on = RF_BLE_IDLE;
+#define ble_mode_on rf_ble_mode_on
 static struct etimer ble_adv_et;
 static uint8_t payload[BLE_ADV_PAYLOAD_BUF_LEN];
 static int p = 0;
@@ -256,12 +257,6 @@ rf_ble_beacond_start()
   process_start(&rf_ble_beacon_process, NULL);
 
   return RF_CORE_CMD_OK;
-}
-/*---------------------------------------------------------------------------*/
-uint8_t
-rf_ble_is_active()
-{
-  return ble_mode_on;
 }
 /*---------------------------------------------------------------------------*/
 void
