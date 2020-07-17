@@ -49,7 +49,8 @@
 #include "sys/etimer.h"
 #include "sys/process.h"
 
-static struct etimer *timerlist;
+struct etimer *etimer_timerlist;
+#define timerlist   etimer_timerlist
 static clock_time_t next_expiration;
 
 PROCESS(etimer_process, "Event timer");
@@ -219,12 +220,6 @@ clock_time_t
 etimer_expiration_time(struct etimer *et)
 {
   return et->timer.start + et->timer.interval;
-}
-/*---------------------------------------------------------------------------*/
-clock_time_t
-etimer_start_time(struct etimer *et)
-{
-  return et->timer.start;
 }
 /*---------------------------------------------------------------------------*/
 int

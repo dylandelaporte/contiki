@@ -184,7 +184,10 @@ clock_time_t etimer_expiration_time(struct etimer *et);
  *             This function returns the start time (when the timer
  *             was last set) for an event timer.
  */
-clock_time_t etimer_start_time(struct etimer *et);
+static inline
+clock_time_t etimer_start_time(struct etimer *et){
+    return et->timer.start;
+}
 
 /**
  * \brief      Check if an event timer has expired.
