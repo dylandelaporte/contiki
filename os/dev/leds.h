@@ -108,7 +108,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 /*---------------------------------------------------------------------------*/
-#if LEDS_CONF_LEGACY_API
+#ifdef LEDS_CONF_LEGACY_API
 /**
  * \brief Define to 1 to enabled the legacy LED API.
  */
@@ -165,10 +165,19 @@ typedef uint8_t leds_mask_t;
 /*---------------------------------------------------------------------------*/
 #if LEDS_LEGACY_API
 /*---------------------------------------------------------------------------*/
+#ifdef LEDS_CONF_COUNT
+#define LEDS_COUNT LEDS_CONF_COUNT
+#else
+/**
+ * \brief The number of LEDs present on a device
+ */
+#define LEDS_COUNT 3
+#endif
+
 #ifdef LEDS_CONF_ALL
 #define LEDS_ALL    LEDS_CONF_ALL
 #else
-#define LEDS_ALL    7
+#define LEDS_ALL ((1 << LEDS_COUNT) - 1)
 #endif
 /*---------------------------------------------------------------------------*/
 void leds_blink(void);
