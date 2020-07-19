@@ -47,7 +47,6 @@
 #include "net/netstack.h"
 #include "sys/energest.h"
 #include "sys/clock.h"
-#include "sys/critical.h"
 #include "sys/rtimer.h"
 #include "sys/cc.h"
 #include "lpm.h"
@@ -144,6 +143,8 @@ static int on(void);
 static int off(void);
 static rf_power_style power_style = RADIO_POWER_STYLE_FREE;
 
+static uint8_t rf_status = 0;
+
 static rfc_propRxOutput_t rx_stats;
 /*---------------------------------------------------------------------------*/
 /* Defines and variables related to the .15.4g PHY HDR */
@@ -170,15 +171,6 @@ static rfc_propRxOutput_t rx_stats;
 #define DOT_4G_PHR_DW_BIT 0
 #endif
 /*---------------------------------------------------------------------------*/
-
-#define LIMITED_BUSYWAIT(cond, timeout) do {                         \
-    rtimer_clock_t end_time = RTIMER_NOW() + timeout;                \
-    while(cond) {                                                    \
-      if(!RTIMER_CLOCK_LT(RTIMER_NOW(), end_time)) {                 \
-        break;                                                       \
-      }                                                              \
-    }                                                                \
-  } while(0)
 /*
  * The maximum number of bytes this driver can accept from the MAC layer for
  * transmission or will deliver to the MAC layer after reception. Includes
@@ -312,10 +304,15 @@ bool rx_is_on(void)
 
   return smartrf_settings_cmd_prop_rx_adv.status == RF_CORE_RADIO_OP_STATUS_ACTIVE;
 }
+/*---------------------------------------------------------------------------*/
+static uint8_t
+rf_is_on(void)
+{
+  if(!rf_core_is_accessible()) {
+    return 0;
+  }
 
-static inline
-uint8_t rf_is_on(void){
-    return rx_is_on();
+  return rf_status;
 }
 /*---------------------------------------------------------------------------*/
 static
@@ -557,7 +554,7 @@ rf_cmd_prop_rx()
     return ret;
   }
 
-  LIMITED_BUSYWAIT((cmd_rx_adv->status != RF_CORE_RADIO_OP_STATUS_ACTIVE)
+  RTIMER_BUSYWAIT_UNTIL((cmd_rx_adv->status == RF_CORE_RADIO_OP_STATUS_ACTIVE)
                    , RF_CORE_ENTER_RX_TIMEOUT);
 
   /* Wait to enter RX */
@@ -593,7 +590,7 @@ rx_on_prop(void)
 {
   int ret;
 
-  if(rf_is_on()) {
+  if(rx_is_on()) {
     PRINTF("rx_on_prop: We were on. PD=%u, RX=0x%04x\n",
            rf_core_is_accessible(), smartrf_settings_cmd_prop_rx_adv.status);
     return RF_CORE_CMD_OK;
@@ -640,7 +637,7 @@ rx_off_prop(void)
     /* Continue nonetheless */
   }
 
-  LIMITED_BUSYWAIT(rf_is_on(), RF_CORE_TURN_OFF_TIMEOUT);
+  RTIMER_BUSYWAIT_UNTIL(!rx_is_on(), RF_CORE_TURN_OFF_TIMEOUT);
 
   if(smartrf_settings_cmd_prop_rx_adv.status == PROP_DONE_STOPPED ||
      smartrf_settings_cmd_prop_rx_adv.status == PROP_DONE_ABORT) {
@@ -710,7 +707,7 @@ soft_off_prop(void)
     return;
   }
 
-  LIMITED_BUSYWAIT(rf_cmd_status_is_running(cmd), RF_CORE_TURN_OFF_TIMEOUT);
+  RTIMER_BUSYWAIT_UNTIL(!rf_cmd_status_is_running(cmd), RF_CORE_TURN_OFF_TIMEOUT);
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t
@@ -916,7 +913,6 @@ release_data_entry(void)
 {
   rfc_dataEntryGeneral_t *entry = (rfc_dataEntryGeneral_t *)rx_read_entry;
   uint8_t *data_ptr = &entry->data;
-  int_master_status_t interrupt_status;
 
   /* Clear the length field (2 bytes) */
   data_ptr[0] = 0;
@@ -926,14 +922,10 @@ release_data_entry(void)
   entry->status = DATA_ENTRY_STATUS_PENDING;
   rx_read_entry = entry->pNextEntry;
 
-  interrupt_status = critical_enter();
-  if(rf_core_rx_is_full) {
-    rf_core_rx_is_full = false;
-    PRINTF("RXQ was full, re-enabling radio!\n");
+  if(!rx_is_on()) {
+    PRINTF("RX was off, re-enabling rx!\n");
     rx_on_prop();
   }
-  critical_exit(interrupt_status);
-
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -1286,8 +1278,12 @@ on(void)
 
   //* apply setup radio chanel settings
   int ret = soft_on_prop();
+  if (ret == RF_CORE_CMD_OK) {
+    rf_status = 1;
+  }
   return ret;
 }
+
 /*---------------------------------------------------------------------------*/
 static int
 off(void)
@@ -1325,6 +1321,8 @@ off(void)
        entry->status = DATA_ENTRY_STATUS_PENDING;
     }
   }
+
+  rf_status = 0;
 
   return RF_CORE_CMD_OK;
 }

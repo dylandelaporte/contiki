@@ -107,7 +107,15 @@ void rf_ble_beacond_stop(void);
  * \retval 1 The radio is in BLE mode
  * \retval 0 The BLE daemon is not active, or disabled
  */
-uint8_t rf_ble_is_active(void);
+#if RF_BLE_ENABLED
+static inline
+uint8_t rf_ble_is_active() {
+  extern uint8_t rf_ble_mode_on;
+  return rf_ble_mode_on;
+}
+#else
+#define rf_ble_is_active() RF_BLE_IDLE
+#endif
 
 /**
  * \brief Set TX power for BLE advertisements

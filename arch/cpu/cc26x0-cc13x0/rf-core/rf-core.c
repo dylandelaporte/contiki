@@ -97,7 +97,8 @@
 typedef ChipType_t chip_type_t;
 /*---------------------------------------------------------------------------*/
 /* Remember the last Radio Op issued to the radio */
-static rfc_radioOp_t *last_radio_op = NULL;
+rfc_radioOp_t* rf_core_last_radio_op = NULL;
+#define last_radio_op   rf_core_last_radio_op
 /*---------------------------------------------------------------------------*/
 /* A struct holding pointers to the primary mode's abort() and restore() */
 static const rf_core_primary_mode_t *primary_mode = NULL;
@@ -113,10 +114,9 @@ volatile uint8_t rf_core_last_corr_lqi = 0;
 volatile uint32_t rf_core_last_packet_timestamp = 0;
 /*---------------------------------------------------------------------------*/
 /* Are we currently in poll mode? */
+#ifndef RF_CORE_POLL_MODE
 uint8_t rf_core_poll_mode = 0;
-/*---------------------------------------------------------------------------*/
-/* Buffer full flag */
-volatile bool rf_core_rx_is_full = false;
+#endif
 /*---------------------------------------------------------------------------*/
 PROCESS(rf_core_process, "CC13xx / CC26xx RF driver");
 /*---------------------------------------------------------------------------*/
@@ -517,12 +517,6 @@ rf_core_cmd_done_dis(void)
   HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIEN) = enabled_irqs;
 }
 /*---------------------------------------------------------------------------*/
-rfc_radioOp_t *
-rf_core_get_last_radio_op()
-{
-  return last_radio_op;
-}
-/*---------------------------------------------------------------------------*/
 void
 rf_core_init_radio_op(rfc_radioOp_t *op, uint16_t len, uint16_t command)
 {
@@ -611,8 +605,6 @@ cc26xx_rf_cpe1_isr(void)
 
   if(HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) & IRQ_RX_BUF_FULL) {
     PRINTF("\nRF: BUF_FULL\n\n");
-    /* set a flag that the buffer is full*/
-    rf_core_rx_is_full = true;
     /* make sure read_frame() will be called to make space in RX buffer */
     process_poll(&rf_core_process);
     /* Clear the IRQ_RX_BUF_FULL interrupt flag by writing zero to bit */
