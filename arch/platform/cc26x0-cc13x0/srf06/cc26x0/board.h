@@ -68,6 +68,11 @@
 #define LEDS_CONF_YELLOW                2
 #define LEDS_CONF_GREEN                 4
 #define LEDS_CONF_ORANGE                8
+
+#define LEDS_CONF_ALL 15
+
+/* Notify various examples that we have LEDs */
+#define PLATFORM_HAS_LEDS        1
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
@@ -80,6 +85,8 @@
 #define BOARD_IOID_LED_2          IOID_27
 #define BOARD_IOID_LED_3          IOID_7
 #define BOARD_IOID_LED_4          IOID_6
+#define BOARD_LED_ALL             (BOARD_LED_1 | BOARD_LED_2 | BOARD_LED_3 | \
+                                   BOARD_LED_4)
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**

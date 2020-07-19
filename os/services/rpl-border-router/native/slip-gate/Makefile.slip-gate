@@ -1,0 +1,9 @@
+# include $(CONTIKI)/Makefile.identify-target
+
+$(info BR native with slip-gate )
+
+EXTERNALDIRS += $(CONTIKI)/os/services/rpl-border-router/native
+CONTIKI_SOURCEFILES += slip-config.c
+
+MODULES += os/services/rpl-border-router/embedded
+

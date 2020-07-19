@@ -41,11 +41,13 @@
 #include "contiki.h"
 #include "contiki-net.h"
 
+#include "platform.h"
 #include "net/routing/routing.h"
 #include "rpl-border-router.h"
 #include "cmd.h"
 #include "border-router.h"
 #include "border-router-cmds.h"
+#include "slip-config.h"
 
 /*---------------------------------------------------------------------------*/
 /* Log configuration */
@@ -59,10 +61,6 @@ extern long slip_sent;
 extern long slip_received;
 
 static uint8_t mac_set;
-
-extern int contiki_argc;
-extern char **contiki_argv;
-extern const char *slip_config_ipaddr;
 
 CMD_HANDLERS(border_router_cmd_handler);
 
@@ -107,7 +105,9 @@ PROCESS_THREAD(border_router_process, ev, data)
 
   PROCESS_PAUSE();
 
+#if BUILD_WITH_SHELL
   process_start(&border_router_cmd_process, NULL);
+#endif
 
   LOG_INFO("RPL-Border router started\n");
 
@@ -122,16 +122,16 @@ PROCESS_THREAD(border_router_process, ev, data)
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
   }
 
-  if(slip_config_ipaddr != NULL) {
+  if(slip_config.ipaddr != NULL) {
     uip_ipaddr_t prefix;
 
-    if(uiplib_ipaddrconv((const char *)slip_config_ipaddr, &prefix)) {
+    if(uiplib_ipaddrconv((const char *)slip_config.ipaddr, &prefix)) {
       LOG_INFO("Setting prefix ");
       LOG_INFO_6ADDR(&prefix);
       LOG_INFO_("\n");
       set_prefix_64(&prefix);
     } else {
-      LOG_ERR("Parse error: %s\n", slip_config_ipaddr);
+      LOG_ERR("Parse error: %s\n", slip_config.ipaddr);
       exit(0);
     }
   }

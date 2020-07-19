@@ -36,11 +36,17 @@
  * Default TX power settings. The board can override
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "dev/radio.h"
 #include "rf-core/prop-mode.h"
 /*---------------------------------------------------------------------------*/
+//platform should have capable to override this with own settings
+#ifndef __WEAK
+#define __WEAK __attribute__((weak))
+#endif
+
 /* Default TX power settings for the 779-930MHz band */
+__WEAK
 const prop_mode_tx_power_config_t prop_mode_tx_power_779_930[] = {
   {  14, 0xa73f },
   {  13, 0xa63f }, /* 12.5 */
@@ -62,6 +68,7 @@ const prop_mode_tx_power_config_t prop_mode_tx_power_779_930[] = {
 };
 /*---------------------------------------------------------------------------*/
 /* Default TX power settings for the 431-527MHz band */
+__WEAK
 const prop_mode_tx_power_config_t prop_mode_tx_power_431_527[] = {
   {  15, 0x003f },
   {  14, 0xbe3f }, /* 13.7 */

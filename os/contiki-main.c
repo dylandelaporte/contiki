@@ -81,7 +81,9 @@ main(void)
   process_init();
   process_start(&etimer_process, NULL);
   ctimer_init();
+#if CONTIKI_WATCHDOG_CONF
   watchdog_init();
+#endif
 
   energest_init();
 
@@ -98,6 +100,11 @@ main(void)
   node_id_init();
 
   LOG_INFO("Starting " CONTIKI_VERSION_STRING "\n");
+  LOG_DBG("TARGET=%s", CONTIKI_TARGET_STRING);
+#ifdef CONTIKI_BOARD_STRING
+  LOG_DBG_(", BOARD=%s", CONTIKI_BOARD_STRING);
+#endif
+  LOG_DBG_("\n");
   LOG_INFO("- Routing: %s\n", NETSTACK_ROUTING.name);
   LOG_INFO("- Net: %s\n", NETSTACK_NETWORK.name);
   LOG_INFO("- MAC: %s\n", NETSTACK_MAC.name);
@@ -164,7 +171,9 @@ main(void)
 
   autostart_start(autostart_processes);
 
+#if CONTIKI_WATCHDOG_CONF
   watchdog_start();
+#endif
 
 #if PLATFORM_PROVIDES_MAIN_LOOP
   platform_main_loop();
@@ -173,7 +182,9 @@ main(void)
     uint8_t r;
     do {
       r = process_run();
+#if CONTIKI_WATCHDOG_CONF
       watchdog_periodic();
+#endif
     } while(r > 0);
 
     platform_idle();

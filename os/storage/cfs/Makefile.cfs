@@ -1,0 +1,6 @@
+TARGET_IS_POSIX ?= 0
+
+ifneq ($(TARGET_IS_POSIX),1)
+SOURCE_EXCLUDE      += cfs-posix.c cfs-posix-dir.c
+MODULES_SOURCES     := $(filter-out cfs-posix.c cfs-posix-dir.c, ${MODULES_SOURCES} )
+endif

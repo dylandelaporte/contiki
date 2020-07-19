@@ -48,14 +48,18 @@
 #include "net/mac/tsch/tsch.h"
 #include "net/mac/framer/frame802154.h"
 #include "net/mac/framer/framer-802154.h"
+#include "net/mac/tsch/tsch-log.h"
 #include "net/netstack.h"
 #include "lib/ccm-star.h"
 #include "lib/aes-128.h"
+#include <stdio.h>
+#include <string.h>
 
 /* Log configuration */
 #include "sys/log.h"
 #define LOG_MODULE "TSCH Pkt"
 #define LOG_LEVEL LOG_LEVEL_MAC
+#include "net/net-debug.h"
 
 /*
  * We use a local packetbuf_attr array to collect necessary frame settings to
@@ -90,9 +94,9 @@ tsch_packet_eackbuf_attr(uint8_t type)
 /*---------------------------------------------------------------------------*/
 /* Construct enhanced ACK packet and return ACK length */
 int
-tsch_packet_create_eack(uint8_t *buf, uint16_t buf_len,
-                        const linkaddr_t *dest_addr, uint8_t seqno,
-                        int16_t drift, int nack)
+tsch_packet_create_eack(uint8_t *buf, int buf_len,
+                        const linkaddr_t *dest_addr, const frame802154_t *frame
+                        , int16_t drift, int nack)
 {
   frame802154_t params;
   struct ieee802154_ies ies;
@@ -107,7 +111,7 @@ tsch_packet_create_eack(uint8_t *buf, uint16_t buf_len,
 
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_FRAME_TYPE, FRAME802154_ACKFRAME);
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_METADATA, 1);
-  tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno);
+  tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, frame->seq);
 
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_NO_DEST_ADDR, 1);
 #if TSCH_PACKET_EACK_WITH_DEST_ADDR
@@ -122,9 +126,15 @@ tsch_packet_create_eack(uint8_t *buf, uint16_t buf_len,
   tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_MAC_NO_SRC_ADDR, 0);
   linkaddr_copy((linkaddr_t *)&params.src_addr, &linkaddr_node_addr);
 #endif
-
 #if LLSEC802154_ENABLED
+  if(frame->fcf.security_enabled) {
   tsch_security_set_packetbuf_attr(FRAME802154_ACKFRAME);
+#if (TSCH_SECURITY_STRICT & TSCH_SECURITY_RELAX_KEYID)
+    // when declared that net keyid free for user specify, use same keyid for ack
+    // as source packet
+    tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_KEY_INDEX, frame->aux_hdr.key_index);
+#endif
+  }
 #endif /* LLSEC802154_ENABLED */
 
   framer_802154_setup_params(tsch_packet_eackbuf_attr, 0, &params);
@@ -234,8 +244,8 @@ tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_offset)
   {
     int i;
     ies.ie_tsch_timeslot_id = 1;
-    for(i = 0; i < tsch_ts_elements_count; i++) {
-      ies.ie_tsch_timeslot[i] = RTIMERTICKS_TO_US(tsch_timing[i]);
+    for(i = 0; i < tsch_ts_netwide_count; i++) {
+      ies.ie_tsch_timeslot[i] = rtimerticks_to_us(tsch_timing[i]);
     }
   }
 #endif /* TSCH_PACKET_EB_WITH_TIMESLOT_TIMING */
@@ -245,8 +255,7 @@ tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_offset)
   if(tsch_hopping_sequence_length.val <= sizeof(ies.ie_hopping_sequence_list)) {
     ies.ie_channel_hopping_sequence_id = 1;
     ies.ie_hopping_sequence_len = tsch_hopping_sequence_length.val;
-    memcpy(ies.ie_hopping_sequence_list, tsch_hopping_sequence,
-           ies.ie_hopping_sequence_len);
+    memcpy(ies.ie_hopping_sequence_list, tsch_hopping_sequence, ies.ie_hopping_sequence_len);
   }
 #endif /* TSCH_PACKET_EB_WITH_HOPPING_SEQUENCE */
 
@@ -262,10 +271,8 @@ tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_offset)
       ies.ie_tsch_slotframe_and_link.slotframe_size = sf0->size.val;
       ies.ie_tsch_slotframe_and_link.num_links = 1;
       ies.ie_tsch_slotframe_and_link.links[0].timeslot = link0->timeslot;
-      ies.ie_tsch_slotframe_and_link.links[0].channel_offset =
-        link0->channel_offset;
-      ies.ie_tsch_slotframe_and_link.links[0].link_options =
-        link0->link_options;
+      ies.ie_tsch_slotframe_and_link.links[0].channel_offset = link0->channel_offset;
+      ies.ie_tsch_slotframe_and_link.links[0].link_options = link0->link_options;
     }
   }
 #endif /* TSCH_PACKET_EB_WITH_SLOTFRAME_AND_LINK */
@@ -402,13 +409,8 @@ tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
 
   if(frame->fcf.frame_version < FRAME802154_IEEE802154_2015
      || frame->fcf.frame_type != FRAME802154_BEACONFRAME) {
-    LOG_INFO("! parse_eb: frame is not a valid TSCH beacon. Frame version %u, type %u, FCF %02x %02x\n",
-           frame->fcf.frame_version, frame->fcf.frame_type, buf[0], buf[1]);
-    LOG_INFO("! parse_eb: frame was from 0x%x/", frame->src_pid);
-    LOG_INFO_LLADDR((const linkaddr_t *)&frame->src_addr);
-    LOG_INFO_(" to 0x%x/", frame->dest_pid);
-    LOG_INFO_LLADDR((const linkaddr_t *)&frame->dest_addr);
-    LOG_INFO_("\n");
+      TSCH_LOG_FRAME("TSCH:! parse_eb: frame is not a valid TSCH beacon."
+              , frame, buf);
     return 0;
   }
 

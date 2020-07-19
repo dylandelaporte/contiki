@@ -111,6 +111,22 @@ typedef uint64_t rtimer_clock_t;
  */
 #define RTIMER_SECOND RTIMER_ARCH_SECOND
 
+#ifndef RTIMER_CONF_MULTIPLE_ACCESS
+#define RTIMER_MULTIPLE_ACCESS 0
+#else
+#define RTIMER_MULTIPLE_ACCESS RTIMER_CONF_MULTIPLE_ACCESS
+#endif
+
+#ifndef RTIMER_CONF_MINIMAL_SAFE_SCHEDULE
+#define RTIMER_MINIMAL_SAFE_SCHEDULE 2U
+#else
+#define RTIMER_MINIMAL_SAFE_SCHEDULE RTIMER_CONF_MINIMAL_SAFE_SCHEDULE
+#endif
+
+#if RTIMER_MINIMAL_SAFE_SCHEDULE < 2U
+#error "RTIMER_GAURD_TIME must be at least 2"
+#endif
+/*---------------------------------------------------------------------------*/
 /**
  * \brief      Initialize the real-time scheduler.
  *
@@ -123,6 +139,12 @@ void rtimer_init(void);
 struct rtimer;
 typedef void (* rtimer_callback_t)(struct rtimer *t, void *ptr);
 
+enum rtimer_state {
+  RTIMER_READY,
+  RTIMER_QUEUED,
+  RTIMER_RUNNING
+};
+
 /**
  * \brief      Representation of a real-time task
  *
@@ -134,17 +156,24 @@ struct rtimer {
   rtimer_clock_t time;
   rtimer_callback_t func;
   void *ptr;
+
+#if RTIMER_MULTIPLE_ACCESS
+  struct rtimer *next;
+  int state;
+#endif
 };
 
 /**
  * TODO: we need to document meanings of these symbols.
  */
-enum {
+typedef enum {
   RTIMER_OK, /**< rtimer task is scheduled successfully */
   RTIMER_ERR_FULL,
   RTIMER_ERR_TIME,
   RTIMER_ERR_ALREADY_SCHEDULED,
-};
+  RTIMER_ERR_NOT_SCHEDULED,
+  RTIMER_ERR_TOO_LATE
+} rtimer_error;
 
 /**
  * \brief      Post a real-time task.
@@ -160,8 +189,8 @@ enum {
  *             time in the future.
  *
  */
-int rtimer_set(struct rtimer *task, rtimer_clock_t time,
-	       rtimer_clock_t duration, rtimer_callback_t func, void *ptr);
+rtimer_error rtimer_set(struct rtimer *task, rtimer_clock_t time,
+               rtimer_clock_t duration, rtimer_callback_t func, void *ptr);
 
 /**
  * \brief      Execute the next real-time task and schedule the next task, if any
@@ -171,6 +200,17 @@ int rtimer_set(struct rtimer *task, rtimer_clock_t time,
  *
  */
 void rtimer_run_next(void);
+
+/**
+ * \brief Cancels the given rtimer
+ *
+ * Nothing happens if the rtimer is not scheduled
+ *
+ * \return RTIMER_OK on success, RTIMER_ERR_NOT_SCHEDULED if the rtimer
+ * wasn't scheduled and RTIMER_ERR_TOO_LATE if it's too late to cancel the
+ * rtimer
+ */
+rtimer_error rtimer_cancel(struct rtimer *rtimer);
 
 /**
  * \brief      Get the current clock time
@@ -183,6 +223,26 @@ void rtimer_run_next(void);
  * \hideinitializer
  */
 #define RTIMER_NOW() rtimer_arch_now()
+
+#define RTIME_EXPIRED( t ) (RTIMER_CLOCK_LT(t, RTIMER_NOW()))
+// \return 1(true) - when expired
+bool  rtime_expired(rtimer_clock_t timeout);
+
+#ifndef __rtimer_diff_t
+#define __rtimer_diff_t rtimer_diff_t
+typedef int32_t rtimer_diff_t;
+#endif
+
+//* rtimer-arch should provide this macro for TSCH net-stack module
+//* often us-ticks conversion uses mul/div ops,
+//* use of routines helps deruce code size.
+#ifdef US_TO_RTIMERTICKS
+rtimer_diff_t us_to_rtimerticks(rtimer_diff_t val);
+#endif
+
+#ifdef RTIMERTICKS_TO_US
+rtimer_diff_t rtimerticks_to_us(rtimer_diff_t val);
+#endif
 
 /**
  * \brief      Get the time that a task last was executed

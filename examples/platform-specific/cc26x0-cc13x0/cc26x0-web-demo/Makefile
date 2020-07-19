@@ -13,6 +13,8 @@ ifeq ($(MAKE_ROUTING),MAKE_ROUTING_RPL_CLASSIC)
 PROJECT_SOURCEFILES += cetic-6lbr-client.c
 endif
 
+CONTIKI_WITH_IPV6 = 1
+
 CONTIKI=../../../..
 
 include $(CONTIKI)/Makefile.dir-variables

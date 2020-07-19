@@ -47,6 +47,7 @@
 
 #include "contiki.h"
 #include "sys/process.h"
+#include "sys/arg.h"
 
 /*
  * Pointer to the currently running process structure.
@@ -65,14 +66,20 @@ struct event_data {
   struct process *p;
 };
 
-static process_num_events_t nevents, fevent;
-static struct event_data events[PROCESS_CONF_NUMEVENTS];
-
-#if PROCESS_CONF_STATS
+#if !PROCESS_CONF_STATS
+#define STATIC_OPEN static
+#else
+#define STATIC_OPEN
 process_num_events_t process_maxevents;
 #endif
 
-static volatile unsigned char poll_requested;
+STATIC_OPEN
+process_num_events_t nevents, fevent;
+STATIC_OPEN
+struct event_data events[PROCESS_CONF_NUMEVENTS];
+
+STATIC_OPEN
+volatile unsigned char poll_requested;
 
 #define PROCESS_STATE_NONE        0
 #define PROCESS_STATE_RUNNING     1
@@ -80,6 +87,7 @@ static volatile unsigned char poll_requested;
 
 static void call_process(struct process *p, process_event_t ev, process_data_t data);
 
+#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -203,6 +211,11 @@ process_exit(struct process *p)
 {
   exit_process(p, PROCESS_CURRENT());
 }
+
+void process_abort(void){
+    PROCESS_CURRENT()->state = PROCESS_STATE_NONE;
+}
+
 /*---------------------------------------------------------------------------*/
 void
 process_init(void)
@@ -357,6 +370,11 @@ process_post(struct process *p, process_event_t ev, process_data_t data)
 
   return PROCESS_ERR_OK;
 }
+/*---------------------------------------------------------------------------*/
+void process_post_pause(void){
+    process_post(PROCESS_CURRENT(), PROCESS_EVENT_CONTINUE, NULL);
+}
+
 /*---------------------------------------------------------------------------*/
 void
 process_post_synch(struct process *p, process_event_t ev, process_data_t data)

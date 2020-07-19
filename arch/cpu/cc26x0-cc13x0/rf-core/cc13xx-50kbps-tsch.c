@@ -41,10 +41,12 @@
 #include "contiki.h"
 #include "net/mac/tsch/tsch.h"
 
-#define CC13XX_TSCH_DEFAULT_TS_CCA_OFFSET         1800
 #define CC13XX_TSCH_DEFAULT_TS_CCA                128
 #define CC13XX_TSCH_DEFAULT_TS_TX_OFFSET          2500
 #define CC13XX_TSCH_DEFAULT_TS_RX_OFFSET          (CC13XX_TSCH_DEFAULT_TS_TX_OFFSET - (TSCH_CONF_RX_WAIT / 2))
+#define CC13XX_TSCH_DEFAULT_TS_CCA_OFFSET         (CC13XX_TSCH_DEFAULT_TS_RX_OFFSET \
+                                                    - CC13XX_TSCH_DEFAULT_TS_CCA \
+                                                    - RADIO_DELAY_BEFORE_TX )
 #define CC13XX_TSCH_DEFAULT_TS_RX_ACK_DELAY       2000
 #define CC13XX_TSCH_DEFAULT_TS_TX_ACK_DELAY       3000
 #define CC13XX_TSCH_DEFAULT_TS_RX_WAIT            TSCH_CONF_RX_WAIT

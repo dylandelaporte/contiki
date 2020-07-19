@@ -48,6 +48,8 @@
 #include "net/mac/tsch/tsch-const.h"
 #include "net/mac/tsch/tsch-types.h"
 #include "net/mac/tsch/tsch-asn.h"
+/* We need definitions from tsch-private.h for TSCH-specific information elements */
+#include "net/mac/tsch/tsch-private.h"
 
 #define FRAME802154E_IE_MAX_LINKS       4
 
@@ -78,7 +80,7 @@ struct ieee802154_ies {
   struct tsch_asn_t ie_asn;
   uint8_t ie_join_priority;
   uint8_t ie_tsch_timeslot_id;
-  uint16_t ie_tsch_timeslot[tsch_ts_elements_count];
+  uint16_t ie_tsch_timeslot[tsch_ts_netwide_count];
   struct tsch_slotframe_and_links ie_tsch_slotframe_and_link;
   /* Payload Long MLME IEs */
   uint8_t ie_channel_hopping_sequence_id;

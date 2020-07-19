@@ -191,8 +191,7 @@ static uip_lladdr_t *
 uip_ds6_route_nexthop_lladdr(uip_ds6_route_t *route)
 {
   if(route != NULL) {
-    return (uip_lladdr_t *)nbr_table_get_lladdr(nbr_routes,
-                                                route->neighbor_routes);
+    return (uip_lladdr_t *)nbr_routes_lladr_item(route->neighbor_routes);
   } else {
     return NULL;
   }
@@ -522,7 +521,7 @@ uip_ds6_route_rm(uip_ds6_route_t *route)
       }
 #endif /* LOG_WITH_ANNOTATE */
       LOG_INFO("Rm: removing neighbor too\n");
-      nbr_table_remove(nbr_routes, route->neighbor_routes->route_list);
+      nbr_routes_remove_item(route->neighbor_routes->route_list);
 #ifdef NETSTACK_CONF_ROUTING_NEIGHBOR_REMOVED_CALLBACK
       NETSTACK_CONF_ROUTING_NEIGHBOR_REMOVED_CALLBACK(
           (const linkaddr_t *)nbr_table_get_lladdr(nbr_routes, route->neighbor_routes->route_list));
@@ -564,7 +563,7 @@ rm_routelist(struct uip_ds6_route_neighbor_routes *routes)
       uip_ds6_route_rm(r->route);
       r = list_head(routes->route_list);
     }
-    nbr_table_remove(nbr_routes, routes);
+    nbr_routes_remove_item(routes);
   }
 
   if(LOG_DBG_ENABLED) {
@@ -613,7 +612,6 @@ uip_ds6_defrt_add(const uip_ipaddr_t *ipaddr, unsigned long interval)
     return NULL;
   }
 
-  LOG_INFO("Add default\n");
   d = uip_ds6_defrt_lookup(ipaddr);
   if(d == NULL) {
     d = memb_alloc(&defaultroutermemb);
@@ -629,6 +627,9 @@ uip_ds6_defrt_add(const uip_ipaddr_t *ipaddr, unsigned long interval)
     }
 
     list_push(defaultrouterlist, d);
+  }
+  else {
+    LOG_INFO("Refreshing default\n");
   }
 
   uip_ipaddr_copy(&d->ipaddr, ipaddr);

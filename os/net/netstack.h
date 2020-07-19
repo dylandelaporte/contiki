@@ -66,6 +66,8 @@
 #else /* NETSTACK_CONF_NETWORK */
 #if NETSTACK_CONF_WITH_IPV6
 #define NETSTACK_NETWORK sicslowpan_driver
+#elif NETSTACK_CONF_WITH_RIME
+#define NETSTACK_NETWORK rime_driver
 #elif NETSTACK_CONF_WITH_NULLNET
 #define NETSTACK_NETWORK nullnet_driver
 #else
@@ -98,6 +100,32 @@
 #define NETSTACK_RADIO   nullradio_driver
 #endif /* NETSTACK_CONF_RADIO */
 
+
+
+/*---------------------------------------------------------------------------*/
+/* ContikiMAC configuration options.
+ *
+ * These are typically configured on a per-platform basis.
+ */
+
+/* SICSLOWPAN_CONF_COMPRESSION_THRESHOLD sets a lower threshold for
+   when packets should not be compressed. This is used by ContikiMAC,
+   which requires packets to be larger than a given minimum size. */
+#ifndef SICSLOWPAN_CONF_COMPRESSION_THRESHOLD
+#define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 0
+/* #define SICSLOWPAN_CONF_COMPRESSION_THRESHOLD 63 */
+#endif /* SICSLOWPAN_CONF_COMPRESSION_THRESHOLD */
+
+/* CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION specifies if ContikiMAC
+   should optimize for the phase of neighbors. The phase optimization
+   may reduce power consumption but is not compatible with all timer
+   settings and is therefore off by default. */
+#ifndef CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION
+#define CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION 0
+#endif /* CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION */
+//==============================================================================
+//         LEGACY netstack conf for deprecated RDC and LLSEC
+
 /* Framer selection. The framer is used by the MAC implementation
    to build and parse frames. */
 #ifdef NETSTACK_CONF_FRAMER
@@ -105,6 +133,34 @@
 #else /* NETSTACK_CONF_FRAMER */
 #define NETSTACK_FRAMER   framer_802154
 #endif /* NETSTACK_CONF_FRAMER */
+
+
+/* NETSTACK_CONF_RDC specifies the Radio Duty Cycling (RDC) layer. The
+   nullrdc_driver never turns the radio off and is compatible with all
+   radios, but consumes a lot of power. The contikimac_driver is
+   highly power-efficent and allows sleepy routers, but is not
+   compatible with all radios. */
+#ifndef NETSTACK_CONF_RDC
+#define NETSTACK_CONF_RDC   nullrdc_driver
+/* #define NETSTACK_CONF_RDC   contikimac_driver */
+#endif /* NETSTACK_CONF_RDC */
+
+/* NETSTACK_CONF_LLSEC specifies the link layer security driver. */
+#ifndef NETSTACK_CONF_LLSEC
+#define NETSTACK_CONF_LLSEC nullsec_driver
+#endif /* NETSTACK_CONF_LLSEC */
+
+/* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE specifies the channel check
+   rate of the RDC layer. This defines how often the RDC will wake up
+   and check for radio channel activity. A higher check rate results
+   in higher communication performance at the cost of a higher power
+   consumption. */
+#ifndef NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE
+#define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
+#endif /* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE */
+//==============================================================================
+
+
 
 #include "net/mac/mac.h"
 #include "net/mac/framer/framer.h"

@@ -42,8 +42,20 @@
 
 /********** Includes **********/
 
+#include <stdbool.h>
 #include "contiki.h"
+#include <stdbool.h>
 #include "lib/ringbufindex.h"
+
+/*********** Callbacks *********/
+
+/* Called by TSCH form interrupt after receiving a frame, enabled upper-layer to decide
+ * whether to ACK or NACK */
+#ifdef TSCH_CALLBACK_DO_NACK
+int TSCH_CALLBACK_DO_NACK(struct tsch_link *link, linkaddr_t *src, linkaddr_t *dst);
+#endif
+
+/************ Types ***********/
 
 /***** External Variables *****/
 
@@ -63,24 +75,15 @@ extern int tsch_current_burst_count;
 /********** Functions *********/
 
 /**
- * Checks if the TSCH lock is set. Accesses to global structures outside of
- * interrupts must be done through the lock, unless the sturcutre has
- * atomic read/write
+ * Returns a 802.15.4 channel from an ASN and channel offset. Basically adds
+ * The offset to the ASN and performs a hopping sequence lookup.
  *
- * \return 1 if the lock is taken, 0 otherwise
+ * \param asn A given ASN
+ * \param channel_offset Given channel offset
+ * \return The resulting channel
  */
-int tsch_is_locked(void);
-/**
- * Takes the TSCH lock. When the lock is taken, slot operation will be skipped
- * until release.
- *
- * \return 1 if the lock was successfully taken, 0 otherwise
- */
-int tsch_get_lock(void);
-/**
- * Releases the TSCH lock.
- */
-void tsch_release_lock(void);
+uint8_t tsch_calculate_channel(struct tsch_asn_t *asn, tsch_ch_offset_t channel_offset);
+
 /**
  * Set global time before starting slot operation, with a rtimer time and an ASN
  *
@@ -93,6 +96,69 @@ void tsch_slot_operation_sync(rtimer_clock_t next_slot_start,
  * Start actual slot operation
  */
 void tsch_slot_operation_start(void);
+
+void tsch_slot_operation_stop(void);
+
+// \brief Break current slot operation correctrly - in sync state, valid for later
+//  tsch_slot_operation_start invoke.
+//  \arg timeout - time [rtc] to planed next slot, that not breaks.
+//          Break later oparation that planed: now+timeout > current_slot_start
+// * usage:
+//      if( tsch_slot_operation_break_before(timeout) ){
+//          make_some_scheduler_changes();
+//          tsch_slot_operation_start();
+//      }
+bool tsch_slot_operation_break_before(rtimer_clock_t timeout);
+
+// this is a kind of:
+//      if( tsch_slot_operation_break_before(timeout) ){
+//          tsch_slot_operation_start();
+//      }
+bool tsch_slot_operation_invalidate_before(rtimer_clock_t timeout);
+
+
+
+#ifndef LIB_INLINES
+#if (PACKETBUF_CONF_ATTRS_INLINE) //|| defined(__GNUC__)
+#define LIB_INLINES     1
+#else
+#define LIB_INLINES     0
+#endif
+#endif //LIB_INLINES
+
+
+
+#if LIB_INLINES
+extern
+volatile bool tsch_locked;
+static inline
+bool tsch_is_locked(void){return tsch_locked;};
+static inline
+void tsch_release_lock(void){tsch_locked = 0;};
+
+#else
+
+/**
+ * Takes the TSCH lock. When the lock is taken, slot operation will be skipped
+ * until release.
+ *
+ * \return 1 if the lock was successfully taken, 0 otherwise
+ */
+bool tsch_is_locked(void);
+/**
+ * Releases the TSCH lock.
+ */
+void tsch_release_lock(void);
+#endif
+
+/**
+ * Checks if the TSCH lock is set. Accesses to global structures outside of
+ * interrupts must be done through the lock, unless the sturcutre has
+ * atomic read/write
+ *
+ * \return 1 if the lock is taken, 0 otherwise
+ */
+bool tsch_get_lock(void);
 
 #endif /* __TSCH_SLOT_OPERATION_H__ */
 /** @} */

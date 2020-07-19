@@ -15,7 +15,10 @@ NM       ?= nm
 OBJCOPY  ?= objcopy
 STRIP    ?= strip
 ifeq ($(WERROR),1)
-CFLAGSWERROR=-Werror
+CFLAGSWERROR +=-Werror 
+CFLAGSWERROR +=-Wno-error=unused-function -Wno-unused-function
+# printf( (char*)pfmt ) - here fmt is variable, may warns on modern compiler 
+#CFLAGSWERROR += -Wno-error=format-security -Wno-format-security
 endif
 CFLAGSNO = -Wall -g $(CFLAGSWERROR)
 CFLAGS  += $(CFLAGSNO)
@@ -51,7 +54,7 @@ LDFLAGS += -Wl,-flat_namespace,-map,$(CONTIKI_NG_PROJECT_MAP)
 CFLAGS += -DHAVE_SNPRINTF=1 -U__ASSERT_USE_STDERR
 else
 ifeq ($(HOST_OS),Linux)
-LDFLAGS += -Wl,-Map=$(CONTIKI_NG_PROJECT_MAP),-export-dynamic
+LDFLAGS += -Wl,--cref,-Map=$(CONTIKI_NG_PROJECT_MAP),-export-dynamic
 endif
 endif
 

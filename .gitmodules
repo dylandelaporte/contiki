@@ -7,12 +7,15 @@
 [submodule "arch/cpu/cc26xx-cc13xx/lib/cc13xxware"]
 	path = arch/cpu/cc26x0-cc13x0/lib/cc13xxware
 	url = https://github.com/contiki-ng/cc13xxware.git
+[submodule "tools/motelist"]
+	path = tools/motelist
+	url = https://github.com/contiki-ng/motelist
 [submodule "tools/sensniff"]
 	path = tools/sensniff
 	url = https://github.com/g-oikonomou/sensniff.git
 [submodule "tools/cooja"]
 	path = tools/cooja
-	url = https://github.com/contiki-ng/cooja.git
+	url = https://github.com/alexrayne/cooja.git
 [submodule "os/net/security/tinydtls"]
 	path = os/net/security/tinydtls
 	url = https://github.com/contiki-ng/tinydtls.git
@@ -28,3 +31,6 @@
 [submodule "arch/cpu/cc26xx-cc13xx/lib/cc2640r2-sdk"]
 	path = arch/cpu/cc26x0-cc13x0/lib/cc2640r2-sdk
 	url = https://github.com/contiki-ng/cc2640r2-sdk.git
+[submodule "arch/platform/cooja/lib/coffeecatch"]
+	path = arch/platform/cooja/lib/coffeecatch
+	url = https://github.com/alexrayne/coffeecatch.git

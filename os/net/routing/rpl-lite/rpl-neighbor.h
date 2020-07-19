@@ -55,6 +55,8 @@
 
 /********** Public symbols **********/
 
+typedef rpl_nbr_t rpl_parent_t;
+
 /* Per-neighbor RPL information. According to RFC 6550, there exist three
  * types of neighbors:
  * - Candidate neighbor set: any neighbor, selected in an implementation
@@ -62,7 +64,7 @@
  * - Parent set: the subset of the candidate neighbor set with rank below our rank
  * - Preferred parent: one node of the parent set
  */
-NBR_TABLE_DECLARE(rpl_neighbors);
+NBR_TABLE_DECLARE(rpl_nbr_t, rpl_neighbors);
 
 /********** Public functions **********/
 
@@ -203,7 +205,6 @@ rpl_nbr_t *rpl_neighbor_select_best(void);
 */
 int rpl_neighbor_snprint(char *buf, int buflen, rpl_nbr_t *nbr);
 
-typedef rpl_nbr_t rpl_parent_t;
 #define rpl_parent_get_from_ipaddr(addr) rpl_neighbor_get_from_ipaddr(addr)
 #define rpl_parent_get_ipaddr(nbr) rpl_neighbor_get_ipaddr(nbr)
  /** @} */

@@ -42,10 +42,25 @@
 
 /********** Includes **********/
 
+#include <stdbool.h>
 #include "contiki.h"
 #include "lib/ringbufindex.h"
 #include "net/linkaddr.h"
+#include "net/mac/tsch/tsch-schedule.h"
 #include "net/mac/mac.h"
+
+/*********** Callbacks *********/
+
+/* Called by TSCH when switching time source */
+#ifdef TSCH_CALLBACK_NEW_TIME_SOURCE
+struct tsch_neighbor;
+void TSCH_CALLBACK_NEW_TIME_SOURCE(const struct tsch_neighbor *old, const struct tsch_neighbor *new);
+#endif
+
+/* Called by TSCH every time a packet is ready to be added to the send queue */
+#ifdef TSCH_CALLBACK_PACKET_READY
+void TSCH_CALLBACK_PACKET_READY(void);
+#endif
 
 /***** External Variables *****/
 
@@ -70,7 +85,11 @@ struct tsch_neighbor *tsch_queue_get_nbr(const linkaddr_t *addr);
  * \brief Get the TSCH time source (we currently assume there is only one)
  * \return The neighbor queue associated to the time source
  */
-struct tsch_neighbor *tsch_queue_get_time_source(void);
+static inline
+struct tsch_neighbor *tsch_queue_get_time_source(void){
+    extern struct tsch_neighbor *tsch_time_source;
+    return tsch_time_source;
+}
 /**
  * \brief Get the address of a neighbor.
  * \return The link-layer address of the neighbor.
@@ -97,11 +116,19 @@ struct tsch_packet *tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_tr
  */
 int tsch_queue_global_packet_count(void);
 /**
+ * \brief Returns the number of packets currently a given neighbor queue
+ * \param addr The link-layer address of the neighbor we are interested in
+ * \return The number of packets in the neighbor's queue
+ */
+int tsch_queue_packet_count(const linkaddr_t *addr);
+
+/**
  * \brief Returns the number of packets currently a given neighbor queue (by pointer)
  * \param n The neighbor we are interested in
  * \return The number of packets in the neighbor's queue
  */
 int tsch_queue_nbr_packet_count(const struct tsch_neighbor *n);
+
 /**
  * \brief Remove first packet from a neighbor queue. The packet is stored in a separate
  * dequeued packet list, for later processing.
@@ -127,16 +154,26 @@ int tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p, struc
  * \brief Reset neighbor queues module
  */
 void tsch_queue_reset(void);
+/* Flush a neighbor queue */
+void tsch_queue_flush_nbr_queue(struct tsch_neighbor *n);
+/* Remove TSCH neighbor queue */
+void tsch_queue_remove_nbr(struct tsch_neighbor *n);
 /**
  * \brief Deallocate all neighbors with empty queue
  */
 void tsch_queue_free_unused_neighbors(void);
+enum { tsch_free_UNUSED = 0
+    /* Flush and Deallocate neighbors wich are not in links*/
+     , tsch_free_UNLINKED = 1
+};
+void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style);
+/* Is the neighbor queue empty? */
 /**
  * \brief Is the neighbor queue empty?
  * \param n The neighbor queue
  * \return 1 if empty, 0 otherwise
  */
-int tsch_queue_is_empty(const struct tsch_neighbor *n);
+bool tsch_queue_is_empty(const struct tsch_neighbor *n);
 /**
  * \brief Returns the first packet that can be sent from a queue on a given link
  * \param n The neighbor queue
@@ -183,6 +220,14 @@ void tsch_queue_update_all_backoff_windows(const linkaddr_t *dest_addr);
  * \brief Initialize TSCH queue module
  */
 void tsch_queue_init(void);
+
+/**
+ * \brief Add a TSCH neighbors traverse head
+ * \param addr The link-layer address of the neighbor to be added
+ */
+struct tsch_neighbor *tsch_neighbors_head(void);
+struct tsch_neighbor *tsch_neighbors_next(struct tsch_neighbor *);
+
 
 #endif /* __TSCH_QUEUE_H__ */
 /** @} */

@@ -45,7 +45,7 @@ doInterfaceActionsBeforeTick(void)
 {
   if (simMoteIDChanged) {
     simMoteIDChanged = 0;
-	random_init(simRandomSeed);
+    random_init(simMoteID | simRandomSeed);
   }
 }
 /*-----------------------------------------------------------------------------------*/

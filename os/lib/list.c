@@ -44,17 +44,24 @@
  * \addtogroup list
  * @{
  */
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "lib/list.h"
 
 #include <string.h>
 /*---------------------------------------------------------------------------*/
+#ifndef NULL
+#define NULL 0
+#endif
+
 struct list {
   struct list *next;
 };
 
 /*---------------------------------------------------------------------------*/
 /**
+
+#if !LIB_INLINES
+#endif // #if !LIB_INLINES
  * Get the tail of a list.
  *
  * This function returns a pointer to the elements following the first
@@ -115,6 +122,8 @@ list_add(list_t list, void *item)
 void
 list_push(list_t list, void *item)
 {
+  /*  struct list *l;*/
+
   /* Make sure not to add the same element twice */
   list_remove(list, item);
 
@@ -185,13 +194,12 @@ list_pop(list_t list)
  *
  */
 /*---------------------------------------------------------------------------*/
-void
-list_remove(list_t list, void *item)
+bool list_remove(list_t list, void *item)
 {
   struct list *l, *r;
 
   if(*list == NULL) {
-    return;
+    return false;
   }
 
   r = NULL;
@@ -205,10 +213,11 @@ list_remove(list_t list, void *item)
         r->next = l->next;
       }
       l->next = NULL;
-      return;
+      return true;
     }
     r = l;
   }
+  return false;
 }
 /*---------------------------------------------------------------------------*/
 /**
