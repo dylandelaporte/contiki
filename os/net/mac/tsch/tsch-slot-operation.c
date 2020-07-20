@@ -798,7 +798,11 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               ack_start_time += tsch_timing[tsch_ts_ack_wait];
 
               if ( RADIO_DELAY_SFD_RX > 0 ) {
+#if TSCH_HW_RECV_BY_PENDING
+                if (!NETSTACK_RADIO.pending_packet())
+#else
                 if (!NETSTACK_RADIO.receiving_packet())
+#endif
                 if (NETSTACK_RADIO.channel_clear() == 0) {
                   /*  use Radio detection via channel_clear since it is at least faster vs
                    *  receiving_packet - in some implementation, it signals at sync complete
@@ -820,7 +824,9 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                           , (ack_len >= 0 )
                          ) );
 
-              if (ack_len <= 0){
+              if (ack_len <= 0)
+              if (NETSTACK_RADIO.receiving_packet())
+              {
                   TSCH_LOG_ADD(tsch_log_message,
                             snprintf(log->message, sizeof(log->message),
                                     "tx ack: tooo long\n") );
@@ -974,6 +980,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
   static linkaddr_t destination_address;
   static int16_t input_index;
   static int input_queue_drop = 0;
+  static int frame_valid = 0;
 
   PT_BEGIN(pt);
 
@@ -1026,15 +1033,19 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
           PT_YIELD(pt);
         }
 
+#if 1 //TSCH_HW_RECV_BY_PENDING
+        packet_seen = NETSTACK_RADIO.pending_packet();
+#else
+        packet_seen = NETSTACK_RADIO.receiving_packet();
+#endif
         /*  use Radio detection via channel_clear since it is at least faster vs
          *  receiving_packet - in some implementation, it signals at sync complete
          *  Sync may add about 1ms (for cc13 50kbps/GPSK2) to final packet signaling
         */
-        packet_seen = (NETSTACK_RADIO.channel_clear() == 0);
-        if( packet_seen )
-            packet_seen = NETSTACK_RADIO.receiving_packet();
-        else
-            current_input = NULL;
+        if(!packet_seen) {
+            //wait Sync until receiving
+            frame_valid = (NETSTACK_RADIO.channel_clear() == 0);
+        }
    }
 
 #else
@@ -1058,18 +1069,18 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       RTIMER_BUSYWAIT_UNTIL_ABS(!(packet_seen = (NETSTACK_RADIO.channel_clear() == 0)),
           current_slot_start, pend_limit);
     }
-    if(packet_seen)
+    frame_valid = packet_seen;
+    if(packet_seen){
         packet_seen = NETSTACK_RADIO.receiving_packet();
-    else
-        current_input = NULL;
+    }
 
     }
 
 #endif
 
-    if (current_input != NULL)
+    if (frame_valid)
     if(!packet_seen) {
-        /* Check if receiving within guard time */
+        /* Check if receiving after Sync */
         const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset]
                                   + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_DETECT
                                   + RADIO_DELAY_SFD_RX /* +Sync len*/
@@ -1106,7 +1117,6 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
     }
 
     if(packet_seen) {
-        static int frame_valid;
         static int header_len;
         static frame802154_t frame;
         radio_value_t radio_last_rssi;
