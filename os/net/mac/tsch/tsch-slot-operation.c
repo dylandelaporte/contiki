@@ -279,8 +279,12 @@ tsch_calculate_channel(struct tsch_asn_t *asn, uint16_t channel_offset)
 /* Timing utility functions */
 
 /* Checks if the current time has passed a ref time + offset. Assumes
- * a single overflow and ref time prior to now. */
-static uint8_t
+ * a single overflow and ref time prior to now.
+ * @return > 0 - missed ref+offset
+ *         == 0 - right at ref+offset
+ *         <0 - not reach ref+offset
+ * */
+static int
 check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t offset, rtimer_clock_t now)
 {
   rtimer_clock_t target = ref_time + offset;
@@ -289,13 +293,13 @@ check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t offset, rtimer_clock_t 
 
   if(now_has_overflowed == target_has_overflowed) {
     /* Both or none have overflowed, just compare now to the target */
-    return target <= now;
+    return now - target;
   } else {
     /* Either now or target of overflowed.
      * If it is now, then it has passed the target.
      * If it is target, then we haven't reached it yet.
      *  */
-    return now_has_overflowed;
+    return ref_time - now;
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -311,7 +315,8 @@ tsch_schedule_slot_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
    * because we can not schedule rtimer less than RTIMER_GUARD in the future */
   int missed = check_timer_miss(ref_time, offset - RTIMER_GUARD, now);
 
-  if(missed) {
+  if(missed>=0) {
+    if ((missed>0) || (RTIMER_GUARD > 0)) // do not warn if right at point
     TSCH_LOG_ADD(tsch_log_message,
                 snprintf(log->message, sizeof(log->message),
                     "!dl-miss %s %d %d",
