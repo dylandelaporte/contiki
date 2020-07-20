@@ -132,6 +132,8 @@ typedef uint_fast16_t tsch_slot_offset_t;
 struct tsch_link *tsch_schedule_get_link_by_timeslot(struct tsch_slotframe *slotframe,
                                         tsch_slot_offset_t timeslot, uint16_t channel_offset);
 
+typedef uint_fast16_t tsch_slot_offset_t;
+
 /**
  * \brief Looks within a slotframe for a first link with a given timeslot
  * \param slotframe The desired slotframe
