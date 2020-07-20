@@ -35,9 +35,9 @@ Engage with the community:
 This fork (brief):
 ============================
 This fork is born in project with TSCH net, star topology.
- 
-Used frequent beacons - about 8/sec, for faster net association. Used multilevel frames - short, and long. This Frames interacts, so that activation short frame depends on long one.
 
+imported and introduced 6top MSF, and NRSF over it.
+ 
 Syncronising with net was optimised by listen beacons as rare as possible, depends on estimation of drift by adaptive sync algorithm. This gives much power consumption economy.
 Therefore in adaptive sync was intoduced hooks on new estimation comes.  
 
@@ -51,31 +51,33 @@ Such work demands some flexibility with encription of links and packets - reaili
 Has imroved cc26xx RFcore-prop driver. 
 Most important - provided power control, that use GLDO during receive. Linear LDO hav eless noise - and gives about 12db for SNR.
 
-Also improved ake system - it now can build in separate dir, and more clever on dependencies, and cache it.
-
 And other little work for core library, etimer and rtimer, cc26xx LPM, SPI ... 
 
-
-This fork improves:
+This fork improves vs Contiki-NG:
 ============================
 
 contiki core improves
 --------------------------------
++ [feature/printf-netaddr] - provide ability for printing net/link-adress via pointer.
+    like linux printk do.
+
++ [speed/inlines] - core optimisation by inlining code
++ [speed/nbr-index-access] - nbr-table inline optimisations
+
 + rtime:
     - [rtimer\_multiple\_access] - PR #1290
     - rtime\_expired() / RTIME\_EXPIRED
 
 + process\_abort() [add-proc-abort]
-
 + [add-net-addrsize4] - allow use 4byte network adress.
 + [fix-rame802154-addrsize] - fixes MAC adress check when LINKADDR_SIZE != 8
 
 + CRC16\_STYLE [add-crc16-lookup8 ] - core crc16 code provided in variants - full soft calculate, or
     via faster table lookup 
 
-+ [fix-assert-cpp ] - fix contiki code vs c++ <assert.h>
-
 + core/lib/ringbuf16index - 16bit ringbiffers
+
++ [fix-assert-cpp ] - fix contiki code vs c++ <assert.h>
 
 + fixes on make system:
     - ![fix-make-deps] - fix make dependences
@@ -85,16 +87,14 @@ contiki core improves
     - [bkozak/build_in_seperate_dir] - PR#1417 We can now set BUILDDIR to build in seperate dir
     - [ivan-alekhin/customrules-fix] - Allow to search "customrules" in additional directories.
     - [fix-make-dotpath] - ommits '.' dir in SOURCEDIRS if one alredy provided PROJECTDIRS
-     
+    - OBJVARIANT variable builds objects into obj.${OBJVARIANT} dir
 
-+ [optimise-list-inlines] - core lists ontimisation by inlining code
++ [feature/debug-os-unstatic] - code preparetions for better debuging.
 
 2) Imported PRs
 -------------------------------
 - PR #2347 [fix-make-dotpath]
 - PR #2338 from tim-ist/bmp_fix
-- [ivan-alekhin/customrules-fix]
-- PR #1417 [bkozak/build\_in\_seperate\_dir] - We can now set BUILDDIR to build in seperate dir
 - [pengi/apps\_from\_platform] - Load platform before apps
 - PR #1265 [bkozak/optomize\_etimer\_implementation] - etimer\_expired\_at, timer\_expired
 - PR #1290 [rtimer\_multiple\_access]
@@ -105,22 +105,21 @@ Work fo Launchpad cc26xx platform:
 - fix SPI driver for LPM system
 - [fix-cc26xx-launchpad-spiclose] allowssome SPI pins maybe assigned as unused 
 - fix UART driver for LPM system
-
-- +[cc26xx-dev-crypto] - add AES128 core driver
-
 - cc1310 RF core:
     * power mode controls allow linear DC for receive [cc26-rf-prop-gldo]
     * fix power on with bad quartz [add-cc26xx-rfosc-timeout]
-    * fixes over RF RAT timer sync vs core clock
+    * RF RAT improved for less cpu usage.
     * RF cores features TSCH\_HW\_FEATURE\_xxx:
         - RF\_CORE\_CONF\_PENDING - a bit styles over pending receiving frames. Introduced RF\_CORE\_PENDING\_READS style - for more relyable pending receiver.
-    * surropt RF prop mode RADIO\_PARAM\_LAST\_RSSI
 
 - RTC CH2 isr hander [cc26xx-add-rtc-isr-ch2]  
 
 - RTIMER\_CONF\_ARCH\_SECOND - provide RTC resolution setup. now tick of RTC can be setup
 
 - [bkozak/add\_rtimer\_multiple\_access] - import PR for rtimer safer work
+
++ [pr/tsch-rx_relaxcpu-prefetch] - deployed `RADIO_DELAY_SFD_RX` constant from 
+    `RADIO_DELAY_BEFORE_TX`, to correct values, that makes drift estimation happy.
 
 3) just a bit fine code:
 -------------------------------
@@ -136,7 +135,25 @@ Work fo Launchpad cc26xx platform:
 
 Work over TSCH net stack
 ============================= 
-introduce configurations:
+introduces to 6top
+------------------------------------
++ MSF - imported MSF service, developed and debuged
++ 6top - some rework on 6top protocol:
+    * provide concurent transactions by rx/tx, sf IDs
+    * fixed some bugs
+    * provide less extensive API `sixp-pkt-ex`
+
+slot strategy
+------------------------------------
++ [pr/tsch-rx_relaxcpu-prefetch] - provides polling radio when receive. This releases 
+    cpu to application between polls. `TSCH_[CONF_]TIMING_POLL_RX_US` enable this mode.
+
+    + also provides control for slot timing styles by prefetching tx. It sufficient when 
+        tx timing of PHY header (`RADIO_DELAY_SFD_RX`) for radio-packet is big, 
+        comparable with RX-guard window.
+        `TSCH_RADIODELAY_PREFETCH_TX` configures prefetching strategy.
+
+configurations:
 ------------------------------------
 
 - TSCH\_CONF\_POLLING\_STYLE - TSCH\_POLLING\_STRONG/RELAXED [tsch-pending-smart]
@@ -166,7 +183,7 @@ TSCH association control [tsch-scan-flex]:
 - TSCH\_CONF\_JOIN\_HOPPING\_START(action) macro - provides user specified action on net join
 - [tsch-scan-handle-radiofail] - fix association hung when radio failes  
 - TSCH\_CONF\_SEQ\_FROMRT - provides initialisation packet seq from RTC [tsch-seq-from-rt]
-- TSCH\_ASSOCIATION\_POLL\_FREQUENCY - when use polling on THSC slot listen, this param set up frequency of rx checks
+
 - fixes on assosianiton proc:
     + [alexrayne-tsch-scan-yelds]
 - add events JOINING/LEAVING\_NETWORK callbacks invoke on coordinator start, disassociate [fix-tsch-cb-leave]     
@@ -188,6 +205,7 @@ more control on scheduler: [tsch-sched-disables]:
 introduce log system:
 ----------------------------------------
 - TSCH\_LOGF configurable macro like PRINTF
+- `TSCH_DBG`  configurable macro to alternative `LOG_DBG`
 - TSCH\_PUTS/PRINTF/ANNOTATE - provide instead global PRINTF
 
 tsch\_queue improves:
@@ -214,12 +232,6 @@ security keys:
 fixes:
 ---------------------------------------
 +! [tsch-fix-slots-stop] - a bit fixes over planing rtimer, when disassociate.
-
-+! [fix-tsch-orchestra-linksel] - a bit fixes on orchestra
-
-+! [fix-tsch-seq-ffff] - fixes for net packet numbers ffff
-
-+ [alexrayne-tsch-slot\_prep\_time] - RTIMER\_GUARD now work on all slot ops, at tsch\_schedule\_slot\_operation. TSCH\_SCHEDULE\_AND\_YIELD now use for accurate positioninig in slot.
 
 
 some code optimisations:
