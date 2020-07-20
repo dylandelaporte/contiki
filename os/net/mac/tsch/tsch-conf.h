@@ -573,6 +573,22 @@ by default, useful in case of duplicate seqno */
 #define TSCH_RADIO_ON_DURING_TIMESLOT 0
 #endif
 
+/* This is level, below that received packets/ack s a droped as unreceived.
+ * Useful for redio-sensitivity tests, or debug radio for long distances
+ * */
+//#define TSCH_RADIO_RSSI_TH_DBM 0
+
+/* ACK signal use for RX statistics.
+ * Useful for connections that are most sends, and rare receives, so only via
+ *      receive ACK can estimate sended RSSI (suggests that itis simmetrical).
+ * This should affects connection stats, andtherefore -> metricrs.
+ * */
+#ifdef TSCH_CONF_ACK_STATS
+#define TSCH_ACK_STATS TSCH_CONF_ACK_STATS
+#else
+#define TSCH_ACK_STATS 0
+#endif
+
 /* ACK timing style:
  * \value 0 - default: old behaviour - where ACK at time position from estimated
  *              packet trasmition time.

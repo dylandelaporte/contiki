@@ -315,8 +315,12 @@ tsch_calculate_channel(struct tsch_asn_t *asn, uint16_t channel_offset)
 /* Timing utility functions */
 
 /* Checks if the current time has passed a ref time + offset. Assumes
- * a single overflow and ref time prior to now. */
-static uint8_t
+ * a single overflow and ref time prior to now.
+ * @return > 0 - missed ref+offset
+ *         == 0 - right at ref+offset
+ *         <0 - not reach ref+offset
+ * */
+static int
 check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t offset, rtimer_clock_t now)
 {
   rtimer_clock_t target = ref_time + offset;
@@ -325,13 +329,13 @@ check_timer_miss(rtimer_clock_t ref_time, rtimer_clock_t offset, rtimer_clock_t 
 
   if(now_has_overflowed == target_has_overflowed) {
     /* Both or none have overflowed, just compare now to the target */
-    return target <= now;
+    return now - target;
   } else {
     /* Either now or target of overflowed.
      * If it is now, then it has passed the target.
      * If it is target, then we haven't reached it yet.
      *  */
-    return now_has_overflowed;
+    return ref_time - now;
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -349,7 +353,8 @@ tsch_schedule_slot_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
   if (RTIMER_CLOCK_LT(ref_time + RTIMER_GUARD, now))
       missed = check_timer_miss(ref_time, offset - RTIMER_GUARD, now);
 
-  if(missed) {
+  if(missed>=0) {
+    if ((missed>0) || (RTIMER_GUARD > 0)) // do not warn if right at point
     TSCH_LOG_ADD(tsch_log_message,
                 snprintf(log->message, sizeof(log->message),
                     "!dl-miss %s %d %d",
@@ -950,7 +955,11 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               ack_start_time += tsch_timing[tsch_ts_ack_wait];
 
               if ( RADIO_DELAY_SFD_RX > 0 ) {
+#if TSCH_HW_RECV_BY_PENDING
+                if (!NETSTACK_RADIO.pending_packet())
+#else
                 if (!NETSTACK_RADIO.receiving_packet())
+#endif
                 if (NETSTACK_RADIO.channel_clear() == 0) {
                   /*  use Radio detection via channel_clear since it is at least faster vs
                    *  receiving_packet - in some implementation, it signals at sync complete
@@ -972,8 +981,9 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                           , (ack_len >= 0 )
                          ) );
 
-              if (ack_len <= 0){
-                  TSCH_LOGF("tx ack: tooo long\n");
+              if (ack_len <= 0)
+              if (NETSTACK_RADIO.receiving_packet())
+              {
                   ack_len = -1;
                   // looks like some noise as on air. need to reser RF receiver to prepare
                   //    for next frame
@@ -1019,6 +1029,21 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               }
               else
                   mac_tx_status = MAC_TX_NOACK;
+
+              if(ack_len > 0) {
+                  radio_value_t radio_last_rssi;
+                  radio_value_t radio_last_lqi;
+
+                  NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &radio_last_rssi);
+                  NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_LINK_QUALITY, &radio_last_lqi);
+                  tsch_stats_rx_packet(current_neighbor, current_input->rssi, radio_last_lqi, tsch_current_channel);
+#ifdef TSCH_RADIO_RSSI_TH_DBM
+                  if (radio_last_rssi < TSCH_RADIO_RSSI_TH_DBM){
+                      ack_len = 0;
+                      TSCH_DBG("tx ack rssi=%d\n", radio_last_rssi);
+                  }
+#endif
+              }
 
               if(ack_len > 0) {
                 if(is_time_source) {
@@ -1183,15 +1208,19 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
           PT_YIELD(pt);
         }
 
+#if 1 //TSCH_HW_RECV_BY_PENDING
+        packet_seen = NETSTACK_RADIO.pending_packet();
+#else
+        packet_seen = NETSTACK_RADIO.receiving_packet();
+#endif
         /*  use Radio detection via channel_clear since it is at least faster vs
          *  receiving_packet - in some implementation, it signals at sync complete
          *  Sync may add about 1ms (for cc13 50kbps/GPSK2) to final packet signaling
         */
-        packet_seen = (NETSTACK_RADIO.channel_clear() == 0);
-        if( packet_seen )
-            packet_seen = NETSTACK_RADIO.receiving_packet();
-        else
-            current_input = NULL;
+        if(!packet_seen) {
+            //wait Sync until receiving
+            frame_valid = (NETSTACK_RADIO.channel_clear() == 0);
+        }
    }
 
 #else
@@ -1215,18 +1244,18 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       RTIMER_BUSYWAIT_UNTIL_ABS(!(packet_seen = (NETSTACK_RADIO.channel_clear() == 0)),
           current_slot_start, pend_limit);
     }
-    if(packet_seen)
+    frame_valid = packet_seen;
+    if(packet_seen){
         packet_seen = NETSTACK_RADIO.receiving_packet();
-    else
-        current_input = NULL;
+    }
 
     }
 
 #endif
 
-    if (current_input != NULL)
+    if (frame_valid)
     if(!packet_seen) {
-        /* Check if receiving within guard time */
+        /* Check if receiving after Sync */
         const unsigned pend_limit = tsch_timing[tsch_ts_rx_offset]
                                   + tsch_timing[tsch_ts_rx_wait] + RADIO_DELAY_BEFORE_DETECT
                                   + RADIO_DELAY_SFD_RX /* +Sync len*/
@@ -1260,14 +1289,21 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
       packet_seen = (current_input->len > 0);
     }
     if(packet_seen) {
-        static int header_len;
-        static frame802154_t frame;
         radio_value_t radio_last_rssi;
-        radio_value_t radio_last_lqi;
 
         NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &radio_last_rssi);
-        current_input->rx_asn = tsch_current_asn;
         current_input->rssi = (signed)radio_last_rssi;
+#ifdef TSCH_RADIO_RSSI_TH_DBM
+        packet_seen = (radio_last_rssi >= TSCH_RADIO_RSSI_TH_DBM);
+        if (!packet_seen)
+            TSCH_DBG("rx drop packet rssi=%d\n", radio_last_rssi);
+#endif
+    }
+    if(packet_seen) {
+        static int header_len;
+        static frame802154_t frame;
+
+        current_input->rx_asn = tsch_current_asn;
         current_input->channel = tsch_current_channel;
 #if TSCH_WITH_LINK_SELECTOR > 1
         current_input->slotframe = current_link->slotframe_handle;
@@ -1438,6 +1474,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 
             /* If the neighbor is known, update its stats */
             if(n != NULL) {
+              radio_value_t radio_last_lqi;
               NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_LINK_QUALITY, &radio_last_lqi);
               tsch_stats_rx_packet(n, current_input->rssi, radio_last_lqi, tsch_current_channel);
             }

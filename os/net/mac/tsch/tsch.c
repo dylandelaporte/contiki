@@ -1009,6 +1009,15 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
         /* Sanity-check the timestamp */
         if(ABS(RTIMER_CLOCK_DIFF(t0, t1)) < 2ul * RTIMER_SECOND) {
+#ifdef TSCH_RADIO_RSSI_TH_DBM
+          radio_value_t radio_last_rssi = 0;
+
+          NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &radio_last_rssi);
+          if (radio_last_rssi < TSCH_RADIO_RSSI_TH_DBM){
+              LOG_INFO("scan drop rssi=%d\n", radio_last_rssi);
+          }
+          else
+#endif
           tsch_associate(input_eb, t0);
         } else {
           LOG_WARN("scan: dropping packet, timestamp too far from current time %u %u\n",
