@@ -22,6 +22,9 @@
 [submodule "tests/18-coap-lwm2m/example-lwm2m-standalone"]
 	path = tests/18-coap-lwm2m/example-lwm2m-standalone
 	url = https://github.com/contiki-ng/example-lwm2m-standalone.git
+[submodule "arch/platform/stm32nucleo-spirit1/stm32cube-lib"]
+	path = arch/platform/stm32nucleo-spirit1/stm32cube-lib
+	url = https://github.com/STclab/stm32nucleo-spirit1-lib
 [submodule "tools/motelist"]
 	path = tools/motelist
 	url = https://github.com/contiki-ng/motelist
