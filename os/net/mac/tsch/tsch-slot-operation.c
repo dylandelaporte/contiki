@@ -879,6 +879,21 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               }
 
               if(ack_len > 0) {
+                  radio_value_t radio_last_rssi;
+                  radio_value_t radio_last_lqi;
+
+                  NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &radio_last_rssi);
+                  NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_LINK_QUALITY, &radio_last_lqi);
+                  tsch_stats_rx_packet(current_neighbor, current_input->rssi, radio_last_lqi, tsch_current_channel);
+#ifdef TSCH_RADIO_RSSI_TH_DBM
+                  if (radio_last_rssi < TSCH_RADIO_RSSI_TH_DBM){
+                      ack_len = 0;
+                      TSCH_DBG("tx ack rssi=%d\n", radio_last_rssi);
+                  }
+#endif
+              }
+
+              if(ack_len > 0) {
                 if(is_time_source) {
                   int32_t eack_time_correction = US_TO_RTIMERTICKS(ack_ies.ie_time_correction);
                   int32_t since_last_timesync = TSCH_ASN_DIFF(tsch_current_asn, last_sync_asn);
@@ -1124,14 +1139,21 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
     }
 
     if(packet_seen) {
-        static int header_len;
-        static frame802154_t frame;
         radio_value_t radio_last_rssi;
-        radio_value_t radio_last_lqi;
 
         NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &radio_last_rssi);
-        current_input->rx_asn = tsch_current_asn;
         current_input->rssi = (signed)radio_last_rssi;
+#ifdef TSCH_RADIO_RSSI_TH_DBM
+        packet_seen = (radio_last_rssi >= TSCH_RADIO_RSSI_TH_DBM);
+        if (!packet_seen)
+            TSCH_DBG("rx drop packet rssi=%d\n", radio_last_rssi);
+#endif
+    }
+    if(packet_seen) {
+        static int header_len;
+        static frame802154_t frame;
+
+        current_input->rx_asn = tsch_current_asn;
         current_input->channel = tsch_current_channel;
         header_len = frame802154_parse((uint8_t *)current_input->payload, current_input->len, &frame);
         frame_valid = header_len > 0 &&
@@ -1260,6 +1282,7 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
 
             /* If the neighbor is known, update its stats */
             if(n != NULL) {
+              radio_value_t radio_last_lqi;
               NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_LINK_QUALITY, &radio_last_lqi);
               tsch_stats_rx_packet(n, current_input->rssi, radio_last_lqi, tsch_current_channel);
             }
