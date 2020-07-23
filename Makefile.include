@@ -90,6 +90,13 @@ PROJECT_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(PROJECT_SOURCEFI
 
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
+# resolves list of pathes ($2) for prefix ($1):
+#  - prefix+path if exist
+#  - path        if exist
+#  - prefix+path - if not exits path 
+resolvedir_prefix = ${foreach d, $(2), ${if ${wildcard $(1)$(d) } , $(1)$(d) , \
+                       $(if ${wildcard $(d) } , $(d) , $(1)$(d) ) } }
+
 ### Include target makefile (TODO Unsafe?)
 
 target_makefile := $(wildcard $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.$(TARGET) \
@@ -231,7 +238,7 @@ else ifeq ($(MAKE_ROUTING),MAKE_ROUTING_NULLROUTING)
   MODULES += $(CONTIKI_NG_ROUTING_DIR)/nullrouting
 endif
 
-MODULEDIRS = $(MODULES_REL) ${addprefix $(CONTIKI)/, $(MODULES)}
+MODULEDIRS = $(MODULES_REL) ${call resolvedir_prefix, $(CONTIKI)/, $(MODULES)}
 UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
 MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
 CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
@@ -287,9 +294,9 @@ CFLAGS += ${addprefix -D,${subst $(COMMA), ,$(DEFINES)}}
 
 ### Setup directory search path for source and header files
 
-CONTIKI_TARGET_DIRS_CONCAT = ${addprefix ${dir $(target_makefile)}, \
+CONTIKI_TARGET_DIRS_CONCAT = ${call resolvedir_prefix, ${dir $(target_makefile)}, \
                                $(CONTIKI_TARGET_DIRS)}
-CONTIKI_CPU_DIRS_CONCAT    = ${addprefix $(CONTIKI_CPU)/, \
+CONTIKI_CPU_DIRS_CONCAT    = ${call resolvedir_prefix, $(CONTIKI_CPU)/, \
                                $(CONTIKI_CPU_DIRS)}
 
 SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
