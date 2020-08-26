@@ -180,9 +180,6 @@ static int32_t drift_correction = 0;
 /* Is drift correction used? (Can be true even if drift_correction == 0) */
 static uint8_t is_drift_correction_used;
 
-/* The neighbor last used as our time source */
-struct tsch_neighbor *last_timesource_neighbor = NULL;
-
 /* Used from tsch_slot_operation and sub-protothreads */
 static rtimer_clock_t volatile current_slot_start;
 
