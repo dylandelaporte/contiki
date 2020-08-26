@@ -46,7 +46,12 @@
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "sys/int-master.h"
+
+#ifdef CMSIS_CONF_HEADER_PATH
+#include CMSIS_CONF_HEADER_PATH
+#else
 #include "cc13x0-cc26x0-cm3.h"
+#endif
 
 #include "ti-lib.h"
 
