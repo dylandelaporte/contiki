@@ -65,11 +65,14 @@
 typedef union uip_ip4addr_t {
   uint8_t  u8[4];                       /* Initializer, must come first. */
   uint16_t u16[2];
+  uint32_t u32[1];
 } uip_ip4addr_t;
 
 typedef union uip_ip6addr_t {
   uint8_t  u8[16];                      /* Initializer, must come first. */
   uint16_t u16[8];
+  uint32_t u32[2];
+  //uint64_t u64; //not use it, to allow aligning with 32bit
 } uip_ip6addr_t;
 
 #if NETSTACK_CONF_WITH_IPV6

@@ -1422,6 +1422,7 @@ extern const uip_ipaddr_t uip_hostaddr, uip_netmask, uip_draddr;
 #else /* UIP_FIXEDADDR */
 extern uip_ipaddr_t uip_hostaddr, uip_netmask, uip_draddr;
 #endif /* UIP_FIXEDADDR */
+// legacy
 extern const uip_ipaddr_t uip_broadcast_addr;
 extern const uip_ipaddr_t uip_all_zeroes_addr;
 

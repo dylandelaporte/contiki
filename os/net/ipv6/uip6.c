@@ -123,6 +123,16 @@ uint16_t uip_ext_len = 0;
 /** \brief The final protocol after IPv6 extension headers:
   * UIP_PROTO_TCP, UIP_PROTO_UDP or UIP_PROTO_ICMP6 */
 uint8_t uip_last_proto = 0;
+
+const uip_ipaddr_t uip_broadcast_addr =
+#if NETSTACK_CONF_WITH_IPV6
+  { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
+#else /* NETSTACK_CONF_WITH_IPV6 */
+  { { 0xff, 0xff, 0xff, 0xff } };
+#endif /* NETSTACK_CONF_WITH_IPV6 */
+const uip_ipaddr_t uip_all_zeroes_addr = { { 0x0, /* rest is 0 */ } };
+
 /** @} */
 
 /*---------------------------------------------------------------------------*/
