@@ -67,6 +67,12 @@
 #else
 #define PRINTF(...)
 #endif
+
+#if 0
+#define INFO(...) PRINTF(__VA_ARGS__)
+#else
+#define INFO(...)
+#endif
 /*---------------------------------------------------------------------------*/
 #ifdef RF_CORE_CONF_DEBUG_CRC
 #define RF_CORE_DEBUG_CRC RF_CORE_CONF_DEBUG_CRC
@@ -169,7 +175,10 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
       is_radio_op = true;
       ((rfc_radioOp_t *)cmd)->status = RF_CORE_RADIO_OP_STATUS_IDLE;
     }
+    INFO("radio:start op$%x\n", ((rfc_command_t *)cmd)->commandNo);
   }
+  else
+    INFO("radio:start cmd$%x\n", (unsigned)cmd);
 
   /*
    * Make sure ContikiMAC doesn't turn us off from within an interrupt while
@@ -213,6 +222,8 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
    * If we reach here the command is no longer pending. It is either completed
    * successfully or with error
    */
+  INFO("radio:finish cmd$%x ok$%x\n"
+              , ((rfc_radioOp_t *)cmd)->commandNo, (unsigned)rf_core_last_cmd_status);
   return (*status & RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_DONE;
 }
 /*---------------------------------------------------------------------------*/
@@ -697,6 +708,7 @@ PROCESS_THREAD(rf_core_process, ev, data)
       packetbuf_clear();
       len = NETSTACK_RADIO.read(packetbuf_dataptr(), PACKETBUF_SIZE);
 
+      INFO("RF<%d\n", len);
       if(len > 0) {
         packetbuf_set_datalen(len);
 
