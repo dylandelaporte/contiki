@@ -625,10 +625,10 @@ $(info proj:$(PROJECT_SOURCEFILES))
 $(info obj:$(PROJECT_OBJECTFILES))
 endif
 
+endif
+
 # this objects need for debuger, and need for quick rebuild
 .PRECIOUS: $(OBJECTDIR)/%.o $(PROJECT_OBJECTFILES) 
-
-endif
 
 %.$(TARGET): $(BUILD_DIR_BOARD)/%.$(TARGET)
 	$(TRACE_CP)
