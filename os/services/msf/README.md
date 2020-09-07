@@ -39,3 +39,23 @@ See `msf.h`, which has all the configuration parameters.
 
 * EBs and DIOs can be transmitted by a node which doesn't have a
    negotiated TX cell to its parent.
+
+## improvements vs base Contiki-NG implementation
+
++ `msf-avoid` module - register of all used cells, local and at nbrs.
+
++ reserving cells take to account avoid cells. it now smarter - can allocate 
+    cells in single slot on different chanels.
+
++ relocate slot action now provide variant - only migrate chanel, if no one slot
+    avail.
+
++ detection of autonomous cells to parent conflicts with any other cells.
+    This sutiation forces negotiate RX/TX cell to parent.
+
++ `msf-negotiated` gives hooks `MSF_AFTER_CELL_USE/RELESE`, `MSF_ON_NEW_NBR`
+
++ `nrsf` protocol service - spreads used/leaved cells over nbrs, and updates 
+    local avoid register.
+
++ timeout for operations with parent now slit from other nbrs.
