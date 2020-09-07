@@ -197,10 +197,10 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
   do {
     *status = HWREG(RFC_DBELL_BASE + RFC_DBELL_O_CMDSTA);
     if(++timeout_count > 50000) {
-      PRINTF("rf_core_send_cmd: 0x%08lx Timeout\n", cmd);
       if(!interrupts_disabled) {
         ti_lib_int_master_enable();
       }
+      PRINTF("rf_core_send_cmd: 0x%08lx Timeout\n", cmd);
       return RF_CORE_CMD_ERROR;
     }
   } while((*status & RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_PENDING);
