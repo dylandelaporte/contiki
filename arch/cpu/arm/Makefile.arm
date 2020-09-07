@@ -17,6 +17,9 @@ NM       = arm-none-eabi-nm
 SIZE     = arm-none-eabi-size
 SREC_CAT = srec_cat
 
+HAVE_SREC_CAT := $(shell $(SREC_CAT) --VERS && echo 1)
+
+
 CFLAGS += -mthumb -mabi=aapcs -mlittle-endian
 CFLAGS += -Wall
 CFLAGS += -std=c99
@@ -63,15 +66,21 @@ OUT_BIN = $(BUILD_DIR_BOARD)/%.bin
 OUT_LST = $(BUILD_DIR_BOARD)/%.lst
 
 ### Don't treat the following files as intermediate
-.PRECIOUS: $(OUT_ELF) $(OUT_HEX) $(OUT_BIN)
+.PRECIOUS: $(OUT_ELF) $(OUT_HEX) $(OUT_BIN) $(OUT_LST)
 
 $(OUT_I16HEX): $(OUT_ELF)
 	$(TRACE_OBJCOPY)
 	$(Q)$(OBJCOPY) -O ihex $< $@
 
+ifeq ($(HAVE_SREC_CAT),1)
 $(OUT_HEX): $(OUT_I16HEX)
 	$(TRACE_SREC_CAT)
-	$(Q)$(SREC_CAT) $< -intel -o $@ -intel
+	$(Q)$(SREC_CAT) --VERS && $(SREC_CAT) $< -intel -o $@ -intel
+else
+$(OUT_HEX): $(OUT_ELF)
+	$(TRACE_SREC_CAT)
+	@echo "need srec tool for it"
+endif
 
 $(OUT_BIN): $(OUT_ELF)
 	$(TRACE_OBJCOPY)
@@ -80,6 +89,8 @@ $(OUT_BIN): $(OUT_ELF)
 $(OUT_LST): $(OUT_ELF)
 	$(TRACE_OBJDUMP)
 	$(Q)$(OBJDUMP) $(OBJDUMP_FLAGS) $< > $@
+
+CUSTOM_RULE_LINK = 1
 
 ### We don't really need the .hex and .bin for the .$(TARGET) but let's make
 ### sure they get built
