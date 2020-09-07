@@ -67,6 +67,14 @@
 #define PACKETBUF_SIZE 128
 #endif
 
+// @brief PACKETBUF_CONF_ATTRS_INLINE values
+//< enable inlines for trivial functions
+#define PACKETBUF_ATTRS_INLINE_SMALL    1
+//< enable inlines for small functions to faster code
+#define PACKETBUF_ATTRS_INLINE_FAST     2
+
+
+
 /**
  * \brief      Clear and reset the packetbuf
  *
@@ -87,21 +95,37 @@ void packetbuf_clear(void);
  *             or referenced to an external location.
  *
  */
-void *packetbuf_dataptr(void);
+static inline
+void* packetbuf_dataptr(void){
+    extern uint8_t* packetbuf_data;
+    return  packetbuf_data;
+}
 
 /**
  * \brief      Get a pointer to the header in the packetbuf, for outbound packets
  * \return     Pointer to the packetbuf header
  *
  */
-void *packetbuf_hdrptr(void);
+static inline
+void* packetbuf_hdrptr(void){
+    extern uint32_t packetbuf_aligned[];
+    return (void*)packetbuf_aligned;
+}
 
 /**
  * \brief      Get the length of the header in the packetbuf
  * \return     Length of the header in the packetbuf
  *
  */
+#if PACKETBUF_CONF_ATTRS_INLINE < PACKETBUF_ATTRS_INLINE_FAST
 uint8_t packetbuf_hdrlen(void);
+#else
+static inline
+uint8_t packetbuf_hdrlen(void){
+    extern uint8_t* packetbuf_data;
+    return (packetbuf_data- (uint8_t*)packetbuf_hdrptr());
+}
+#endif
 
 
 /**
@@ -109,14 +133,22 @@ uint8_t packetbuf_hdrlen(void);
  * \return     Length of the data in the packetbuf
  *
  */
-uint16_t packetbuf_datalen(void);
+static inline
+uint16_t packetbuf_datalen(void){
+    extern uint16_t packetbuf_buflen;
+    return packetbuf_buflen;
+}
 
 /**
  * \brief      Get the total length of the header and data in the packetbuf
  * \return     Length of data and header in the packetbuf
  *
  */
-uint16_t packetbuf_totlen(void);
+static inline
+uint_fast16_t packetbuf_totlen(void){
+    extern uint_fast16_t packetbuf_len;
+    return packetbuf_len;
+}
 
 /**
  * \brief      Get the total length of the remaining space in the packetbuf
@@ -129,7 +161,7 @@ uint16_t packetbuf_remaininglen(void);
  * \brief      Set the length of the data in the packetbuf
  * \param len  The length of the data
  */
-void packetbuf_set_datalen(uint16_t len);
+void packetbuf_set_datalen(unsigned len);
 
 /**
  * \brief      Copy from external data into the packetbuf
