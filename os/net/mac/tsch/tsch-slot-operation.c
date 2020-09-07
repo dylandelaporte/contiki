@@ -352,11 +352,9 @@ tsch_schedule_slot_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
 
   if(missed>=0) {
     if ((missed>0) || (RTIMER_GUARD > 0)) // do not warn if right at point
-    TSCH_LOG_ADD(tsch_log_message,
-                snprintf(log->message, sizeof(log->message),
-                    "!dl-miss %s %d %d",
-                        str, (int)(now-ref_time), (int)offset);
-    );
+    TSCH_LOGF("!dl-miss %s %u+%d != %u (+%d) \n",   str
+              , ref_time, (int)offset, now, (int)(now-ref_time)
+              );
 
     return 0;
   }
@@ -1743,6 +1741,7 @@ tsch_slot_operation_start(void)
     current_slot_start += time_to_next_active_slot;
     // forced use RF power prefetch, to ensure if RF powered off.
     time_to_next_active_slot = tsch_next_slot_prefetched_time(time_to_next_active_slot);
+    TSCH_LOGF("start: from %d -> %d\n", prev_slot_start, time_to_next_active_slot);
   } while(!tsch_schedule_slot_operation(&tsch_slot_operation_timer, prev_slot_start, time_to_next_active_slot, "association"));
 }
 /*---------------------------------------------------------------------------*/
