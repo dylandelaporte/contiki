@@ -525,7 +525,7 @@ void msf_unuse_cleanup(){
             continue;
         int k = idx;
         for (; k > 0; --k){
-            if (cell[-1].raw != cellFREE)
+            if ( cell[idx-1].raw != cellFREE)
                 break;
         }
         memmove(cell+k, cell+idx, sizeof(cell[0])*(avoids_list_num-idx) );
