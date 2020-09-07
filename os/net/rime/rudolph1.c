@@ -103,7 +103,7 @@ format_data(struct rudolph1_conn *c, int chunk)
   struct rudolph1_datapacket *p;
   
   packetbuf_clear();
-  p = packetbuf_dataptr();
+  p = (struct rudolph1_datapacket*)packetbuf_dataptr();
   p->h.type = TYPE_DATA;
   p->h.version = c->version;
   p->h.chunk = chunk;
@@ -139,7 +139,7 @@ send_nack(struct rudolph1_conn *c)
   struct rudolph1_hdr *hdr;
   packetbuf_clear();
   packetbuf_hdralloc(sizeof(struct rudolph1_hdr));
-  hdr = packetbuf_hdrptr();
+  hdr = (struct rudolph1_hdr*)packetbuf_hdrptr();
 
   hdr->type = TYPE_NACK;
   hdr->version = c->version;
@@ -207,7 +207,7 @@ static void
 recv_trickle(struct trickle_conn *trickle)
 {
   struct rudolph1_conn *c = (struct rudolph1_conn *)trickle;
-  struct rudolph1_datapacket *p = packetbuf_dataptr();
+  struct rudolph1_datapacket *p = (struct rudolph1_datapacket*)packetbuf_dataptr();
 
   if(p->h.type == TYPE_DATA) {
     PRINTF("%d.%d: received trickle with chunk %d\n",
@@ -236,7 +236,7 @@ recv_ipolite(struct ipolite_conn *ipolite, const linkaddr_t *from)
 {
   struct rudolph1_conn *c = (struct rudolph1_conn *)
     ((char *)ipolite - offsetof(struct rudolph1_conn, ipolite));
-  struct rudolph1_datapacket *p = packetbuf_dataptr();
+  struct rudolph1_datapacket *p = (struct rudolph1_datapacket*)packetbuf_dataptr();
 
   PRINTF("%d.%d: Got ipolite type %d\n",
 	 linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1],

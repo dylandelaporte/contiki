@@ -54,15 +54,27 @@ struct packetbuf_attr packetbuf_attrs[PACKETBUF_NUM_ATTRS];
 struct packetbuf_addr packetbuf_addrs[PACKETBUF_NUM_ADDRS];
 
 
-static uint16_t buflen, bufptr;
-static uint8_t hdrlen;
+//    [   packet buf                                   ]
+//    [                   |      origin data packet    ]
+//    [ <header allocate  | hdr remove >|  rest data   ]
+//    ^                   ^             ^              ^
+//    packetbuf      +hlen|            data     +buflen|
+//    |                                            +len|
+uint16_t packetbuf_buflen;
+uint8_t  packetbuf_hlen;
+#define buflen  packetbuf_buflen
+#define hdrlen  packetbuf_hlen
 
 /* The declarations below ensure that the packet buffer is aligned on
    an even 32-bit boundary. On some platforms (most notably the
    msp430 or OpenRISC), having a potentially misaligned packet buffer may lead to
    problems when accessing words. */
-static uint32_t packetbuf_aligned[(PACKETBUF_SIZE + 3) / 4];
-static uint8_t *packetbuf = (uint8_t *)packetbuf_aligned;
+uint32_t packetbuf_aligned[(PACKETBUF_SIZE + 3) / 4];
+uint8_t *packetbuf_store = (uint8_t *)packetbuf_aligned;
+#define packetbuf   ((uint8_t *)packetbuf_aligned)
+
+uint8_t*      packetbuf_data;
+uint_fast16_t packetbuf_len;
 
 #undef DEBUG
 #define DEBUG 0
@@ -77,8 +89,11 @@ static uint8_t *packetbuf = (uint8_t *)packetbuf_aligned;
 void
 packetbuf_clear(void)
 {
-  buflen = bufptr = 0;
+  //bufptr = 0;
   hdrlen = 0;
+  buflen = 0;
+  packetbuf_len = 0;
+  packetbuf_data = packetbuf;
 
   packetbuf_attr_clear();
 }
@@ -86,13 +101,14 @@ packetbuf_clear(void)
 int
 packetbuf_copyfrom(const void *from, uint16_t len)
 {
-  uint16_t l;
+  uint16_t L;
 
   packetbuf_clear();
-  l = MIN(PACKETBUF_SIZE, len);
-  memcpy(packetbuf, from, l);
-  buflen = l;
-  return l;
+  L = MIN(PACKETBUF_SIZE, len);
+  memcpy(packetbuf, from, L);
+  buflen = L;
+  packetbuf_len = L;
+  return L;
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -109,17 +125,15 @@ packetbuf_copyto(void *to)
 int
 packetbuf_hdralloc(int size)
 {
-  int16_t i;
-
   if(size + packetbuf_totlen() > PACKETBUF_SIZE) {
     return 0;
   }
 
   /* shift data to the right */
-  for(i = packetbuf_totlen() - 1; i >= 0; i--) {
-    packetbuf[i + size] = packetbuf[i];
-  }
+  memmove(&packetbuf[size], packetbuf, packetbuf_totlen());
   hdrlen += size;
+  packetbuf_data += size;
+  packetbuf_len += size;
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -130,56 +144,37 @@ packetbuf_hdrreduce(int size)
     return 0;
   }
 
-  bufptr += size;
+  packetbuf_data += size;
   buflen -= size;
   return 1;
 }
 /*---------------------------------------------------------------------------*/
 void packetbuf_compact(void)
 {
-  if(bufptr) {
+  int bufptr = packetbuf_hdrlen() - hdrlen;
+  if(bufptr > 0) {
     /* shift data to the left */
-    memmove(&packetbuf[hdrlen], &packetbuf[packetbuf_hdrlen()], buflen);
-    bufptr = 0;
+    memmove(&packetbuf[hdrlen], packetbuf_data, buflen);
+    packetbuf_data = &packetbuf[hdrlen];
+    packetbuf_len -= bufptr;
   }
 }
 /*---------------------------------------------------------------------------*/
-void
-packetbuf_set_datalen(uint16_t len)
+void packetbuf_set_datalen(unsigned len)
 {
   PRINTF("packetbuf_set_len: len %d\n", len);
   buflen = len;
+  packetbuf_len = packetbuf_hdrlen() + len;
 }
 /*---------------------------------------------------------------------------*/
-void *
-packetbuf_dataptr(void)
-{
-  return packetbuf + packetbuf_hdrlen();
-}
-/*---------------------------------------------------------------------------*/
-void *
-packetbuf_hdrptr(void)
-{
-  return packetbuf;
-}
-/*---------------------------------------------------------------------------*/
-uint16_t
-packetbuf_datalen(void)
-{
-  return buflen;
-}
-/*---------------------------------------------------------------------------*/
+#if PACKETBUF_CONF_ATTRS_INLINE < PACKETBUF_ATTRS_INLINE_FAST
 uint8_t
 packetbuf_hdrlen(void)
 {
-  return bufptr + hdrlen;
+  return (packetbuf_data-packetbuf); //-bufptr;
+  //return bufptr + hdrlen;
 }
-/*---------------------------------------------------------------------------*/
-uint16_t
-packetbuf_totlen(void)
-{
-  return packetbuf_hdrlen() + packetbuf_datalen();
-}
+#endif
 /*---------------------------------------------------------------------------*/
 uint16_t
 packetbuf_remaininglen(void)

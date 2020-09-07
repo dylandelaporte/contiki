@@ -67,7 +67,7 @@ static void
 received(struct runicast_conn *uc, const linkaddr_t *from, uint8_t seqno)
 {
   struct rmh_conn *c = (struct rmh_conn *)uc;
-  struct data_hdr *msg = packetbuf_dataptr();
+  struct data_hdr *msg = (struct data_hdr*)packetbuf_dataptr();
   linkaddr_t *nexthop;
 
   PRINTF("data_packet_received from %d.%d towards %d.%d len %d\n", 
@@ -146,7 +146,7 @@ rmh_send(struct rmh_conn *c, linkaddr_t *to, uint8_t num_rexmit, uint8_t max_hop
 
     
     if(packetbuf_hdralloc(sizeof(struct data_hdr))) {
-      hdr = packetbuf_hdrptr();
+      hdr = (struct data_hdr*)packetbuf_hdrptr();
       linkaddr_copy(&hdr->dest, to);
       linkaddr_copy(&hdr->originator, &linkaddr_node_addr);
       hdr->hops = 1;

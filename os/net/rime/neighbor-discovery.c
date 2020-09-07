@@ -81,7 +81,7 @@ send_adv(void *ptr)
 
   packetbuf_clear();
   packetbuf_set_datalen(sizeof(struct adv_msg));
-  hdr = packetbuf_dataptr();
+  hdr = (struct adv_msg*)packetbuf_dataptr();
   hdr->val = c->val;
   broadcast_send(&c->c);
   if(c->u->sent) {

@@ -101,7 +101,7 @@ send_adv(void *ptr)
   struct announcement *a;
 
   packetbuf_clear();
-  adata = packetbuf_dataptr();
+  adata = (struct announcement_msg*)packetbuf_dataptr();
   adata->num = 0;
   for(a = announcement_list(); a != NULL && a->has_value; a = list_item_next(a)) {
     adata->data[adata->num].id = a->id;

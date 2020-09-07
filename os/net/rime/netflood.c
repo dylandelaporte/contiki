@@ -163,7 +163,7 @@ int
 netflood_send(struct netflood_conn *c, uint8_t seqno)
 {
   if(packetbuf_hdralloc(sizeof(struct netflood_hdr))) {
-    struct netflood_hdr *hdr = packetbuf_hdrptr();
+    struct netflood_hdr *hdr = (struct netflood_hdr *)packetbuf_hdrptr();
     linkaddr_copy(&hdr->originator, &linkaddr_node_addr);
     linkaddr_copy(&c->last_originator, &hdr->originator);
     c->last_originator_seqno = hdr->originator_seqno = seqno;

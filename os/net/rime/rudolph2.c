@@ -112,7 +112,7 @@ format_data(struct rudolph2_conn *c, int chunk)
   int len;
   
   packetbuf_clear();
-  hdr = packetbuf_dataptr();
+  hdr = (struct rudolph2_hdr*)packetbuf_dataptr();
   hdr->type = TYPE_DATA;
   hdr->hops_from_base = c->hops_from_base;
   hdr->version = c->version;
@@ -172,7 +172,7 @@ send_nack(struct rudolph2_conn *c)
   struct rudolph2_hdr *hdr;
   packetbuf_clear();
   packetbuf_hdralloc(sizeof(struct rudolph2_hdr));
-  hdr = packetbuf_hdrptr();
+  hdr = (struct rudolph2_hdr*)packetbuf_hdrptr();
 
   hdr->hops_from_base = c->hops_from_base;
   hdr->type = TYPE_NACK;
@@ -290,7 +290,7 @@ static void
 recv(struct polite_conn *polite)
 {
   struct rudolph2_conn *c = (struct rudolph2_conn *)polite;
-  struct rudolph2_hdr *hdr = packetbuf_dataptr();
+  struct rudolph2_hdr *hdr = (struct rudolph2_hdr*)packetbuf_dataptr();
 
   /* Only accept NACKs from nodes that are farther away from the base
      than us. */

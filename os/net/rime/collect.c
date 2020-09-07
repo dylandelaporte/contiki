@@ -882,7 +882,7 @@ send_ack(struct collect_conn *tc, const linkaddr_t *to, int flags)
 
   packetbuf_clear();
   packetbuf_set_datalen(sizeof(struct ack_msg));
-  ack = packetbuf_dataptr();
+  ack = (struct ack_msg*)packetbuf_dataptr();
   memset(ack, 0, sizeof(struct ack_msg));
   ack->rtmetric = tc->rtmetric;
   ack->flags = flags;

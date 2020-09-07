@@ -59,7 +59,7 @@ read_data(struct rucb_conn *c)
   packetbuf_clear();
   if(c->u->read_chunk) {
     len = c->u->read_chunk(c, c->chunk * RUCB_DATASIZE,
-			    packetbuf_dataptr(), RUCB_DATASIZE);
+			    (char*)packetbuf_dataptr(), RUCB_DATASIZE);
   }
   packetbuf_set_datalen(len);
   return len;
@@ -113,7 +113,7 @@ recv(struct runicast_conn *ruc, const linkaddr_t *from, uint8_t seqno)
 
   if(linkaddr_cmp(&c->sender, &linkaddr_null)) {
     linkaddr_copy(&c->sender, from);
-    c->u->write_chunk(c, 0, RUCB_FLAG_NEWFILE, packetbuf_dataptr(), 0);
+    c->u->write_chunk(c, 0, RUCB_FLAG_NEWFILE, (char*)packetbuf_dataptr(), 0);
     c->chunk = 0;
   }
 
@@ -126,10 +126,10 @@ recv(struct runicast_conn *ruc, const linkaddr_t *from, uint8_t seqno)
 	     linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1],
 	     datalen);
       c->u->write_chunk(c, c->chunk * RUCB_DATASIZE,
-			 RUCB_FLAG_LASTCHUNK, packetbuf_dataptr(), datalen);
+			 RUCB_FLAG_LASTCHUNK, (char*)packetbuf_dataptr(), datalen);
     } else {
       c->u->write_chunk(c, c->chunk * RUCB_DATASIZE,
-			RUCB_FLAG_NONE, packetbuf_dataptr(), datalen);
+			RUCB_FLAG_NONE, (char*)packetbuf_dataptr(), datalen);
     }
     c->chunk++;
   }

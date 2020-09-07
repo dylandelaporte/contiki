@@ -90,7 +90,7 @@ send_rreq(struct route_discovery_conn *c, const linkaddr_t *dest)
   dest = &dest_copy;
 
   packetbuf_clear();
-  msg = packetbuf_dataptr();
+  msg = ( struct route_msg*)packetbuf_dataptr();
   packetbuf_set_datalen(sizeof(struct route_msg));
 
   msg->pad = 0;
@@ -112,7 +112,7 @@ send_rrep(struct route_discovery_conn *c, const linkaddr_t *dest)
 
   packetbuf_clear();
   dest = &saved_dest;
-  rrepmsg = packetbuf_dataptr();
+  rrepmsg = (struct rrep_hdr*)packetbuf_dataptr();
   packetbuf_set_datalen(sizeof(struct rrep_hdr));
   rrepmsg->hops = 0;
   linkaddr_copy(&rrepmsg->dest, dest);
@@ -163,7 +163,7 @@ insert_route(const linkaddr_t *originator, const linkaddr_t *last_hop,
 static void
 rrep_packet_received(struct unicast_conn *uc, const linkaddr_t *from)
 {
-  struct rrep_hdr *msg = packetbuf_dataptr();
+  struct rrep_hdr *msg = (struct rrep_hdr*)packetbuf_dataptr();
   struct route_entry *rt;
   linkaddr_t dest;
   struct route_discovery_conn *c = (struct route_discovery_conn *)
@@ -215,7 +215,7 @@ static int
 rreq_packet_received(struct netflood_conn *nf, const linkaddr_t *from,
 		     const linkaddr_t *originator, uint8_t seqno, uint8_t hops)
 {
-  struct route_msg *msg = packetbuf_dataptr();
+  struct route_msg *msg = (struct route_msg*)packetbuf_dataptr();
   struct route_discovery_conn *c = (struct route_discovery_conn *)
     ((char *)nf - offsetof(struct route_discovery_conn, rreqconn));
 
