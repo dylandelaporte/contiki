@@ -1120,7 +1120,7 @@ static
 int nrsf_cells_to_all_nbrs(tsch_neighbor_t *skip_nbr, SIXPCellsPkt* cells, nbr_op f
                             , const char* info)
 {
-    if (cells->cells[-1].raw == nrsfOPS_CLEAN)
+    if (sixp_pkt_cells_rawhead(cells) == nrsfOPS_CLEAN)
         return 0;
     if (cells->head.num_cells <= 0)
         return 0;
@@ -1229,7 +1229,7 @@ int nrsf_release_cells_by_nbr(tsch_neighbor_t *nbr, SIXPCellsPkt* cells){
 
 int nrsf_notify_cells_2nbr(tsch_neighbor_t *nbr, SIXPCellsPkt* cells){
     LOG_DBG("nrsf_notify_cells_2nbr\n");
-    if (cells->cells[-1].raw == nrsfOPS_CLEAN)
+    if (sixp_pkt_cells_rawhead(cells) == nrsfOPS_CLEAN)
         return 0;
     if (cells->head.num_cells <= 0)
         return 0;
