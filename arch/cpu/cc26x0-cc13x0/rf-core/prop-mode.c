@@ -440,7 +440,7 @@ prop_div_radio_setup(void)
   }
 
   /* Wait until radio setup is done */
-  if(rf_core_wait_cmd_done(cmd) != RF_CORE_CMD_OK) {
+  if(rf_core_wait_cmd_done(cmd) == RF_CORE_CMD_ERROR) {
     PRINTF("prop_div_radio_setup: DIV_SETUP wait, CMDSTA=0x%08lx,"
            "status=0x%04x\n", cmd_status, cmd->status);
     return RF_CORE_CMD_ERROR;
@@ -555,7 +555,7 @@ rx_off_prop(void)
   RTIMER_BUSYWAIT_UNTIL(!transmitting(), RF_CORE_TX_FINISH_TIMEOUT);
 
   /* Send a CMD_ABORT command to RF Core */
-  if(rf_core_send_cmd(CMDR_DIR_CMD(CMD_ABORT), &cmd_status) != RF_CORE_CMD_OK) {
+  if(rf_core_send_cmd(CMDR_DIR_CMD(CMD_ABORT), &cmd_status) == RF_CORE_CMD_ERROR) {
     PRINTF("rx_off_prop: CMD_ABORT status=0x%08lx\n", cmd_status);
     /* Continue nonetheless */
   }
@@ -599,7 +599,7 @@ prop_fs(void)
   rfc_radioOp_t *cmd = (rfc_radioOp_t *)&smartrf_settings_cmd_fs;
 
   /* Send the command to the RF Core */
-  if(rf_core_send_cmd((uint32_t)cmd, &cmd_status) != RF_CORE_CMD_OK) {
+  if(rf_core_send_cmd((uint32_t)cmd, &cmd_status) == RF_CORE_CMD_ERROR) {
     PRINTF("prop_fs: CMD_FS, CMDSTA=0x%08lx, status=0x%04x\n",
            cmd_status, cmd->status);
     return RF_CORE_CMD_ERROR;
@@ -663,9 +663,16 @@ init(void)
 {
   lpm_register_module(&prop_lpm_module);
 
-  if(ti_lib_chipinfo_chip_family_is_cc13xx() == false) {
+  if(   (ti_lib_chipinfo_chip_family_is_cc13xx() == false)
+     && (ti_lib_chipinfo_chip_family_is_cc26xx() == false)
+     )
+  {
     return RF_CORE_CMD_ERROR;
   }
+
+  //* if CPU reset during radio active, ensure radio is downed, to avoid
+  //    concurent access to uninitialised buffers
+  rf_core_power_down();
 
   /* Initialise RX buffers */
   memset(rx_buf, 0, sizeof(rx_buf));
@@ -1168,10 +1175,30 @@ on(void)
     return RF_CORE_CMD_ERROR;
   }
 
-  if (rx_on_prop() == RF_CORE_CMD_OK) {
+  if (rx_on_prop() != RF_CORE_CMD_ERROR) {
     rf_status = 1;
     return RF_CORE_CMD_OK;
   }
+
+  if ((rf_core_cmd_status()& RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_SCHEDULING_ERR){
+      //looks there was alredy pended command of radio, but app expects radio
+      //    is turn on, and ready. So, abort any commans, and retry setup.
+
+      /* Send a CMD_ABORT command to RF Core */
+      if( rf_core_start_cmd(CMDR_DIR_CMD(CMD_ABORT)) == RF_CORE_CMD_ERROR) {
+        PRINTF_FAIL("on: CMD_ABORT status=0x%08lx\n", rf_core_cmd_status());
+        /* Continue nonetheless */
+        return RF_CORE_CMD_ERROR;
+      }
+
+      // retry setup online
+      if (soft_on_prop()  != RF_CORE_CMD_ERROR) {
+        rf_status = 1;
+        return RF_CORE_CMD_OK;
+      }
+      PRINTF_FAIL("on: retry with status=0x%08lx\n", rf_core_cmd_status());
+  }
+
   return RF_CORE_CMD_ERROR;
 }
 /*---------------------------------------------------------------------------*/
