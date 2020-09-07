@@ -156,8 +156,9 @@ rf_core_is_accessible()
   return RF_CORE_NOT_ACCESSIBLE;
 }
 /*---------------------------------------------------------------------------*/
-uint_fast8_t
-rf_core_send_cmd(uint32_t cmd, uint32_t *status)
+//rf_core_send_cmd(uint32_t cmd, uint32_t *status)
+uint32_t rf_core_last_cmd_status;
+uint_fast8_t rf_core_start_cmd(uint32_t cmd)
 {
   uint32_t timeout_count = 0;
   bool interrupts_disabled;
@@ -204,7 +205,7 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
 
   HWREG(RFC_DBELL_BASE + RFC_DBELL_O_CMDR) = cmd;
   do {
-    *status = HWREG(RFC_DBELL_BASE + RFC_DBELL_O_CMDSTA);
+    rf_core_last_cmd_status = HWREG(RFC_DBELL_BASE + RFC_DBELL_O_CMDSTA);
     if(++timeout_count > 50000) {
       if(!interrupts_disabled) {
         ti_lib_int_master_enable();
@@ -212,7 +213,7 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
       PRINTF("rf_core_send_cmd: 0x%08lx Timeout\n", cmd);
       return RF_CORE_CMD_ERROR;
     }
-  } while((*status & RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_PENDING);
+  } while((rf_core_last_cmd_status & RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_PENDING);
 
   if(!interrupts_disabled) {
     ti_lib_int_master_enable();
@@ -222,9 +223,7 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
    * If we reach here the command is no longer pending. It is either completed
    * successfully or with error
    */
-  INFO("radio:finish cmd$%x ok$%x\n"
-              , ((rfc_radioOp_t *)cmd)->commandNo, (unsigned)rf_core_last_cmd_status);
-  return (*status & RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_DONE;
+  return (rf_core_last_cmd_status & RF_CORE_CMDSTA_RESULT_MASK) == RF_CORE_CMDSTA_DONE;
 }
 /*---------------------------------------------------------------------------*/
 uint_fast8_t
@@ -244,7 +243,10 @@ rf_core_wait_cmd_done(void *cmd)
   } while((command->status & RF_CORE_RADIO_OP_MASKED_STATUS)
           != RF_CORE_RADIO_OP_MASKED_STATUS_DONE);
 
-  return (command->status & RF_CORE_RADIO_OP_MASKED_STATUS)
+  rf_core_last_cmd_status = command->status;
+  INFO("radio:finish cmd$%x ok$%x\n"
+              , ((rfc_radioOp_t *)cmd)->commandNo, (unsigned)rf_core_last_cmd_status);
+  return (rf_core_last_cmd_status & RF_CORE_RADIO_OP_MASKED_STATUS)
          == RF_CORE_RADIO_OP_STATUS_DONE_OK;
 }
 /*---------------------------------------------------------------------------*/

@@ -378,6 +378,17 @@ extern uint8_t rf_core_poll_mode;
 uint8_t rf_core_is_accessible(void);
 
 /**
+ * @brief Block and wait for a Radio op to complete
+ * @return status of a last cmd started by rf_core_start_cmd(...) or
+ *      @sa RF_CORE_CMDSTA_xxx codes
+ */
+static inline
+uint32_t rf_core_cmd_status(void){
+    extern uint32_t rf_core_last_cmd_status;
+    return rf_core_last_cmd_status;
+}
+
+/**
  * \brief Sends a command to the RF core.
  *
  * \param cmd The command value or a pointer to a command buffer
@@ -404,7 +415,14 @@ uint8_t rf_core_is_accessible(void);
  * For immediate commands and radio Ops, this function will set the command's
  * status field to RF_CORE_RADIO_OP_STATUS_IDLE before sending it to the RF
  */
-uint_fast8_t rf_core_send_cmd(uint32_t cmd, uint32_t *status);
+uint_fast8_t rf_core_start_cmd(uint32_t cmd);
+
+static inline
+uint_fast8_t rf_core_send_cmd(uint32_t cmd, uint32_t *status){
+    uint_fast8_t ok = rf_core_start_cmd(cmd);
+    *status = rf_core_cmd_status();
+    return ok;
+}
 
 /**
  * \brief Block and wait for a Radio op to complete
