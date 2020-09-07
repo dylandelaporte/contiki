@@ -999,6 +999,10 @@ receiving_packet(void)
   }
 
 #if (RF_CORE_RECV_STYLE == RF_CORE_RECV_BY_SYNC)
+
+#if !MAC_CONF_WITH_TSCH
+#pragma warning ( "RF_CORE_RECV_BY_SYNC well tested only with TSCH stack" )
+#endif
   /*
    * Under TSCH operation, we rely on "hints" from the MDMSOFT interrupt
    * flag. This flag is set by the radio upon sync word detection, but it is
