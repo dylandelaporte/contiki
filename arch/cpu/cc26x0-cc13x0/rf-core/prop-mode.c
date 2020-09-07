@@ -478,7 +478,7 @@ rf_cmd_prop_rx()
     return RF_CORE_CMD_ERROR;
   }
 
-  RTIMER_BUSYWAIT_UNTIL(cmd_rx_adv->status == RF_CORE_RADIO_OP_STATUS_ACTIVE,
+  RTIMER_BUSYWAIT_UNTIL(cmd_rx_adv->status >= RF_CORE_RADIO_OP_STATUS_ACTIVE,
                         RF_CORE_ENTER_RX_TIMEOUT);
 
   /* Wait to enter RX */
