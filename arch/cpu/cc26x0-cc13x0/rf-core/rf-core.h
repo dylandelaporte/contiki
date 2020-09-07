@@ -115,6 +115,9 @@
  */
 #ifdef RF_CORE_CONF_POLL_MODE
 #define RF_CORE_POLL_MODE RF_CORE_CONF_POLL_MODE
+// TSCH stack now useonly POLL_MODE
+#elif MAC_CONF_WITH_TSCH
+#define RF_CORE_POLL_MODE 1
 #endif
 /*---------------------------------------------------------------------------*/
 /*
