@@ -227,6 +227,8 @@ enum {
    * mandatory.
    */
   RADIO_CONST_MAX_PAYLOAD_LEN,
+
+  RADIO_PARAM_TOTAL
 };
 
 /* Radio power modes */

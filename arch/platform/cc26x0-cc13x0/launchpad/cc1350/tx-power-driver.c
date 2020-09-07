@@ -59,6 +59,26 @@ const prop_mode_tx_power_config_t tx_power_driver_779_930[] = {
   { -10, 0x04c0 },
   {-128, 0xFFFF },
 };
+/* TX power settings for the 431-527MHz band */
+const prop_mode_tx_power_config_t tx_power_driver_431_527[] = {
+  {  15, 0x913f },
+  {  14, 0xb83f },  //13.5
+  {  13, 0xd80f },
+  {  12, 0x784e },
+  {  11, 0x4e48 },
+  {  10, 0x46cb },
+  {   9, 0x38c8 },
+  {   8, 0x2ec6 },
+  {   7, 0x2ac5 },
+  {   6, 0x24c4 },
+  {   5, 0x20c3 },
+  {   4, 0x18c2 },
+  {   3, 0x16c2 },
+  {   2, 0x12c1 },
+  {   0, 0x0ec1 },
+  { -10, 0x04c0 },
+  {-128, 0xFFFF },
+};
 /*---------------------------------------------------------------------------*/
 /**
  * @}

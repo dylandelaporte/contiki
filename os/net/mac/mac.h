@@ -104,6 +104,15 @@ enum {
      fatal error. The upper layer does not need to try again, as the
      error will be fatal then as well. */
   MAC_TX_ERR_FATAL,
+
+  /**< This error provided by TSCH slot operation to note security
+   *   encription error. */
+  MAC_TX_ERR_SEC,
+
+  /**< The MAC layer get invalid acknowledgement for the packet. */
+  MAC_TX_BADACK,
+
+  MAC_TX_ERR_SECACK,
 };
 
 #endif /* MAC_H_ */

@@ -148,6 +148,7 @@ tun_alloc(char *dev)
   LOG_INFO("Opening: %s\n", dev);
   if( (fd = open("/dev/net/tun", O_RDWR)) < 0 ) {
     /* Error message handled by caller */
+    LOG_ERR("failed open %s\n", dev);
     return -1;
   }
 
@@ -163,6 +164,7 @@ tun_alloc(char *dev)
   if((err = ioctl(fd, TUNSETIFF, (void *) &ifr)) < 0 ) {
     /* Error message handled by caller */
     close(fd);
+    LOG_ERR("failed assign TUN for %s\n", dev);
     return err;
   }
 

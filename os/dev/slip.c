@@ -121,6 +121,51 @@ rxbuf_init(void)
   state = STATE_OK;
 }
 /*---------------------------------------------------------------------------*/
+//typedef uint_fast16_t SlipPosition;
+typedef uint16_t SlipPosition;
+
+// @arg outbuf[0] - escape flag for initialisation: 0 - no ESC, != 0 - escaped
+// @return len of decoded outbuf
+// @return outbuf[len] - escape flag of input, for decode continue
+static
+SlipPosition slip_decode_rxbuf_from(SlipPosition begin
+        , uint8_t *outbuf, SlipPosition blen
+        )
+{
+    SlipPosition i;
+    SlipPosition len = 0;
+    SlipPosition end = pkt_end;
+    if (begin >= pkt_end)
+        end = RX_BUFSIZE;
+
+    char esc = outbuf[len];
+
+    for(i = begin; i < end; ++i) {
+      if(len > blen) {
+        len = 0;
+        break;
+      }
+      if(esc) {
+        if(rxbuf[i] == SLIP_ESC_ESC) {
+          outbuf[len] = SLIP_ESC;
+          len++;
+        } else if(rxbuf[i] == SLIP_ESC_END) {
+          outbuf[len] = SLIP_END;
+          len++;
+        }
+        esc = 0;
+      } else if(rxbuf[i] == SLIP_ESC) {
+        esc = SLIP_ESC;
+      } else {
+        outbuf[len] = rxbuf[i];
+        len++;
+      }
+    }
+    if(len < blen)
+        outbuf[len] = esc;
+    return len;
+}
+
 static uint16_t
 slip_poll_handler(uint8_t *outbuf, uint16_t blen)
 {
@@ -129,80 +174,17 @@ slip_poll_handler(uint8_t *outbuf, uint16_t blen)
    * If pkt_end != begin it will not change again.
    */
   if(begin != pkt_end) {
-    uint16_t len;
-    uint16_t cur_next_free;
-    uint16_t cur_ptr;
-    int esc = 0;
+    SlipPosition len;
+    SlipPosition cur_next_free;
+    SlipPosition cur_ptr;
+
+    outbuf[0] = 0;
 
     if(begin < pkt_end) {
-      uint16_t i;
-      len = 0;
-      for(i = begin; i < pkt_end; ++i) {
-        if(len > blen) {
-          len = 0;
-          break;
-        }
-        if(esc) {
-          if(rxbuf[i] == SLIP_ESC_ESC) {
-            outbuf[len] = SLIP_ESC;
-            len++;
-          } else if(rxbuf[i] == SLIP_ESC_END) {
-            outbuf[len] = SLIP_END;
-            len++;
-          }
-          esc = 0;
-        } else if(rxbuf[i] == SLIP_ESC) {
-          esc = 1;
-        } else {
-          outbuf[len] = rxbuf[i];
-          len++;
-        }
-      }
+      len = slip_decode_rxbuf_from(begin, outbuf, blen);
     } else {
-      uint16_t i;
-      len = 0;
-      for(i = begin; i < RX_BUFSIZE; ++i) {
-        if(len > blen) {
-          len = 0;
-          break;
-        }
-        if(esc) {
-          if(rxbuf[i] == SLIP_ESC_ESC) {
-            outbuf[len] = SLIP_ESC;
-            len++;
-          } else if(rxbuf[i] == SLIP_ESC_END) {
-            outbuf[len] = SLIP_END;
-            len++;
-          }
-          esc = 0;
-        } else if(rxbuf[i] == SLIP_ESC) {
-          esc = 1;
-        } else {
-          outbuf[len] = rxbuf[i];
-          len++;
-        }
-      }
-      for(i = 0; i < pkt_end; ++i) {
-        if(len > blen) {
-          len = 0;
-          break;
-        }
-        if(esc) {
-          if(rxbuf[i] == SLIP_ESC_ESC) {
-            outbuf[len] = SLIP_ESC;
-            len++;
-          } else if(rxbuf[i] == SLIP_ESC_END) {
-            outbuf[len] = SLIP_END;
-            len++;
-          }
-          esc = 0;
-        } else if(rxbuf[i] == SLIP_ESC) {
-          esc = 1;
-        } else {
-          outbuf[len] = rxbuf[i];
-          len++;
-        }
-      }
+      len = slip_decode_rxbuf_from(begin, outbuf, blen);
+      len += slip_decode_rxbuf_from(0, outbuf+len, blen-len);
     }
 
     /* Remove data from buffer together with the copied packet. */

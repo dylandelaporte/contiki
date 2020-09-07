@@ -36,13 +36,14 @@
  * Implementation of the CC13xx/CC26xx RF core driver
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
+#include "contiki-conf.h"
 #include "dev/watchdog.h"
 #include "sys/process.h"
 #include "sys/energest.h"
 #include "sys/cc.h"
 #include "net/netstack.h"
 #include "net/packetbuf.h"
+#include "net/rime/rimestats.h"
 #include "rf-core/rf-core.h"
 #include "rf-core/rf-switch.h"
 #include "ti-lib.h"
@@ -60,7 +61,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "assert.h"
 /*---------------------------------------------------------------------------*/
+#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -94,42 +97,26 @@
 typedef ChipType_t chip_type_t;
 /*---------------------------------------------------------------------------*/
 /* Remember the last Radio Op issued to the radio */
-static rfc_radioOp_t *last_radio_op = NULL;
+rfc_radioOp_t* rf_core_last_radio_op = NULL;
+#define last_radio_op   rf_core_last_radio_op
 /*---------------------------------------------------------------------------*/
 /* A struct holding pointers to the primary mode's abort() and restore() */
 static const rf_core_primary_mode_t *primary_mode = NULL;
 /*---------------------------------------------------------------------------*/
-/* RAT has 32-bit register, overflows once 18 minutes */
-#define RAT_RANGE  4294967296ull
-/* approximate value */
-#define RAT_OVERFLOW_PERIOD_SECONDS (60 * 18)
-
-/* how often to check for the overflow, as a minimum */
-#define RAT_OVERFLOW_TIMER_INTERVAL (CLOCK_SECOND * RAT_OVERFLOW_PERIOD_SECONDS / 3)
 
 /* Radio timer (RAT) offset as compared to the rtimer counter (RTC) */
-static int32_t rat_offset;
-static bool rat_offset_known;
+int32_t rat_offset = 0;
+static bool rat_offset_known = false;
 
-/* Value during the last read of the RAT register */
-static uint32_t rat_last_value;
-
-/* For RAT overflow handling */
-static struct ctimer rat_overflow_timer;
-static volatile uint32_t rat_overflow_counter;
-static rtimer_clock_t rat_last_overflow;
-
-static void rat_overflow_check_timer_cb(void *);
 /*---------------------------------------------------------------------------*/
 volatile int8_t rf_core_last_rssi = RF_CORE_CMD_CCA_REQ_RSSI_UNKNOWN;
 volatile uint8_t rf_core_last_corr_lqi = 0;
 volatile uint32_t rf_core_last_packet_timestamp = 0;
 /*---------------------------------------------------------------------------*/
 /* Are we currently in poll mode? */
+#ifndef RF_CORE_POLL_MODE
 uint8_t rf_core_poll_mode = 0;
-/*---------------------------------------------------------------------------*/
-/* Buffer full flag */
-volatile bool rf_core_rx_is_full = false;
+#endif
 /*---------------------------------------------------------------------------*/
 PROCESS(rf_core_process, "CC13xx / CC26xx RF driver");
 /*---------------------------------------------------------------------------*/
@@ -178,10 +165,10 @@ rf_core_send_cmd(uint32_t cmd, uint32_t *status)
   interrupts_disabled = ti_lib_int_master_disable();
 
   if(!rf_core_is_accessible()) {
-    PRINTF("rf_core_send_cmd: RF was off\n");
     if(!interrupts_disabled) {
       ti_lib_int_master_enable();
     }
+    PRINTF("rf_core_send_cmd: RF was off\n");
     return RF_CORE_CMD_ERROR;
   }
 
@@ -530,12 +517,6 @@ rf_core_cmd_done_dis(void)
   HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIEN) = enabled_irqs;
 }
 /*---------------------------------------------------------------------------*/
-rfc_radioOp_t *
-rf_core_get_last_radio_op()
-{
-  return last_radio_op;
-}
-/*---------------------------------------------------------------------------*/
 void
 rf_core_init_radio_op(rfc_radioOp_t *op, uint16_t len, uint16_t command)
 {
@@ -572,122 +553,11 @@ rf_core_primary_mode_restore()
 
   return RF_CORE_CMD_ERROR;
 }
+
 /*---------------------------------------------------------------------------*/
-uint8_t
-rf_core_rat_init(void)
-{
-  rat_last_value = HWREG(RFC_RAT_BASE + RATCNT);
-
-  ctimer_set(&rat_overflow_timer, RAT_OVERFLOW_TIMER_INTERVAL,
-             rat_overflow_check_timer_cb, NULL);
-
-  return 1;
-}
-/*---------------------------------------------------------------------------*/
-uint8_t
-rf_core_check_rat_overflow(void)
-{
-  uint32_t rat_current_value;
-  uint8_t interrupts_disabled;
-
-  /* Bail out if the RF is not on */
-  if(primary_mode == NULL || !primary_mode->is_on()) {
-    return 0;
-  }
-
-  interrupts_disabled = ti_lib_int_master_disable();
-
-  rat_current_value = HWREG(RFC_RAT_BASE + RATCNT);
-  if(rat_current_value + RAT_RANGE / 4 < rat_last_value) {
-    /* Overflow detected */
-    rat_last_overflow = RTIMER_NOW();
-    rat_overflow_counter++;
-  }
-  rat_last_value = rat_current_value;
-
-  if(!interrupts_disabled) {
-    ti_lib_int_master_enable();
-  }
-
-  return 1;
-}
-/*---------------------------------------------------------------------------*/
-static void
-rat_overflow_check_timer_cb(void *unused)
-{
-  uint8_t success = 0;
-  uint8_t was_off = 0;
-
-  if(primary_mode != NULL) {
-
-    if(!primary_mode->is_on()) {
-      was_off = 1;
-      if(NETSTACK_RADIO.on() != RF_CORE_CMD_OK) {
-        PRINTF("overflow: on() failed\n");
-        ctimer_set(&rat_overflow_timer, CLOCK_SECOND,
-                   rat_overflow_check_timer_cb, NULL);
-        return;
-      }
-    }
-
-    success = rf_core_check_rat_overflow();
-
-    if(was_off) {
-      NETSTACK_RADIO.off();
-    }
-  }
-
-  if(success) {
-    /* Retry after half of the interval */
-    ctimer_set(&rat_overflow_timer, RAT_OVERFLOW_TIMER_INTERVAL,
-               rat_overflow_check_timer_cb, NULL);
-  } else {
-    /* Retry sooner */
-    ctimer_set(&rat_overflow_timer, CLOCK_SECOND,
-               rat_overflow_check_timer_cb, NULL);
-  }
-}
-/*---------------------------------------------------------------------------*/
-uint32_t
-rf_core_convert_rat_to_rtimer(uint32_t rat_timestamp)
-{
-  uint64_t rat_timestamp64;
-  uint32_t adjusted_overflow_counter;
-  uint8_t was_off = 0;
-
-  if(primary_mode == NULL) {
-    PRINTF("rf_core_convert_rat_to_rtimer: not initialized\n");
-    return 0;
-  }
-
-  if(!primary_mode->is_on()) {
-    was_off = 1;
-    NETSTACK_RADIO.on();
-  }
-
-  rf_core_check_rat_overflow();
-
-  if(was_off) {
-    NETSTACK_RADIO.off();
-  }
-
-  adjusted_overflow_counter = rat_overflow_counter;
-
-  /* if the timestamp is large and the last oveflow was recently,
-     assume that the timestamp refers to the time before the overflow */
-  if(rat_timestamp > (uint32_t)(RAT_RANGE * 3 / 4)) {
-    if(RTIMER_CLOCK_LT(RTIMER_NOW(),
-                       rat_last_overflow + RAT_OVERFLOW_PERIOD_SECONDS * RTIMER_SECOND / 4)) {
-      adjusted_overflow_counter--;
-    }
-  }
-
-  /* add the overflowed time to the timestamp */
-  rat_timestamp64 = rat_timestamp + RAT_RANGE * adjusted_overflow_counter;
-  /* correct timestamp so that it refers to the end of the SFD */
-  rat_timestamp64 += primary_mode->sfd_timestamp_offset;
-
-  return RADIO_TO_RTIMER(rat_timestamp64 - rat_offset);
+uint8_t rf_core_primary_mode_is_on(void){
+    assert( primary_mode != NULL);
+    return primary_mode->is_on();
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(rf_core_process, ev, data)
@@ -716,11 +586,15 @@ PROCESS_THREAD(rf_core_process, ev, data)
 static void
 rx_nok_isr(void)
 {
+  RIMESTATS_ADD(badcrc);
+  PRINTF("RF: Bad CRC\n");
 }
 /*---------------------------------------------------------------------------*/
 void
 cc26xx_rf_cpe1_isr(void)
 {
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
   PRINTF("RF Error\n");
 
   if(!rf_core_is_accessible()) {
@@ -731,8 +605,6 @@ cc26xx_rf_cpe1_isr(void)
 
   if(HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) & IRQ_RX_BUF_FULL) {
     PRINTF("\nRF: BUF_FULL\n\n");
-    /* set a flag that the buffer is full*/
-    rf_core_rx_is_full = true;
     /* make sure read_frame() will be called to make space in RX buffer */
     process_poll(&rf_core_process);
     /* Clear the IRQ_RX_BUF_FULL interrupt flag by writing zero to bit */
@@ -741,11 +613,15 @@ cc26xx_rf_cpe1_isr(void)
 
   /* Clear INTERNAL_ERROR interrupt flag */
   HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) = 0x7FFFFFFF;
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 void
 cc26xx_rf_cpe0_isr(void)
 {
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
   if(!rf_core_is_accessible()) {
     printf("RF ISR called but RF not ready... PANIC!!\n");
     if(rf_core_power_up() != RF_CORE_CMD_OK) {
@@ -777,6 +653,8 @@ cc26xx_rf_cpe0_isr(void)
   }
 
   ti_lib_int_master_enable();
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

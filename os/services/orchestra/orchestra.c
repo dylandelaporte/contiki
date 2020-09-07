@@ -135,9 +135,7 @@ orchestra_callback_packet_ready(void)
   }
 
 #if TSCH_WITH_LINK_SELECTOR
-  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME, slotframe);
-  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT, timeslot);
-  packetbuf_set_attr(PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET, channel_offset);
+  packetbuf_set_linksel(slotframe, timeslot, channel_offset);
 #endif
 
   return matched_rule;

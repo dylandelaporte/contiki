@@ -46,6 +46,13 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+
+/*---------------------------------------------------------------------------*/
+/* Include Arch-Specific conf */
+#ifdef INT_MASTER_CONF_ARCH_HDR_PATH
+#include INT_MASTER_CONF_ARCH_HDR_PATH
+#endif /* GPIO_HAL_CONF_ARCH_HDR_PATH */
+
 /*---------------------------------------------------------------------------*/
 #ifdef INT_MASTER_CONF_STATUS_DATATYPE
 #define INT_MASTER_STATUS_DATATYPE INT_MASTER_CONF_STATUS_DATATYPE
@@ -66,7 +73,11 @@ typedef INT_MASTER_STATUS_DATATYPE int_master_status_t;
  *
  * The platform developer must provide this function
  */
+#ifndef int_master_arch_enable
 void int_master_enable(void);
+#else
+#define int_master_enable() int_master_arch_enable()
+#endif
 
 /**
  * \brief Disable the master interrupt
@@ -86,7 +97,11 @@ void int_master_enable(void);
  *
  * The platform developer must provide this function
  */
+#ifndef int_master_arch_read_and_disable
 int_master_status_t int_master_read_and_disable(void);
+#else
+#define int_master_read_and_disable() int_master_arch_read_and_disable()
+#endif
 
 /**
  * \brief Set the status of the master interrupt
@@ -98,7 +113,11 @@ int_master_status_t int_master_read_and_disable(void);
  *
  * The platform developer must provide this function
  */
+#ifndef int_master_arch_status_set
 void int_master_status_set(int_master_status_t status);
+#else
+#define int_master_status_set(status) int_master_arch_status_set(status)
+#endif
 
 /**
  * \brief Retrieve the status of the master interrupt
@@ -110,7 +129,12 @@ void int_master_status_set(int_master_status_t status);
  *
  * The platform developer must provide this function
  */
+#ifndef int_master_arch_is_enabled
 bool int_master_is_enabled(void);
+#else
+#define int_master_is_enabled() int_master_arch_is_enabled()
+#endif
+
 /*---------------------------------------------------------------------------*/
 #endif /* INT_MASTER_H_ */
 /*---------------------------------------------------------------------------*/

@@ -113,7 +113,7 @@ sixp_nbr_free(sixp_nbr_t *nbr)
 {
   assert(nbr != NULL);
   if(nbr != NULL) {
-    (void)nbr_table_remove(sixp_nbrs, nbr);
+    (void)sixp_nbrs_remove_item(nbr);
   }
 }
 /*---------------------------------------------------------------------------*/

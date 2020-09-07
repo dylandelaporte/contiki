@@ -46,7 +46,9 @@
 
 #include "contiki-net.h"
 #include "net/packetbuf.h"
+#include "net/rime/rime.h"
 #include "sys/cc.h"
+#include "packetbuf.h"
 
 struct packetbuf_attr packetbuf_attrs[PACKETBUF_NUM_ATTRS];
 struct packetbuf_addr packetbuf_addrs[PACKETBUF_NUM_ADDRS];
@@ -62,6 +64,7 @@ static uint8_t hdrlen;
 static uint32_t packetbuf_aligned[(PACKETBUF_SIZE + 3) / 4];
 static uint8_t *packetbuf = (uint8_t *)packetbuf_aligned;
 
+#undef DEBUG
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -183,6 +186,9 @@ packetbuf_attr_clear(void)
   for(i = 0; i < PACKETBUF_NUM_ADDRS; ++i) {
     linkaddr_copy(&packetbuf_addrs[i].addr, &linkaddr_null);
   }
+#if TSCH_WITH_LINK_SELECTOR
+  packetbuf_linksel_clear();
+#endif
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -201,6 +207,7 @@ packetbuf_attr_copyfrom(struct packetbuf_attr *attrs,
   memcpy(packetbuf_addrs, addrs, sizeof(packetbuf_addrs));
 }
 /*---------------------------------------------------------------------------*/
+#if !PACKETBUF_CONF_ATTRS_INLINE
 int
 packetbuf_set_attr(uint8_t type, const packetbuf_attr_t val)
 {
@@ -214,17 +221,18 @@ packetbuf_attr(uint8_t type)
   return packetbuf_attrs[type].val;
 }
 /*---------------------------------------------------------------------------*/
+const linkaddr_t *
+packetbuf_addr(uint8_t type)
+{
+  return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
+}
+#endif /* PACKETBUF_CONF_ATTRS_INLINE */
+/*---------------------------------------------------------------------------*/
 int
 packetbuf_set_addr(uint8_t type, const linkaddr_t *addr)
 {
   linkaddr_copy(&packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr, addr);
   return 1;
-}
-/*---------------------------------------------------------------------------*/
-const linkaddr_t *
-packetbuf_addr(uint8_t type)
-{
-  return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -233,5 +241,29 @@ packetbuf_holds_broadcast(void)
   return linkaddr_cmp(&packetbuf_addrs[PACKETBUF_ADDR_RECEIVER - PACKETBUF_ADDR_FIRST].addr, &linkaddr_null);
 }
 /*---------------------------------------------------------------------------*/
+#if TSCH_WITH_LINK_SELECTOR
+void packetbuf_set_linksel(uint16_t  sfh, uint16_t  slot, uint16_t  choffs){
+    packetbuf_set_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME        , sfh );
+    packetbuf_set_attr(PACKETBUF_ATTR_TSCH_TIMESLOT         , slot );
+    packetbuf_set_attr(PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET   , choffs);
+}
+
+void packetbuf_linksel_set(const packetbuf_linkselector val){
+    packetbuf_set_linksel(val.sfh, val.slot, val.choffs);
+}
+
+void packetbuf_linksel_clear(const packetbuf_linkselector val){
+    packetbuf_set_linksel(0xffff, 0xffff, 0xffff);
+}
+
+packetbuf_linkselector packetbuf_linksel(){
+    packetbuf_linkselector save;
+    save.sfh        = packetbuf_attr(PACKETBUF_ATTR_TSCH_SLOTFRAME);
+    save.slot       = packetbuf_attr(PACKETBUF_ATTR_TSCH_TIMESLOT);
+    save.choffs     = packetbuf_attr(PACKETBUF_ATTR_TSCH_CHANNEL_OFFSET);
+    return save;
+}
+
+#endif
 
 /** @} */

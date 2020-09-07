@@ -48,10 +48,25 @@
 #include "contiki.h"
 #include <stdio.h>
 #include "net/mac/tsch/tsch.h"
+#include "net/mac/tsch/tsch-queue.h"
+#include "net/mac/tsch/tsch-private.h"
+#include "net/mac/tsch/tsch-log.h"
+#include "net/mac/tsch/tsch-packet.h"
+#include "net/mac/tsch/tsch-schedule.h"
+#include "net/mac/tsch/tsch-slot-operation.h"
 #include "lib/ringbufindex.h"
 #include "sys/log.h"
 
-#if TSCH_LOG_PER_SLOT
+#if TSCH_LOG_LEVEL >= 1
+#undef DEBUG
+#define DEBUG DEBUG_PRINT
+#else /* TSCH_LOG_LEVEL */
+#undef DEBUG
+#define DEBUG DEBUG_NONE
+#endif /* TSCH_LOG_LEVEL */
+#include "net/net-debug.h"
+
+#if TSCH_LOG_LEVEL >= 2 /* Skip this file for log levels 0 or 1 */
 
 PROCESS_NAME(tsch_pending_events_process);
 
@@ -64,66 +79,122 @@ static struct tsch_log_t log_array[TSCH_LOG_QUEUE_LEN];
 static int log_dropped = 0;
 static int log_active = 0;
 
+#define LOG_PRINTF(...) LOG_OUTPUT(__VA_ARGS__)
+
 /*---------------------------------------------------------------------------*/
 /* Process pending log messages */
-void
-tsch_log_process_pending(void)
+int tsch_log_process_pending(void)
 {
   static int last_log_dropped = 0;
   int16_t log_index;
   /* Loop on accessing (without removing) a pending input packet */
   if(log_dropped != last_log_dropped) {
-    printf("[WARN: TSCH-LOG  ] logs dropped %u\n", log_dropped);
+      LOG_PRINTF("TSCH:! logs dropped %u\n", log_dropped);
     last_log_dropped = log_dropped;
   }
-  while((log_index = ringbufindex_peek_get(&log_ringbuf)) != -1) {
+  if((log_index = ringbufindex_peek_get(&log_ringbuf)) != -1) {
     struct tsch_log_t *log = &log_array[log_index];
-    if(log->link == NULL) {
-      printf("[INFO: TSCH-LOG  ] {asn %02x.%08lx link-NULL} ", log->asn.ms1b, log->asn.ls4b);
+    struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->slotframe_handle);
+    if(sf == NULL) {
+        LOG_PRINTF("TSCH: {asn-%x.%lx link-NULL} ", log->asn.ms1b, (unsigned long)log->asn.ls4b);
     } else {
-      struct tsch_slotframe *sf = tsch_schedule_get_slotframe_by_handle(log->link->slotframe_handle);
-      printf("[INFO: TSCH-LOG  ] {asn %02x.%08lx link %2u %3u %3u %2u %2u ch %2u} ",
-             log->asn.ms1b, log->asn.ls4b,
-             log->link->slotframe_handle, sf ? sf->size.val : 0,
-             log->burst_count, log->link->timeslot + log->burst_count, log->channel_offset,
+      LOG_PRINTF("TSCH: {asn-%x.%lx link-%u:%u*%u[%u+%u] ch%u} ",
+             log->asn.ms1b, (unsigned long)log->asn.ls4b,
+             log->slotframe_handle, sf ? sf->size.val : 0,
+             log->burst_count, log->timeslot, log->channel_offset,
              log->channel);
     }
     switch(log->type) {
       case tsch_log_tx:
-        printf("%s-%u-%u tx ",
-                linkaddr_cmp(&log->tx.dest, &linkaddr_null) ? "bc" : "uc", log->tx.is_data, log->tx.sec_level);
-        log_lladdr_compact(&linkaddr_node_addr);
-        printf("->");
-        log_lladdr_compact(&log->tx.dest);
-        printf(", len %3u, seq %3u, st %d %2d",
-                log->tx.datalen, log->tx.seqno, log->tx.mac_tx_status, log->tx.num_tx);
+          LOG_PRINTF("%s-%u-%u[%u] tx ->",
+                  linkaddr_cmp(&log->tx.dest, &linkaddr_null) ? "bc" : "uc"
+                          , log->tx.is_data
+                          , log->tx.sec_level, log->tx.sec_key
+                          );
+          log_lladdr_compact(&log->tx.dest);
+          LOG_PRINTF(", len %3u, seq %3u, st %d %2d",
+                  log->tx.datalen, log->tx.seqno, log->tx.mac_tx_status, log->tx.num_tx);
         if(log->tx.drift_used) {
-          printf(", dr %3d", log->tx.drift);
+            LOG_PRINTF(", dr %d", log->tx.drift);
         }
-        printf("\n");
+        LOG_PRINTF("\n");
         break;
       case tsch_log_rx:
-        printf("%s-%u-%u rx ",
-                log->rx.is_unicast == 0 ? "bc" : "uc", log->rx.is_data, log->rx.sec_level);
-        log_lladdr_compact(&log->rx.src);
-        printf("->");
-        log_lladdr_compact(log->rx.is_unicast ? &linkaddr_node_addr : NULL);
-        printf(", len %3u, seq %3u",
-                log->rx.datalen, log->rx.seqno);
-        printf(", edr %3d", (int)log->rx.estimated_drift);
+          LOG_PRINTF("%s-%u-%u[%u] rx <-",
+            log->rx.is_unicast == 0 ? "bc" : "uc", log->rx.is_data
+            , log->rx.sec_level,log->rx.sec_key
+            );
+          log_lladdr_compact(&log->rx.src);
+          LOG_PRINTF(", len %3u, seq %3u",
+                  log->rx.datalen, log->rx.seqno);
         if(log->rx.drift_used) {
-          printf(", dr %3d\n", log->rx.drift);
-        } else {
-          printf("\n");
+            LOG_PRINTF(", dr %d", log->rx.drift);
         }
+        LOG_PRINTF(", edr %d\n", (int)log->rx.estimated_drift);
         break;
       case tsch_log_message:
-        printf("%s\n", log->message);
+          LOG_PRINTF("%.*s\n", sizeof(log->message), log->message);
         break;
+      case tsch_log_text:
+          LOG_PRINTF(log->text);
+        break;
+      case tsch_log_fmt:
+          LOG_PRINTF(log->fmt.text
+                     , log->fmt.arg[0], log->fmt.arg[1], log->fmt.arg[2], log->fmt.arg[3]);
+        break;
+
+      case tsch_log_fmt8:
+          LOG_PRINTF(log->fmt.text
+                     , log->fmt.arg[0], log->fmt.arg[1], log->fmt.arg[2], log->fmt.arg[3]
+                     , log->fmt.arg[4], log->fmt.arg[5], log->fmt.arg[6], log->fmt.arg[7]
+                     );
+        break;
+
+      case tsch_log_change_timesrc:
+          LOG_PRINTF("TSCH: update time source: %x -> %x\n"
+                  , TSCH_LOG_ID_FROM_LINKADDR(&log->timesrc_change.was)
+                  , TSCH_LOG_ID_FROM_LINKADDR(&log->timesrc_change.now)
+                  );
+          break;
+
+      case tsch_log_frame:
+          LOG_PRINTF("%s\n    Frame version %u, type %u, FCF %02x %02x\n"
+                  , log->frame.msg
+                  , log->frame.frame_version, log->frame.frame_type
+                  , log->frame.raw[0], log->frame.raw[1]);
+          net_debug_lladdr_snprint(log->frame.tmp, sizeof(log->frame.tmp), &log->frame.src_addr);
+          LOG_PRINTF("TSCH:! parse_eb: frame was from 0x%x/%s"
+                  , log->frame.src_pid, log->frame.tmp);
+          net_debug_lladdr_snprint(log->frame.tmp, sizeof(log->frame.tmp), &log->frame.dst_addr);
+          LOG_PRINTF(" to 0x%x/%s\n", log->frame.dst_pid, log->frame.tmp);
+          break;
+
+      case tsch_log_packet:
+          LOG_PRINTF(log->packet.fmt
+                  , log->packet.p
+                  , log->packet.index
+                  );
+          break;
+
+      case tsch_log_packet_verbose:
+          LOG_PRINTF("TSCH: %s locked(%u), n:%p p:%p[%u]->buf:%p\n"
+                  , log->packet.fmt, log->packet.locked
+                  , log->packet.n
+                  , log->packet.p, log->packet.index
+                  , log->packet.qb
+                  );
+          break;
+      case tsch_log_rx_drift:
+       printf("RX : fantastic drift %ld = %lu[expect time] - %lu[rx time]\n"
+              , (unsigned long)log->rx_drift.drift
+              , (unsigned long)log->rx_drift.expect_us, (unsigned long)log->rx_drift.start_us);
+       break;
     }
     /* Remove input from ringbuf */
     ringbufindex_get(&log_ringbuf);
+    return 1;
   }
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 /* Prepare addition of a new log.
@@ -135,9 +206,16 @@ tsch_log_prepare_add(void)
   if(log_index != -1) {
     struct tsch_log_t *log = &log_array[log_index];
     log->asn = tsch_current_asn;
-    log->link = current_link;
-    log->burst_count = tsch_current_burst_count;
-    log->channel = tsch_current_channel;
+    if (current_link != NULL){
+    log->slotframe_handle   = current_link->slotframe_handle;
+    log->timeslot           = current_link->timeslot;
+    }
+    else {
+        log->slotframe_handle = -1;
+        log->timeslot         = -1;
+    }
+    log->burst_count    = tsch_current_burst_count;
+    log->channel        = tsch_current_channel;
     log->channel_offset = tsch_current_channel_offset;
     return log;
   } else {
@@ -176,5 +254,57 @@ tsch_log_stop(void)
   }
 }
 
-#endif /* TSCH_LOG_PER_SLOT */
+void tsch_log_puts(const char* txt){
+    TSCH_LOG_ADD(tsch_log_text, log->text = txt; );
+}
+
+void tsch_log_printf3(const char* fmt, int arg1, int arg2, int arg3){
+    TSCH_LOG_ADD(tsch_log_fmt,
+                 log->fmt.text = fmt;
+                 log->fmt.arg[0] = arg1;
+                 log->fmt.arg[1] = arg2;
+                 log->fmt.arg[2] = arg3;
+                 );
+}
+
+void tsch_log_printf4(const char* fmt, int arg1, int arg2, int arg3, int arg4){
+    TSCH_LOG_ADD(tsch_log_fmt,
+                 log->fmt.text = fmt;
+                 log->fmt.arg[0] = arg1;
+                 log->fmt.arg[1] = arg2;
+                 log->fmt.arg[2] = arg3;
+                 log->fmt.arg[3] = arg4;
+                 );
+}
+
+void tsch_log_printf8(const char* fmt
+                      , int arg1, int arg2, int arg3, int arg4
+                      , int arg5, int arg6, int arg7, int arg8){
+    TSCH_LOG_ADD(tsch_log_fmt8,
+                 log->fmt.text = fmt;
+                 log->fmt.arg[0] = arg1;
+                 log->fmt.arg[1] = arg2;
+                 log->fmt.arg[2] = arg3;
+                 log->fmt.arg[3] = arg4;
+                 log->fmt.arg[4] = arg5;
+                 log->fmt.arg[5] = arg6;
+                 log->fmt.arg[6] = arg7;
+                 log->fmt.arg[7] = arg8;
+                 );
+}
+
+void tsch_log_print_frame(const char* msg, frame802154_t *frame, const void* raw){
+    TSCH_LOG_ADD(tsch_log_frame,
+                 log->frame.msg             = msg;
+                 log->frame.frame_version   = frame->fcf.frame_version;
+                 log->frame.frame_type      = frame->fcf.frame_type;
+                 log->frame.src_pid         = frame->src_pid;
+                 log->frame.dst_pid         = frame->dest_pid;
+                 memcpy(&log->frame.src_addr, frame->src_addr, sizeof(log->frame.src_addr));
+                 memcpy(&log->frame.dst_addr, frame->dest_addr, sizeof(log->frame.dst_addr));
+                 memcpy(log->frame.raw, raw, sizeof(log->frame.raw));
+                 );
+}
+
+#endif /* TSCH_LOG_LEVEL */
 /** @} */

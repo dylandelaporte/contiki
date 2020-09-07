@@ -73,7 +73,7 @@
  *   operating.  If this value is 0xffff, the device is not
  *   associated.
  */
-static uint16_t mac_pan_id = IEEE802154_PANID;
+uint16_t mac_pan_id = IEEE802154_PANID;
 
 /**
  *  \brief Structure that contains the lengths of the various addressing and security fields
@@ -119,28 +119,11 @@ get_key_id_len(uint8_t key_id_mode)
 }
 #endif /* LLSEC802154_USES_AUX_HEADER && LLSEC802154_USES_EXPLICIT_KEYS */
 /*---------------------------------------------------------------------------*/
-/* Get current PAN ID */
-uint16_t
-frame802154_get_pan_id(void)
-{
-  return mac_pan_id;
-}
-/*---------------------------------------------------------------------------*/
-/* Set current PAN ID */
-void
-frame802154_set_pan_id(uint16_t pan_id)
-{
-  mac_pan_id = pan_id;
-}
-/*----------------------------------------------------------------------------*/
 /* Tells whether a given Frame Control Field indicates a frame with
  * source PANID and/or destination PANID */
 void
 frame802154_has_panid(frame802154_fcf_t *fcf, int *has_src_pan_id, int *has_dest_pan_id)
 {
-  int src_pan_id = 0;
-  int dest_pan_id = 0;
-
   if(fcf == NULL) {
     return;
   }
@@ -150,54 +133,60 @@ frame802154_has_panid(frame802154_fcf_t *fcf, int *has_src_pan_id, int *has_dest
      * IEEE 802.15.4-2015
      * Table 7-2, PAN ID Compression value for frame version 0b10
      */
-    if((fcf->dest_addr_mode == FRAME802154_NOADDR &&
-        fcf->src_addr_mode == FRAME802154_NOADDR &&
-        fcf->panid_compression == 1) ||
-       (fcf->dest_addr_mode != FRAME802154_NOADDR &&
-        fcf->src_addr_mode == FRAME802154_NOADDR &&
-        fcf->panid_compression == 0) ||
-       (fcf->dest_addr_mode == FRAME802154_LONGADDRMODE &&
-        fcf->src_addr_mode == FRAME802154_LONGADDRMODE &&
-        fcf->panid_compression == 0) ||
-       ((fcf->dest_addr_mode == FRAME802154_SHORTADDRMODE &&
-         fcf->src_addr_mode != FRAME802154_NOADDR) ||
-        (fcf->dest_addr_mode != FRAME802154_NOADDR &&
-         fcf->src_addr_mode == FRAME802154_SHORTADDRMODE)) ){
-      dest_pan_id = 1;
+      bool no_dest = (fcf->dest_addr_mode == FRAME802154_NOADDR);
+      bool no_src  = (fcf->src_addr_mode == FRAME802154_NOADDR);
+      bool short_dest = (fcf->dest_addr_mode == FRAME802154_SHORTADDRMODE);
+      bool short_src  = (fcf->src_addr_mode == FRAME802154_SHORTADDRMODE);
+      bool long_dest = (fcf->dest_addr_mode == FRAME802154_LONGADDRMODE);
+      bool long_src  = (fcf->src_addr_mode == FRAME802154_LONGADDRMODE);
+
+    if(has_dest_pan_id != NULL){
+    if((no_dest && no_src && (fcf->panid_compression == 1) ) ||
+       ( !no_dest && no_src && (fcf->panid_compression == 0) ) ||
+       ( long_dest && long_src && (fcf->panid_compression == 0) ) ||
+       ( short_dest && !no_src) || (!no_dest && short_src)
+       )
+    {
+        *has_dest_pan_id = 1;
+    }
+    else
+        *has_dest_pan_id = 0;
     }
 
-    if(fcf->panid_compression == 0 &&
-       ((fcf->dest_addr_mode == FRAME802154_NOADDR &&
-         fcf->src_addr_mode == FRAME802154_LONGADDRMODE) ||
-        (fcf->dest_addr_mode == FRAME802154_NOADDR &&
-         fcf->src_addr_mode == FRAME802154_SHORTADDRMODE) ||
-        (fcf->dest_addr_mode == FRAME802154_SHORTADDRMODE &&
-         fcf->src_addr_mode == FRAME802154_SHORTADDRMODE) ||
-        (fcf->dest_addr_mode == FRAME802154_SHORTADDRMODE &&
-         fcf->src_addr_mode == FRAME802154_LONGADDRMODE) ||
-        (fcf->dest_addr_mode == FRAME802154_LONGADDRMODE &&
-         fcf->src_addr_mode == FRAME802154_SHORTADDRMODE))) {
-      src_pan_id = 1;
+    if(has_src_pan_id != NULL){
+    if((fcf->panid_compression == 0) &&
+      ( (no_dest && long_src) ||
+        (no_dest && short_src) ||
+        (short_dest && short_src) ||
+        (short_dest && long_src) ||
+        (long_dest && short_src)
+      ))
+    {
+        *has_src_pan_id = 1;
     }
+    else
+        *has_src_pan_id = 0;
+    }//if(has_src_pan_id != NULL)
 
   } else {
     /* No PAN ID in ACK */
     if(fcf->frame_type != FRAME802154_ACKFRAME) {
+      if(has_src_pan_id != NULL){
       if(!fcf->panid_compression && (fcf->src_addr_mode & 3)) {
         /* If compressed, don't include source PAN ID */
-        src_pan_id = 1;
+          *has_src_pan_id = 1;
       }
+      else
+          *has_src_pan_id = 0;
+      }
+      if(has_dest_pan_id != NULL){
       if(fcf->dest_addr_mode & 3) {
-        dest_pan_id = 1;
+          *has_dest_pan_id = 1;
+      }
+      else
+          *has_dest_pan_id = 0;
       }
     }
-  }
-
-  if(has_src_pan_id != NULL) {
-    *has_src_pan_id = src_pan_id;
-  }
-  if(has_dest_pan_id != NULL) {
-    *has_dest_pan_id = dest_pan_id;
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -244,26 +233,25 @@ frame802154_extract_linkaddr(frame802154_t *frame,
   if(frame == NULL) {
     return 0;
   }
+  if(source_address != NULL) {
   /* Check and extract source address */
   src_addr_len = frame->fcf.src_addr_mode ?
     ((frame->fcf.src_addr_mode == FRAME802154_SHORTADDRMODE) ? 2 : 8) : 0;
   if(src_addr_len == 0 || frame802154_is_broadcast_addr(frame->fcf.src_addr_mode, frame->src_addr)) {
     /* Broadcast address */
-    if(source_address != NULL) {
       linkaddr_copy(source_address, &linkaddr_null);
-    }
   } else {
     /* Unicast address */
-    if(src_addr_len != LINKADDR_SIZE) {
+    if(src_addr_len >= LINKADDR_SIZE)
+        linkaddr_copy(source_address, (linkaddr_t *)frame->src_addr);
+    else
       /* Destination address has a size we can not handle */
       return 0;
     }
-    if(source_address != NULL) {
-      linkaddr_copy(source_address, (linkaddr_t *)frame->src_addr);
-    }
-  }
+  }//if(source_address != NULL)
 
   /* Check and extract destination address */
+  if(dest_address != NULL) {
   dest_addr_len = frame->fcf.dest_addr_mode ?
     ((frame->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) ? 2 : 8) : 0;
   if(dest_addr_len == 0 || frame802154_is_broadcast_addr(frame->fcf.dest_addr_mode, frame->dest_addr)) {
@@ -273,14 +261,13 @@ frame802154_extract_linkaddr(frame802154_t *frame,
     }
   } else {
     /* Unicast address */
-    if(dest_addr_len != LINKADDR_SIZE) {
+    if(dest_addr_len >= LINKADDR_SIZE)
+        linkaddr_copy(dest_address, (linkaddr_t *)frame->dest_addr);
+    else
       /* Destination address has a size we can not handle */
       return 0;
     }
-    if(dest_address != NULL) {
-      linkaddr_copy(dest_address, (linkaddr_t *)frame->dest_addr);
-    }
-  }
+  }//if(dest_address != NULL)
 
   return 1;
 }

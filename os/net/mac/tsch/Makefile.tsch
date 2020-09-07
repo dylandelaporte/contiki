@@ -1,0 +1,9 @@
+ifeq ($(MAKE_ROUTING),MAKE_ROUTING_NULLROUTING)
+SOURCE_EXCLUDE += tsch-rpl.c
+else ifneq ("$(filter "-DROUTING_CONF_NULLROUTING=1", $(CFLAGS) )", "")
+SOURCE_EXCLUDE += tsch-rpl.c
+else ifeq ($(CONTIKI_WITH_RPL),1)
+CONTIKI_SOURCEFILES += tsch-rpl.c 
+else ifneq ("$(filter "-DUIP_CONF_IPV6_RPL=1", $(CFLAGS) )", "")
+CONTIKI_SOURCEFILES += tsch-rpl.c 
+endif

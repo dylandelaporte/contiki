@@ -47,13 +47,14 @@ else
 endif
 
 ### Use CMSIS from arch/cpu/arm/common
-CONTIKI_ARM_DIRS += . 
+CONTIKI_ARM_DIRS += . common/sys 
 CONTIKI_CPU_DIRS += $(addprefix ../arm/, $(CONTIKI_ARM_DIRS))
 
 ### Default to use os/lib/dbg-io unless configured to do otherwise
 MAKE_WITH_LIB_DBG_IO ?= 1
 
 ifeq ($(MAKE_WITH_LIB_DBG_IO),1)
+  MODULES += arch/cpu/arm/common/dbg-io
   MODULES += os/lib/dbg-io
 endif
 

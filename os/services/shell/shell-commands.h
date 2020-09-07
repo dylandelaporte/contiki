@@ -43,6 +43,26 @@
 #ifndef _SHELL_COMMANDS_H_
 #define _SHELL_COMMANDS_H_
 
+/*---------------------------------------------------------------------------*/
+#ifdef SHELL_COMMANDS_CONF_PING
+#define SHELL_COMMANDS_PING    SHELL_COMMANDS_CONF_PING
+#else
+#define SHELL_COMMANDS_PING    1
+#endif
+#ifdef SHELL_COMMANDS_CONF_SETROOT
+#define SHELL_COMMANDS_SETROOT    SHELL_COMMANDS_CONF_SETROOT
+#else
+#define SHELL_COMMANDS_SETROOT    1
+#endif
+
+#ifdef SHELL_COMMANDS_CONF_TSCH_SCHEDULE
+#define SHELL_COMMANDS_TSCH_SCHEDULE    SHELL_COMMANDS_CONF_TSCH_SCHEDULE
+#else
+#define SHELL_COMMANDS_TSCH_SCHEDULE    1
+#endif
+
+/*---------------------------------------------------------------------------*/
+
 /* Command handling function type */
 typedef char (shell_commands_func)(struct pt *pt, shell_output_func output, char *args);
 

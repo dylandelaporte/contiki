@@ -43,8 +43,15 @@
 /********** Includes **********/
 
 #include "contiki.h"
+#include "net/packetbuf.h"
+#include "net/mac/tsch/tsch-private.h"
 #include "net/mac/framer/frame802154.h"
 #include "net/mac/framer/frame802154e-ie.h"
+#include "net/mac/tsch/tsch-types.h"
+
+/********** variables *********/
+// this tempoary packet used by tsch_scan
+extern struct input_packet   tsch_temp_packet;
 
 /********** Functions *********/
 
@@ -58,9 +65,9 @@
  * \param nack Value of the NACK bit
  * \return The length of the packet that was created. -1 if failure.
  */
-int tsch_packet_create_eack(uint8_t *buf, uint16_t buf_size,
-                            const linkaddr_t *dest_addr, uint8_t seqno,
-                            int16_t drift, int nack);
+int tsch_packet_create_eack(uint8_t *buf, int buf_size,
+    const linkaddr_t *dest_addr, const frame802154_t *frame
+    , int16_t drift, int nack);
 /**
  * \brief Parse enhanced ACK packet
  * \param buf The buffer where to parse the EACK from
@@ -88,6 +95,7 @@ int tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_ptr);
  * \return 1 if success, 0 otherwise
  */
 int tsch_packet_update_eb(uint8_t *buf, int buf_size, uint8_t tsch_sync_ie_offset);
+/* Parse EB and extract ASN and join priority */
 /**
  * \brief Parse EB
  * \param buf The buffer where to parse the EB from
@@ -101,6 +109,11 @@ int tsch_packet_update_eb(uint8_t *buf, int buf_size, uint8_t tsch_sync_ie_offse
 int tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
     frame802154_t *frame, struct ieee802154_ies *ies,
     uint8_t *hdrlen, int frame_without_mic);
+
+// Parse EB and extract ASN and join priority, and validate EB
+int tsch_packet_parse_my_eb(const struct input_packet *input_eb,
+    frame802154_t *frame, struct ieee802154_ies *ies
+    );
 /**
  * \brief Set frame pending bit in a packet (whose header was already build)
  * \param buf The buffer where the packet resides
@@ -129,4 +142,3 @@ void tsch_packet_eackbuf_set_attr(uint8_t type, const packetbuf_attr_t val);
 packetbuf_attr_t tsch_packet_eackbuf_attr(uint8_t type);
 
 #endif /* __TSCH_PACKET_H__ */
-/** @} */
