@@ -210,6 +210,9 @@ void leds_arch_set(leds_mask_t leds);
 #define LEDS_LED3     0x02 /**< Convenience macro to refer to the 3rd LED (LED 3) */
 #define LEDS_LED4     0x03 /**< Convenience macro to refer to the 4th LED (LED 4) */
 #define LEDS_LED5     0x04 /**< Convenience macro to refer to the 5th LED (LED 5) */
+#define LEDS_LED6     0x05 /**< Convenience macro to refer to the 5th LED (LED 5) */
+#define LEDS_LED7     0x06 /**< Convenience macro to refer to the 5th LED (LED 5) */
+#define LEDS_LED8     0x07 /**< Convenience macro to refer to the 5th LED (LED 5) */
 /*---------------------------------------------------------------------------*/
 /**
  * \brief A LED logical representation
