@@ -1,0 +1,9 @@
+TARGET_IS_POSIX ?= 0
+
+ifneq ($(TARGET_IS_POSIX),1)
+SOURCE_EXCLUDE      += cfs-posix.c cfs-posix-dir.c
+MODULES_SOURCES     := $(filter-out cfs-posix.c cfs-posix-dir.c, ${MODULES_SOURCES} )
+endif
+
+#this is flag for build system, that have CFS 
+HAVE_CFS=1

@@ -30,7 +30,7 @@
  */
 
 #include "websocket-http-client.h"
-#include "net/ipv6/uiplib.h"
+#include "net/ip/uiplib.h"
 #include "resolv.h"
 
 #include "ipv6/ip64-addr.h"

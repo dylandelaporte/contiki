@@ -57,6 +57,7 @@
 #include "rf-core/rf-core.h"
 #include "rf-core/rf-switch.h"
 #include "rf-core/rf-ble.h"
+#include "rf-core/rf-rat.h"
 /*---------------------------------------------------------------------------*/
 /* RF core and RF HAL API */
 #include "hw_rfc_dbell.h"
@@ -964,7 +965,7 @@ read_frame(void *buf, unsigned short buf_len)
   /* get the timestamp */
   memcpy(&rat_timestamp, (uint8_t *)rx_read_entry + RX_BUF_DATA_OFFSET + len + 2, 4);
 
-  rf_core_last_packet_timestamp = rf_core_convert_rat_to_rtimer(rat_timestamp);
+  rf_rat_last_timestamp(rat_timestamp);
 
   if(!rf_core_poll_mode) {
     /* Not in poll mode: packetbuf should not be accessed in interrupt context.
@@ -1455,7 +1456,7 @@ get_object(radio_param_t param, void *dest, size_t size)
     if(size != sizeof(rtimer_clock_t) || !dest) {
       return RADIO_RESULT_INVALID_VALUE;
     }
-    *(rtimer_clock_t *)dest = rf_core_last_packet_timestamp;
+    *(rtimer_clock_t *)dest = rf_rat_calc_last_rttime();
 
     return RADIO_RESULT_OK;
   }

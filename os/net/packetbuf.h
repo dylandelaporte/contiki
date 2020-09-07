@@ -67,6 +67,20 @@
 #define PACKETBUF_SIZE 128
 #endif
 
+#ifdef PACKETBUF_CONF_WITH_PACKET_TYPE
+#define PACKETBUF_WITH_PACKET_TYPE PACKETBUF_CONF_WITH_PACKET_TYPE
+#else
+#define PACKETBUF_WITH_PACKET_TYPE NETSTACK_CONF_WITH_RIME
+#endif
+
+// @brief PACKETBUF_CONF_ATTRS_INLINE values
+//< enable inlines for trivial functions
+#define PACKETBUF_ATTRS_INLINE_SMALL    1
+//< enable inlines for small functions to faster code
+#define PACKETBUF_ATTRS_INLINE_FAST     2
+
+
+
 /**
  * \brief      Clear and reset the packetbuf
  *
@@ -87,21 +101,37 @@ void packetbuf_clear(void);
  *             or referenced to an external location.
  *
  */
-void *packetbuf_dataptr(void);
+static inline
+void* packetbuf_dataptr(void){
+    extern uint8_t* packetbuf_data;
+    return  packetbuf_data;
+}
 
 /**
  * \brief      Get a pointer to the header in the packetbuf, for outbound packets
  * \return     Pointer to the packetbuf header
  *
  */
-void *packetbuf_hdrptr(void);
+static inline
+void* packetbuf_hdrptr(void){
+    extern uint32_t packetbuf_aligned[];
+    return (void*)packetbuf_aligned;
+}
 
 /**
  * \brief      Get the length of the header in the packetbuf
  * \return     Length of the header in the packetbuf
  *
  */
+#if PACKETBUF_CONF_ATTRS_INLINE < PACKETBUF_ATTRS_INLINE_FAST
 uint8_t packetbuf_hdrlen(void);
+#else
+static inline
+uint8_t packetbuf_hdrlen(void){
+    extern uint8_t* packetbuf_data;
+    return (packetbuf_data- (uint8_t*)packetbuf_hdrptr());
+}
+#endif
 
 
 /**
@@ -109,14 +139,22 @@ uint8_t packetbuf_hdrlen(void);
  * \return     Length of the data in the packetbuf
  *
  */
-uint16_t packetbuf_datalen(void);
+static inline
+uint16_t packetbuf_datalen(void){
+    extern uint16_t packetbuf_buflen;
+    return packetbuf_buflen;
+}
 
 /**
  * \brief      Get the total length of the header and data in the packetbuf
  * \return     Length of data and header in the packetbuf
  *
  */
-uint16_t packetbuf_totlen(void);
+static inline
+uint_fast16_t packetbuf_totlen(void){
+    extern uint_fast16_t packetbuf_len;
+    return packetbuf_len;
+}
 
 /**
  * \brief      Get the total length of the remaining space in the packetbuf
@@ -129,7 +167,7 @@ uint16_t packetbuf_remaininglen(void);
  * \brief      Set the length of the data in the packetbuf
  * \param len  The length of the data
  */
-void packetbuf_set_datalen(uint16_t len);
+void packetbuf_set_datalen(unsigned len);
 
 /**
  * \brief      Copy from external data into the packetbuf
@@ -192,6 +230,20 @@ int packetbuf_hdralloc(int size);
  */
 int packetbuf_hdrreduce(int size);
 
+/**
+ * \brief      Compact the packetbuf
+ *
+ *             This function compacts the packetbuf by copying the data
+ *             portion of the packetbuf so that becomes consecutive to
+ *             the header.
+ *
+ *             This function is called by the Rime code before a
+ *             packet is to be sent by a device driver. This assures
+ *             that the entire packet is consecutive in memory.
+ *
+ */
+void packetbuf_compact(void);
+
 /* Packet attributes stuff below: */
 
 typedef uint16_t packetbuf_attr_t;
@@ -221,6 +273,7 @@ enum {
   PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS,
   PACKETBUF_ATTR_MAC_SEQNO,
   PACKETBUF_ATTR_MAC_ACK,
+  PACKETBUF_ATTR_IS_CREATED_AND_SECURED, //ContikiMAC use it
   PACKETBUF_ATTR_MAC_METADATA,
   PACKETBUF_ATTR_MAC_NO_SRC_ADDR,
   PACKETBUF_ATTR_MAC_NO_DEST_ADDR,
@@ -231,38 +284,95 @@ enum {
 #endif /* TSCH_WITH_LINK_SELECTOR */
 
   /* Scope 1 attributes: used between two neighbors only. */
+#if PACKETBUF_WITH_PACKET_TYPE
+  PACKETBUF_ATTR_PACKET_TYPE,
+#endif
+#if NETSTACK_CONF_WITH_RIME
+  PACKETBUF_ATTR_PACKET_ID,
+  PACKETBUF_ATTR_RELIABLE,
+  PACKETBUF_ATTR_REXMIT,
+  PACKETBUF_ATTR_MAX_REXMIT,
+  PACKETBUF_ATTR_NUM_REXMIT,
+#endif /* NETSTACK_CONF_WITH_RIME */
+  PACKETBUF_ATTR_PENDING,
   PACKETBUF_ATTR_FRAME_TYPE,
 #if LLSEC802154_USES_AUX_HEADER
   PACKETBUF_ATTR_SECURITY_LEVEL,
+        //< this is PACKETBUF_ATTR_SECURITY_LEVEL value force drop Sequrity to None,
+        //    ommits default security value
+        PACKETBUF_ATTR_SECURITY_LEVEL_DROP = 0x80,
 #endif /* LLSEC802154_USES_AUX_HEADER */
-#if LLSEC802154_USES_EXPLICIT_KEYS
-  PACKETBUF_ATTR_KEY_ID_MODE,
-  PACKETBUF_ATTR_KEY_INDEX,
-#endif /* LLSEC802154_USES_EXPLICIT_KEYS */
 
 #if LLSEC802154_USES_FRAME_COUNTER
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_0_1,
   PACKETBUF_ATTR_FRAME_COUNTER_BYTES_2_3,
 #endif /* LLSEC802154_USES_FRAME_COUNTER */
+#if LLSEC802154_USES_EXPLICIT_KEYS
+  PACKETBUF_ATTR_KEY_ID_MODE,
+  PACKETBUF_ATTR_KEY_INDEX,
+  PACKETBUF_ATTR_KEY_SOURCE_BYTES_0_1,
+#endif /* LLSEC802154_USES_EXPLICIT_KEYS */
 
   /* Scope 2 attributes: used between end-to-end nodes. */
+#if NETSTACK_CONF_WITH_RIME
+  PACKETBUF_ATTR_HOPS,
+  PACKETBUF_ATTR_TTL,
+  PACKETBUF_ATTR_EPACKET_ID,
+  PACKETBUF_ATTR_EPACKET_TYPE,
+  PACKETBUF_ATTR_ERELIABLE,
+#endif /* NETSTACK_CONF_WITH_RIME */
+
   /* These must be last */
   PACKETBUF_ADDR_SENDER,
   PACKETBUF_ADDR_RECEIVER,
+#if NETSTACK_CONF_WITH_RIME
+  PACKETBUF_ADDR_ESENDER,
+  PACKETBUF_ADDR_ERECEIVER,
+#endif /* NETSTACK_CONF_WITH_RIME */
+#if TSCH_WITH_PHANTOM_NBR
+  PACKETBUF_ADDR_TSCH_RECEIVER,
+#endif /* TSCH_WITH_LINK_SELECTOR */
 
   PACKETBUF_ATTR_MAX
+  ,   PACKETBUF_ADDR_MAX = PACKETBUF_ATTR_MAX
 };
 
-#define PACKETBUF_NUM_ADDRS 2
 #define PACKETBUF_NUM_ATTRS (PACKETBUF_ATTR_MAX - PACKETBUF_NUM_ADDRS)
 #define PACKETBUF_ADDR_FIRST PACKETBUF_ADDR_SENDER
+#define PACKETBUF_NUM_ADDRS (PACKETBUF_ADDR_MAX - PACKETBUF_ADDR_FIRST)
 
 #define PACKETBUF_IS_ADDR(type) ((type) >= PACKETBUF_ADDR_FIRST)
 
+#if PACKETBUF_CONF_ATTRS_INLINE
+
+extern struct packetbuf_attr packetbuf_attrs[];
+extern struct packetbuf_addr packetbuf_addrs[];
+
+static inline int
+packetbuf_set_attr(uint8_t type, const packetbuf_attr_t val)
+{
+  packetbuf_attrs[type].val = val;
+  return 1;
+}
+static inline packetbuf_attr_t
+packetbuf_attr(uint8_t type)
+{
+  return packetbuf_attrs[type].val;
+}
+
+int               packetbuf_set_addr(uint8_t type, const linkaddr_t *addr);
+
+static inline const linkaddr_t *
+packetbuf_addr(uint8_t type)
+{
+  return &packetbuf_addrs[type - PACKETBUF_ADDR_FIRST].addr;
+}
+#else /* PACKETBUF_CONF_ATTRS_INLINE */
 int               packetbuf_set_attr(uint8_t type, const packetbuf_attr_t val);
 packetbuf_attr_t packetbuf_attr(uint8_t type);
 int               packetbuf_set_addr(uint8_t type, const linkaddr_t *addr);
 const linkaddr_t *packetbuf_addr(uint8_t type);
+#endif /* PACKETBUF_CONF_ATTRS_INLINE */
 
 /**
  * \brief      Checks whether the current packet is a broadcast.
@@ -290,6 +400,25 @@ struct packetbuf_attrlist {
   uint8_t type;
   uint8_t len;
 };
+
+
+
+//----------------------------------------------------------------------------
+struct packetbuf_linkselector{
+    uint16_t  sfh;
+    uint16_t  slot;
+    uint16_t  choffs;
+};
+typedef struct packetbuf_linkselector packetbuf_linkselector;
+
+#if TSCH_WITH_LINK_SELECTOR
+void packetbuf_set_linksel(uint16_t  fsh, uint16_t  slot, uint16_t  choffs);
+void packetbuf_linksel_set(const packetbuf_linkselector val);
+void packetbuf_linksel_clear();
+packetbuf_linkselector packetbuf_linksel();
+#endif
+
+
 
 #endif /* PACKETBUF_H_ */
 /** @} */

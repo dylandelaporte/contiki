@@ -46,6 +46,7 @@ frequency hopping for enhanced reliability.
 
 /********** Includes **********/
 
+#include <stdbool.h>
 #include "contiki.h"
 #include "net/mac/mac.h"
 #include "net/linkaddr.h"
@@ -143,14 +144,26 @@ void TSCH_CALLBACK_NEW_TIME_SOURCE(const struct tsch_neighbor *old, const struct
 int TSCH_CALLBACK_PACKET_READY(void);
 #endif
 
+// called by TSCH scheduler every time link is activated, and there is link with
+//  LINK_OPTION_SIGNAL[_XXX] in same time-slot
+//  @arg signaling_link - provided last checked link with signaling request
+#ifdef TSCH_CALLBACK_LINK_SIGNAL
+void TSCH_CALLBACK_LINK_SIGNAL(struct tsch_link * signaling_link);
+#endif
+
 /***** External Variables *****/
 
 /* Are we coordinator of the TSCH network? */
-extern int tsch_is_coordinator;
+#ifndef TSCH_IS_COORDINATOR
+/* Are we coordinator of the TSCH network? */
+extern bool tsch_is_coordinator;
+#else
+#define tsch_is_coordinator TSCH_IS_COORDINATOR
+#endif
 /* Are we associated to a TSCH network? */
-extern int tsch_is_associated;
+extern bool tsch_is_associated;
 /* Is the PAN running link-layer security? */
-extern int tsch_is_pan_secured;
+extern bool tsch_is_pan_secured;
 /* The TSCH MAC driver */
 extern const struct mac_driver tschmac_driver;
 /* 802.15.4 broadcast MAC address */
@@ -163,7 +176,7 @@ extern uint8_t tsch_join_priority;
 extern struct tsch_link *current_link;
 /* If we are inside a slot, these tell the current channel and channel offset */
 extern uint8_t tsch_current_channel;
-extern uint8_t tsch_current_channel_offset;
+extern tsch_ch_offset_t tsch_current_channel_offset;
 /* TSCH channel hopping sequence */
 extern uint8_t tsch_hopping_sequence[TSCH_HOPPING_SEQUENCE_MAX_LEN];
 extern struct tsch_asn_divisor_t tsch_hopping_sequence_length;
@@ -222,7 +235,7 @@ void tsch_set_ka_timeout(uint32_t timeout);
  *
  * \param enable 1 to be coordinator, 0 to be a node
  */
-void tsch_set_coordinator(int enable);
+void tsch_set_coordinator(bool enable);
 /**
  * Enable/disable security. If done at the coordinator, the Information
  * will be included in EBs, and all nodes will adopt the same security level.
@@ -231,7 +244,10 @@ void tsch_set_coordinator(int enable);
  *
  * \param enable 1 to enable security, 0 to disable it
  */
-void tsch_set_pan_secured(int enable);
+void tsch_set_pan_secured(bool enable);
+
+
+/* Set TSCH to send a keepalive message after TSCH_KEEPALIVE_TIMEOUT */
 /**
   * Schedule a keep-alive transmission within [timeout*0.9, timeout[
   * Can be called from an interrupt.
@@ -239,7 +255,11 @@ void tsch_set_pan_secured(int enable);
   *
   * \param immediate send immediately when 1, schedule using current timeout when 0
   */
+#if !TSCH_IS_COORDINATOR && (TSCH_MAX_KEEPALIVE_TIMEOUT > 0)
 void tsch_schedule_keepalive(int immediate);
+#else
+#define tsch_schedule_keepalive(...)
+#endif
 /**
   * Get the time, in clock ticks, since the TSCH network was started.
   *

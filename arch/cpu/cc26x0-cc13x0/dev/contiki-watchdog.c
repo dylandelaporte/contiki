@@ -113,6 +113,9 @@ watchdog_init(void)
 {
   ti_lib_watchdog_reload_set(WATCHDOG_TIMER_TOP_TICK);
   lock_config(LOCK_REGISTERS_UNLOCKED);
+#if (CONTIKI_WATCHDOG_CONF >= CONTIKI_WATCHDOG_STALL)
+  ti_lib_watchdog_stall_enable();
+#endif
 }
 /*---------------------------------------------------------------------------*/
 /**

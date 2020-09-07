@@ -40,7 +40,13 @@
 #ifndef STACK_CHECK_CONF_ENABLED
 #define STACK_CHECK_CONF_ENABLED 0
 #endif
+
+#ifndef PACKETBUF_CONF_ATTRS_INLINE
+#define PACKETBUF_CONF_ATTRS_INLINE       1
+#endif
+
 /*---------------------------------------------------------------------------*/
 #include "msp430-conf.h"
 /*---------------------------------------------------------------------------*/
+
 #endif /* CONTIKI_CONF_H */

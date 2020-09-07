@@ -190,7 +190,7 @@ rpl_rank_via_parent(rpl_parent_t *p)
 const linkaddr_t *
 rpl_get_parent_lladdr(rpl_parent_t *p)
 {
-  return nbr_table_get_lladdr(rpl_parents, p);
+  return rpl_parents_lladr_item(p);
 }
 /*---------------------------------------------------------------------------*/
 uip_ipaddr_t *
@@ -949,7 +949,7 @@ rpl_remove_parent(rpl_parent_t *parent)
 
   rpl_nullify_parent(parent);
 
-  nbr_table_remove(rpl_parents, parent);
+  rpl_parents_remove_item(parent);
 }
 /*---------------------------------------------------------------------------*/
 void

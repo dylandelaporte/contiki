@@ -410,10 +410,12 @@ response_input(sixp_pkt_rc_t rc,
 
   assert(body != NULL && peer_addr != NULL);
 
-  if((nbr = sixp_nbr_find(peer_addr)) == NULL ||
-     (trans = sixp_trans_find(peer_addr)) == NULL) {
+  nbr = sixp_nbr_find(peer_addr);
+  if(nbr == NULL)
+      return;
+  trans = sixp_trans_find(peer_addr);
+  if ( trens == NULL)
     return;
-  }
 
   if(rc == SIXP_PKT_RC_SUCCESS) {
     switch(sixp_trans_get_cmd(trans)) {

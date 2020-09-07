@@ -81,7 +81,9 @@ main(void)
   process_init();
   process_start(&etimer_process, NULL);
   ctimer_init();
+#if CONTIKI_WATCHDOG_CONF
   watchdog_init();
+#endif
 
   energest_init();
 
@@ -169,7 +171,9 @@ main(void)
 
   autostart_start(autostart_processes);
 
+#if CONTIKI_WATCHDOG_CONF
   watchdog_start();
+#endif
 
 #if PLATFORM_PROVIDES_MAIN_LOOP
   platform_main_loop();
@@ -178,7 +182,9 @@ main(void)
     uint8_t r;
     do {
       r = process_run();
+#if CONTIKI_WATCHDOG_CONF
       watchdog_periodic();
+#endif
     } while(r > 0);
 
     platform_idle();

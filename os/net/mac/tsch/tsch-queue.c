@@ -55,6 +55,7 @@
 #include "net/queuebuf.h"
 #include "net/mac/tsch/tsch.h"
 #include "net/nbr-table.h"
+#include <stdint.h>
 #include <string.h>
 
 /* Log configuration */
@@ -74,6 +75,17 @@ NBR_TABLE(struct tsch_neighbor, tsch_neighbors);
 /* Broadcast and EB virtual neighbors */
 struct tsch_neighbor *n_broadcast;
 struct tsch_neighbor *n_eb;
+
+
+
+/*---------------------------------------------------------------------------*/
+struct tsch_neighbor *tsch_neighbors_head(void){
+    return (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+}
+
+struct tsch_neighbor *tsch_neighbors_next(struct tsch_neighbor *n){
+    return (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+}
 
 /*---------------------------------------------------------------------------*/
 /* Add a TSCH neighbor */
@@ -116,25 +128,12 @@ tsch_queue_get_nbr(const linkaddr_t *addr)
 }
 /*---------------------------------------------------------------------------*/
 /* Get a TSCH time source (we currently assume there is only one) */
-struct tsch_neighbor *
-tsch_queue_get_time_source(void)
-{
-  if(!tsch_is_locked()) {
-    struct tsch_neighbor *curr_nbr = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
-    while(curr_nbr != NULL) {
-      if(curr_nbr->is_time_source) {
-        return curr_nbr;
-      }
-      curr_nbr = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, curr_nbr);
-    }
-  }
-  return NULL;
-}
+struct tsch_neighbor *tsch_time_source = NULL;
 /*---------------------------------------------------------------------------*/
 linkaddr_t *
 tsch_queue_get_nbr_address(const struct tsch_neighbor *n)
 {
-  return nbr_table_get_lladdr(tsch_neighbors, n);
+  return tsch_neighbors_lladr_item(n);
 }
 /*---------------------------------------------------------------------------*/
 /* Update TSCH time source */
@@ -155,17 +154,22 @@ tsch_queue_update_time_source(const linkaddr_t *new_addr)
       }
 
       if(new_time_src != old_time_src) {
-        LOG_INFO("update time source: ");
-        LOG_INFO_LLADDR(tsch_queue_get_nbr_address(old_time_src));
-        LOG_INFO_(" -> ");
-        LOG_INFO_LLADDR(tsch_queue_get_nbr_address(new_time_src));
-        LOG_INFO_("\n");
+          TSCH_LOG_ADD(tsch_log_change_timesrc,
+                linkaddr_copy(&log->timesrc_change.was
+                        , (old_time_src)? tsch_queue_get_nbr_address(old_time_src)
+                                        : &linkaddr_null );
+                linkaddr_copy(&log->timesrc_change.now
+                        , (new_time_src)? tsch_queue_get_nbr_address(new_time_src)
+                                        : &linkaddr_null );
+          );
 
         /* Update time source */
         if(new_time_src != NULL) {
           new_time_src->is_time_source = 1;
           /* (Re)set keep-alive timeout */
           tsch_set_ka_timeout(TSCH_KEEPALIVE_TIMEOUT);
+          /* Start sending keepalives */
+          tsch_schedule_keepalive(0);
         } else {
           /* Stop sending keepalives */
           tsch_set_ka_timeout(0);
@@ -174,6 +178,7 @@ tsch_queue_update_time_source(const linkaddr_t *new_addr)
         if(old_time_src != NULL) {
           old_time_src->is_time_source = 0;
         }
+        tsch_time_source = new_time_src;
 
         tsch_stats_reset_neighbor_stats();
 
@@ -189,7 +194,7 @@ tsch_queue_update_time_source(const linkaddr_t *new_addr)
 }
 /*---------------------------------------------------------------------------*/
 /* Flush a neighbor queue */
-static void
+void
 tsch_queue_flush_nbr_queue(struct tsch_neighbor *n)
 {
   while(!tsch_queue_is_empty(n)) {
@@ -203,15 +208,22 @@ tsch_queue_flush_nbr_queue(struct tsch_neighbor *n)
       /* Free packet queuebuf */
       tsch_queue_free_packet(p);
     }
+    TSCH_LOG_ADD(tsch_log_packet,
+        log->packet.fmt = "TSCH-queue: packet is deleted packet=%p\n";
+        log->packet.p     = p;
+    );
   }
 }
 /*---------------------------------------------------------------------------*/
 /* Remove TSCH neighbor queue */
-static void
+void
 tsch_queue_remove_nbr(struct tsch_neighbor *n)
 {
   if(n != NULL) {
     if(tsch_get_lock()) {
+
+      TSCH_LOGF("drop nb $%lx\n",
+              TSCH_LOG_ID_FROM_LINKADDR( nbr_table_get_lladdr(tsch_neighbors, n) ));
 
       tsch_release_lock();
 
@@ -219,7 +231,7 @@ tsch_queue_remove_nbr(struct tsch_neighbor *n)
       tsch_queue_flush_nbr_queue(n);
 
       /* Free neighbor */
-      nbr_table_remove(tsch_neighbors, n);
+      tsch_neighbors_remove_item(n);
     }
   }
 }
@@ -237,7 +249,7 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
   /* The scheduler provides a callback which sets the timeslot and other attributes */
   if(TSCH_CALLBACK_PACKET_READY() < 0) {
     /* No scheduled slots for the packet available; drop it early to save queue space. */
-    LOG_DBG("tsch_queue_add_packet(): rejected by the scheduler\n");
+	TSCH_DBG("tsch_queue_add_packet(): rejected by the scheduler\n");
     return NULL;
   }
 #endif
@@ -260,8 +272,11 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
             /* Add to ringbuf (actual add committed through atomic operation) */
             n->tx_array[put_index] = p;
             ringbufindex_put(&n->tx_ringbuf);
-            LOG_DBG("packet is added put_index %u, packet %p\n",
-                   put_index, p);
+            TSCH_DBG("TSCH-queue:for %lx is added packet=%p[%u/%u]\n"
+                        , TSCH_LOG_ID_FROM_LINKADDR(addr)
+                        , p, put_index
+                        , ringbufindex_elements(&n->tx_ringbuf)
+            );
             return p;
           } else {
             memb_free(&packet_memb, p);
@@ -270,8 +285,15 @@ tsch_queue_add_packet(const linkaddr_t *addr, uint8_t max_transmissions,
       }
     }
   }
-  LOG_ERR("! add packet failed: %u %p %d %p %p\n", tsch_is_locked(), n, put_index, p, p ? p->qb : NULL);
-  return NULL;
+  TSCH_LOG_ADD(tsch_log_packet_verbose,
+      log->packet.fmt = "TSCH-queue:! add packet failed:";
+      log->packet.locked = tsch_is_locked();
+      log->packet.n     = n;
+      log->packet.p     = p;
+      log->packet.index = put_index;
+      log->packet.qb    = p ? p->qb : NULL;
+  );
+  return 0;
 }
 /*---------------------------------------------------------------------------*/
 /* Returns the number of packets currently in any TSCH queue */
@@ -283,11 +305,18 @@ tsch_queue_global_packet_count(void)
 /*---------------------------------------------------------------------------*/
 /* Returns the number of packets currently in the queue */
 int
+tsch_queue_packet_count(const linkaddr_t *addr)
+{
+  return tsch_queue_nbr_packet_count(tsch_queue_get_nbr(addr));
+}
+/*---------------------------------------------------------------------------*/
+/* Returns the number of packets currently in the queue */
+int
 tsch_queue_nbr_packet_count(const struct tsch_neighbor *n)
 {
-  if(n != NULL) {
-    return ringbufindex_elements(&n->tx_ringbuf);
-  }
+    if(n != NULL) {
+      return ringbufindex_elements(&n->tx_ringbuf);
+    }
   return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -300,6 +329,7 @@ tsch_queue_remove_packet_from_queue(struct tsch_neighbor *n)
       /* Get and remove packet from ringbuf (remove committed through an atomic operation */
       int16_t get_index = ringbufindex_get(&n->tx_ringbuf);
       if(get_index != -1) {
+          TSCH_DBG("TSCH-queue: packet is removed, get_index=%u\n", get_index);
         return n->tx_array[get_index];
       } else {
         return NULL;
@@ -347,6 +377,11 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
       /* Drop packet */
       tsch_queue_remove_packet_from_queue(n);
       in_queue = 0;
+      TSCH_DBG("retransmition fail seq%d ->(%p)# %x\n"
+                  , queuebuf_attr(p->qb, PACKETBUF_ATTR_MAC_SEQNO)
+                  , n
+                  , TSCH_LOG_ID_FROM_LINKADDR(&link->addr)
+              );
     }
     /* Update CSMA state in the unicast case */
     if(is_unicast) {
@@ -355,6 +390,10 @@ tsch_queue_packet_sent(struct tsch_neighbor *n, struct tsch_packet *p,
       if(is_shared_link) {
         /* Shared link: increment backoff exponent, pick a new window */
         tsch_queue_backoff_inc(n);
+        TSCH_DBG("retransmition backoff (%d^e%d) -># %x\n"
+                    , n->backoff_window, n->backoff_exponent
+                    , TSCH_LOG_ID_FROM_LINKADDR(&link->addr)
+                    );
       }
     }
   }
@@ -368,9 +407,9 @@ tsch_queue_reset(void)
 {
   /* Deallocate unneeded neighbors */
   if(!tsch_is_locked()) {
-    struct tsch_neighbor *n = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *n = tsch_neighbors_head();
     while(n != NULL) {
-      struct tsch_neighbor *next_n = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+      struct tsch_neighbor *next_n = tsch_neighbors_next(n);
       /* Flush queue */
       tsch_queue_flush_nbr_queue(n);
       /* Reset backoff exponent */
@@ -382,18 +421,30 @@ tsch_queue_reset(void)
 /*---------------------------------------------------------------------------*/
 /* Deallocate neighbors with empty queue */
 void
-tsch_queue_free_unused_neighbors(void)
+tsch_queue_free_unused_neighbors(void){
+    tsch_queue_free_neighbors(tsch_free_UNUSED);
+}
+
+void tsch_queue_free_neighbors(unsigned/*tsch_free_XXX*/ style)
+
 {
   /* Deallocate unneeded neighbors */
   if(!tsch_is_locked()) {
-    struct tsch_neighbor *n = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *n = tsch_neighbors_head();
     while(n != NULL) {
-      struct tsch_neighbor *next_n = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+      struct tsch_neighbor *next_n = tsch_neighbors_next(n);
       /* Queue is empty, no tx link to this neighbor: deallocate.
        * Always keep time source and virtual broadcast neighbors. */
-      if(!n->is_broadcast && !n->is_time_source && !n->tx_links_count
-         && tsch_queue_is_empty(n)) {
+      if(!n->is_broadcast && !n->is_time_source && !n->tx_links_count){
+        if ((style & tsch_free_UNLINKED) != 0){
+            tsch_queue_flush_nbr_queue(n);
+        }
+        if (tsch_queue_is_empty(n)) {
+        	TSCH_DBG("drop nb $%lx style%d\n"
+                    , TSCH_LOG_ID_FROM_LINKADDR( nbr_table_get_lladdr(tsch_neighbors, n))
+                    , style );
         tsch_queue_remove_nbr(n);
+      }
       }
       n = next_n;
     }
@@ -401,19 +452,21 @@ tsch_queue_free_unused_neighbors(void)
 }
 /*---------------------------------------------------------------------------*/
 /* Is the neighbor queue empty? */
-int
+bool
 tsch_queue_is_empty(const struct tsch_neighbor *n)
 {
-  return !tsch_is_locked() && n != NULL && ringbufindex_empty(&n->tx_ringbuf);
+    if (!tsch_is_locked() && (n != NULL))
+        return  ringbufindex_empty(&n->tx_ringbuf);
+    return false;
 }
 /*---------------------------------------------------------------------------*/
 /* Returns the first packet from a neighbor queue */
 struct tsch_packet *
 tsch_queue_get_packet_for_nbr(const struct tsch_neighbor *n, struct tsch_link *link)
 {
+  if(n != NULL) {
   if(!tsch_is_locked()) {
-    int is_shared_link = link != NULL && link->link_options & LINK_OPTION_SHARED;
-    if(n != NULL) {
+      int is_shared_link = (link != NULL) && (link->link_options & LINK_OPTION_SHARED);
       int16_t get_index = ringbufindex_peek_get(&n->tx_ringbuf);
       if(get_index != -1 &&
           !(is_shared_link && !tsch_queue_backoff_expired(n))) {    /* If this is a shared link,
@@ -451,21 +504,25 @@ struct tsch_packet *
 tsch_queue_get_unicast_packet_for_any(struct tsch_neighbor **n, struct tsch_link *link)
 {
   if(!tsch_is_locked()) {
-    struct tsch_neighbor *curr_nbr = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *curr_nbr = tsch_neighbors_head();
     struct tsch_packet *p = NULL;
-    while(curr_nbr != NULL) {
+    for(; curr_nbr != NULL
+        ; curr_nbr = tsch_neighbors_next( curr_nbr ) )
+    {
       if(!curr_nbr->is_broadcast && curr_nbr->tx_links_count == 0) {
         /* Only look up for non-broadcast neighbors we do not have a tx link to */
+        if ( tsch_queue_is_empty(curr_nbr) )
+            continue;
+
         p = tsch_queue_get_packet_for_nbr(curr_nbr, link);
         if(p != NULL) {
           if(n != NULL) {
-            *n = curr_nbr;
+              *n = curr_nbr;
           }
           return p;
         }
       }
-      curr_nbr = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, curr_nbr);
-    }
+    }//for(; curr_nbr != NULL
   }
   return NULL;
 }
@@ -506,14 +563,18 @@ tsch_queue_update_all_backoff_windows(const linkaddr_t *dest_addr)
 {
   if(!tsch_is_locked()) {
     int is_broadcast = linkaddr_cmp(dest_addr, &tsch_broadcast_address);
-    struct tsch_neighbor *n = (struct tsch_neighbor *)nbr_table_head(tsch_neighbors);
+    struct tsch_neighbor *n = tsch_neighbors_head();
     while(n != NULL) {
       if(n->backoff_window != 0 /* Is the queue in backoff state? */
-         && ((n->tx_links_count == 0 && is_broadcast)
-             || (n->tx_links_count > 0 && linkaddr_cmp(dest_addr, tsch_queue_get_nbr_address(n))))) {
+         && ((n->tx_links_count == 0 && is_broadcast) // why?
+             || (n->tx_links_count > 0
+                 && linkaddr_cmp(dest_addr, tsch_queue_get_nbr_address(n))
+             ))
+         )
+      {
         n->backoff_window--;
       }
-      n = (struct tsch_neighbor *)nbr_table_next(tsch_neighbors, n);
+      n = tsch_neighbors_next(n);
     }
   }
 }

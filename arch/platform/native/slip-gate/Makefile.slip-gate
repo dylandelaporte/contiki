@@ -1,0 +1,11 @@
+CFLAGS += -DBOARD_SLIPGATE=1
+
+CONTIKI_TARGET_DIRS += slip-gate
+BOARD_SOURCEFILES += slip-arch.c serial-fd.c 
+
+EXTERNALDIRS += $(CONTIKI)/os/services/rpl-border-router/native
+BOARD_SOURCEFILES += slip-config.c
+
+# looks gcc ld can`t handle weak symbols in archives. So sure that board.o links
+#    out of archive
+PROJECT_SOURCEFILES += board.c 

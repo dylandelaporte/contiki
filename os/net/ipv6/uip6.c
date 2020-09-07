@@ -72,9 +72,9 @@
  */
 
 #include "sys/cc.h"
-#include "net/ipv6/uip.h"
-#include "net/ipv6/uip-arch.h"
-#include "net/ipv6/uipopt.h"
+#include "net/ip/uip.h"
+#include "net/ip/uip-arch.h"
+#include "net/ip/uipopt.h"
 #include "net/ipv6/uip-icmp6.h"
 #include "net/ipv6/uip-nd6.h"
 #include "net/ipv6/uip-ds6.h"
@@ -123,6 +123,16 @@ uint16_t uip_ext_len = 0;
 /** \brief The final protocol after IPv6 extension headers:
   * UIP_PROTO_TCP, UIP_PROTO_UDP or UIP_PROTO_ICMP6 */
 uint8_t uip_last_proto = 0;
+
+const uip_ipaddr_t uip_broadcast_addr =
+#if NETSTACK_CONF_WITH_IPV6
+  { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
+#else /* NETSTACK_CONF_WITH_IPV6 */
+  { { 0xff, 0xff, 0xff, 0xff } };
+#endif /* NETSTACK_CONF_WITH_IPV6 */
+const uip_ipaddr_t uip_all_zeroes_addr = { { 0x0, /* rest is 0 */ } };
+
 /** @} */
 
 /*---------------------------------------------------------------------------*/
@@ -2334,17 +2344,21 @@ uip_process(uint8_t flag)
   return;
 }
 /*---------------------------------------------------------------------------*/
+#ifndef uip_htons
 uint16_t
 uip_htons(uint16_t val)
 {
   return UIP_HTONS(val);
 }
+#endif
 
+#ifndef uip_htonl
 uint32_t
 uip_htonl(uint32_t val)
 {
   return UIP_HTONL(val);
 }
+#endif
 /*---------------------------------------------------------------------------*/
 void
 uip_send(const void *data, int len)

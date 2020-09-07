@@ -39,7 +39,7 @@
  *
  */
 
-/** \addtogroup data
+/** \addtogroup lib
     @{ */
 /**
  * \defgroup list Linked list library
@@ -67,6 +67,7 @@
 #ifndef LIST_H_
 #define LIST_H_
 
+#include "sys/cc.h"
 #include <stdbool.h>
 
 #define LIST_CONCAT2(s1, s2) s1##s2
@@ -129,14 +130,72 @@
        list_init((struct_ptr)->name);                                   \
     } while(0)
 
+
+
 /**
  * The linked list type.
  *
  */
 typedef void ** list_t;
 
-void   list_init(list_t list);
-void * list_head(list_t list);
+/**
+ * Initialize a list.
+ *
+ * This function initalizes a list. The list will be empty after this
+ * function has been called.
+ *
+ * \param list The list to be initialized.
+ */
+static inline
+void   list_init(list_t list)
+{
+  *list = NULL;
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * Get a pointer to the first element of a list.
+ *
+ * This function returns a pointer to the first element of the
+ * list. The element will \b not be removed from the list.
+ *
+ * \param list The list.
+ * \return A pointer to the first element on the list.
+ *
+ * \sa list_tail()
+ */
+static inline
+void * list_head(list_t list)
+{
+  return *list;
+}
+
+static inline
+void * list_item_next(void *item){
+    struct list {
+      struct list *next;
+    };
+    return item == NULL ? NULL : ((struct list *)item)->next;
+}
+/*---------------------------------------------------------------------------*/
+/**
+ * Duplicate a list.
+ *
+ * This function duplicates a list by copying the list reference, but
+ * not the elements.
+ *
+ * \note This function does \b not copy the elements of the list, but
+ * merely duplicates the pointer to the first element of the list.
+ *
+ * \param dest The destination list.
+ * \param src The source list.
+ */
+static inline
+void list_copy(list_t dest, list_t src)
+{
+  *dest = *src;
+}
+
 void * list_tail(list_t list);
 void * list_pop (list_t list);
 void   list_push(list_t list, void *item);
@@ -144,15 +203,13 @@ void   list_push(list_t list, void *item);
 void * list_chop(list_t list);
 
 void   list_add(list_t list, void *item);
-void   list_remove(list_t list, void *item);
+// @return true - item was removed from list
+//         false - item not in list
+bool   list_remove(list_t list, void *item);
 
 int    list_length(list_t list);
 
-void   list_copy(list_t dest, list_t src);
-
 void   list_insert(list_t list, void *previtem, void *newitem);
-
-void * list_item_next(void *item);
 
 bool list_contains(list_t list, void *item);
 
