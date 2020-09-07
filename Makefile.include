@@ -61,6 +61,7 @@ CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 CFLAGS += -Wno-unused-const-variable
 
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
+CFLAGS_WERROR += -Wno-error=array-bounds
 
 ifneq ("$(DEBUG)","")
 CFLAGS += -g3
