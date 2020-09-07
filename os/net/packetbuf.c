@@ -135,6 +135,15 @@ packetbuf_hdrreduce(int size)
   return 1;
 }
 /*---------------------------------------------------------------------------*/
+void packetbuf_compact(void)
+{
+  if(bufptr) {
+    /* shift data to the left */
+    memmove(&packetbuf[hdrlen], &packetbuf[packetbuf_hdrlen()], buflen);
+    bufptr = 0;
+  }
+}
+/*---------------------------------------------------------------------------*/
 void
 packetbuf_set_datalen(uint16_t len)
 {

@@ -198,6 +198,20 @@ int packetbuf_hdralloc(int size);
  */
 int packetbuf_hdrreduce(int size);
 
+/**
+ * \brief      Compact the packetbuf
+ *
+ *             This function compacts the packetbuf by copying the data
+ *             portion of the packetbuf so that becomes consecutive to
+ *             the header.
+ *
+ *             This function is called by the Rime code before a
+ *             packet is to be sent by a device driver. This assures
+ *             that the entire packet is consecutive in memory.
+ *
+ */
+void packetbuf_compact(void);
+
 /* Packet attributes stuff below: */
 
 typedef uint16_t packetbuf_attr_t;

@@ -158,6 +158,23 @@
 #ifndef NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE
 #define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
 #endif /* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE */
+
+//------------------------------------------------------------------------------
+//  Legacy contikiMAC, xMAC, RIME use this constant
+
+#ifndef NETSTACK_RDC_CHANNEL_CHECK_RATE
+#ifdef NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE
+#define NETSTACK_RDC_CHANNEL_CHECK_RATE NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE
+#else /* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE */
+#define NETSTACK_RDC_CHANNEL_CHECK_RATE 8
+#endif /* NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE */
+#endif /* NETSTACK_RDC_CHANNEL_CHECK_RATE */
+
+#if (NETSTACK_RDC_CHANNEL_CHECK_RATE & (NETSTACK_RDC_CHANNEL_CHECK_RATE - 1)) != 0
+#error NETSTACK_RDC_CONF_CHANNEL_CHECK_RATE must be a power of two (i.e., 1, 2, 4, 8, 16, 32, 64, ...).
+#error Change NETSTACK_RDC_CONF_CHANNEL_CHECK_RATE in contiki-conf.h, project-conf.h or in your Makefile.
+#endif
+
 //==============================================================================
 
 
