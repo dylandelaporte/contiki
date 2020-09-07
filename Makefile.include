@@ -717,5 +717,5 @@ else
 # abstract from the actual binary name. It needs to contain some
 # command in order to be a rule, not just a prerequisite.
 %: %.$(TARGET)
-	@echo "prepared for $@ prerequesites $(BUILD_DIR)/%.$(TARGET) "
+	@echo "prepared for $@ prerequesites "$(BUILD_DIR)/$@.$(TARGET)
 endif
