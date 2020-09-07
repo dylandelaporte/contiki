@@ -62,6 +62,10 @@ CFLAGS += -Wno-unused-const-variable
 
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
+ifneq ("$(DEBUG)","")
+CFLAGS += -g3
+endif
+
 ifeq ($(WERROR),1)
  LDFLAGS += $(LDFLAGS_WERROR)
 endif
