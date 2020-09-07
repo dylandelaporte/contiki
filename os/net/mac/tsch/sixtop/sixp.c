@@ -267,6 +267,7 @@ sixp_input(const uint8_t *buf, uint16_t len, const linkaddr_t *src_addr)
   else
       seqno = -1;
 
+  nbr = NULL;
   if(pkt.type == SIXP_PKT_TYPE_REQUEST) {
     if(trans != NULL) {
       // CLEAR command MUST NOT rejects on seq mismutch
