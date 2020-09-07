@@ -513,9 +513,9 @@ tsch_schedule_get_next_active_link(struct tsch_asn_t *asn
           if ((l->link_options & (LINK_OPTION_DISABLE)) != 0)
               continue;
           if (TSCH_SCHEDULE_POLICY & TSCH_SCHEDULE_OMMIT_NOXFER){
-          if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX|LINK_OPTION_PLANPOINT)) == 0)
+              if ((l->link_options & (LINK_OPTION_RX|LINK_OPTION_TX|LINK_OPTION_PLANPOINT)) == 0)
               // when link ton transfers, skip it
-              continue;
+                continue;
               if ((l->link_options & LINK_OPTION_TIME_EB_ESCAPE) != 0){
                   // TODO use cource calculation to escape use division
                   linktime += *time_offset; //(*time_offset/sf->size.val)*sf->size.val;
