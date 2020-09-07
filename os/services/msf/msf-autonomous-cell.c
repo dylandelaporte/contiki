@@ -298,9 +298,9 @@ int msf_autonomous_inspect_vs_cell(msf_cell_t cell){
     if (msf_autonomous_rx_cell_is_conflicts)
         return 0;
 
-        msf_autonomous_rx_cell_is_conflicts = true;
-        msf_housekeeping_negotiate_for_parent_rx();
-        LOG_DBG("autoRX conflicts!\n");
-        return 1;
-    }
+    msf_autonomous_rx_cell_is_conflicts = true;
+    msf_housekeeping_negotiate_for_parent_rx();
+    LOG_DBG("autoRX conflicts!\n");
+    return 1;
+}
 /*---------------------------------------------------------------------------*/
