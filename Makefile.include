@@ -333,7 +333,7 @@ endif
 
 ### Automatic dependency generation
 
-ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(findstring clean,$(MAKECMDGOALS)),clean)
 -include ${addprefix $(OBJECTDIR)/,$(CONTIKI_SOURCEFILES:.c=.d) \
                                    $(PROJECT_SOURCEFILES:.c=.d)}
 endif
