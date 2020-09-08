@@ -1521,7 +1521,7 @@ set_value(radio_param_t param, radio_value_t value)
       }
       break;
 #else
-      if ( (poll_mode != 0) == ((value & RADIO_RX_MODE_POLL_MODE) != 0) )
+      if ( (rf_core_poll_mode != 0) == ((value & RADIO_RX_MODE_POLL_MODE) != 0) )
           return RADIO_RESULT_OK;
       else
           return RADIO_RESULT_INVALID_VALUE;
