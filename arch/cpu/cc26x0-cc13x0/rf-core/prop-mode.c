@@ -190,23 +190,51 @@ static rfc_propRxOutput_t rx_stats;
 #define PROP_MODE_SETTINGS PROP_MODE_SETTINGS_SMARTRF
 #endif
 
+/* @brief selects prop mode driver to use plain RX/TX commands, or advanced one.
+ *
+ * @note depends on this mode, settings (smartrf_settings or simplelink rf-settings)
+ *      should provide configuared XXX_cmd_prop_tx/rx or XXX_cmd_prop_tx/rx_adv
+ *      commands respected.
+ * */
+#ifdef PROP_MODE_CONF_ADVANCED
+// advanced RX/TX commands allow 4g compatible frames
+//      settings should provide XXX_cmd_prop_tx/rx_adv commands
+#define PROP_MODE_ADVANCED  PROP_MODE_CONF_ADVANCED
+#else
+// driver use plain RX/TX prop commands
+//      settings should provide XXX_cmd_prop_tx/rx commands
+#define PROP_MODE_ADVANCED  1
+#endif
+
 #if PROP_MODE_SETTINGS == PROP_MODE_SETTINGS_SIMPLELINK
 #include "prop-settings.h"
 
 #define settings_prop_mode          rf_prop_mode
 #define settings_cmd_prop_fs        rf_cmd_prop_fs
+#define settings_cmd_prop_radio_div_setup   rf_cmd_prop_radio_div_setup
+
+#if PROP_MODE_ADVANCED
 #define settings_cmd_prop_tx_adv    rf_cmd_prop_tx_adv
 #define settings_cmd_prop_rx_adv    rf_cmd_prop_rx_adv
-#define settings_cmd_prop_radio_div_setup   rf_cmd_prop_radio_div_setup
+#else
+#define settings_cmd_prop_tx_adv    rf_cmd_prop_tx
+#define settings_cmd_prop_rx_adv    rf_cmd_prop_rx
+#endif
 
 #elif PROP_MODE_SETTINGS == PROP_MODE_SETTINGS_SMARTRF
 #include "smartrf-settings.h"
 
 #define settings_prop_mode          smartrf_settings_prop_mode
 #define settings_cmd_prop_fs        smartrf_settings_cmd_fs
+#define settings_cmd_prop_radio_div_setup   smartrf_settings_cmd_prop_radio_div_setup
+
+#if PROP_MODE_ADVANCED
 #define settings_cmd_prop_tx_adv    smartrf_settings_cmd_prop_tx_adv
 #define settings_cmd_prop_rx_adv    smartrf_settings_cmd_prop_rx_adv
-#define settings_cmd_prop_radio_div_setup   smartrf_settings_cmd_prop_radio_div_setup
+#else
+#define settings_cmd_prop_tx_adv    smartrf_settings_cmd_prop_tx
+#define settings_cmd_prop_rx_adv    smartrf_settings_cmd_prop_rx
+#endif
 
 #else
 #error "uncknown RFsettings style"
@@ -231,8 +259,13 @@ static rfc_propRxOutput_t rx_stats;
 /* Convenience macros for volatile access with the RF commands */
 #define v_cmd_radio_setup   CC_ACCESS_NOW(rfc_CMD_PROP_RADIO_DIV_SETUP_t, settings_cmd_prop_radio_div_setup)
 #define v_cmd_fs            CC_ACCESS_NOW(rfc_CMD_FS_t,                   settings_cmd_prop_fs)
+#if PROP_MODE_ADVANCED
 #define v_cmd_tx            CC_ACCESS_NOW(rfc_CMD_PROP_TX_ADV_t,          settings_cmd_prop_tx_adv)
 #define v_cmd_rx            CC_ACCESS_NOW(rfc_CMD_PROP_RX_ADV_t,          settings_cmd_prop_rx_adv)
+#else
+#define v_cmd_tx            CC_ACCESS_NOW(rfc_CMD_PROP_TX_t,          settings_cmd_prop_tx_adv)
+#define v_cmd_rx            CC_ACCESS_NOW(rfc_CMD_PROP_RX_t,          settings_cmd_prop_rx_adv)
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Select power table based on the frequency band */
@@ -342,7 +375,13 @@ rtimer_clock_t   rat_sync_check(rtimer_clock_t stamp);
 /*---------------------------------------------------------------------------*/
 /* The outgoing frame buffer */
 #define TX_BUF_PAYLOAD_LEN 180
+
+#if PROP_MODE_ADVANCED
 #define TX_BUF_HDR_LEN       2
+#else
+// plain prop mode header includes frame len only, not use it
+#define TX_BUF_HDR_LEN       0
+#endif
 
 static uint8_t tx_buf[TX_BUF_HDR_LEN + TX_BUF_PAYLOAD_LEN] CC_ALIGN(4);
 /*---------------------------------------------------------------------------*/
@@ -563,11 +602,11 @@ static uint8_t
 rf_cmd_prop_rx()
 {
   uint32_t cmd_status;
-  volatile rfc_CMD_PROP_RX_ADV_t *cmd_rx_adv;
   int ret;
 
+#if PROP_MODE_ADVANCED
+  volatile rfc_CMD_PROP_RX_ADV_t *cmd_rx_adv;
   cmd_rx_adv = (rfc_CMD_PROP_RX_ADV_t *)&settings_cmd_prop_rx_adv;
-  cmd_rx_adv->status = RF_CORE_RADIO_OP_STATUS_IDLE;
 
   cmd_rx_adv->rxConf.bIncludeCrc = RF_CORE_RX_BUF_INCLUDE_CRC;
   cmd_rx_adv->rxConf.bAppendRssi = RF_CORE_RX_BUF_INCLUDE_RSSI;
@@ -579,7 +618,12 @@ rf_cmd_prop_rx()
    * 2047 - length offset
    */
   cmd_rx_adv->maxPktLen = DOT_4G_MAX_FRAME_LEN - cmd_rx_adv->lenOffset;
+#else
+  volatile rfc_CMD_PROP_RX_t *cmd_rx_adv;
+  cmd_rx_adv = (rfc_CMD_PROP_RX_t *)&settings_cmd_prop_rx_adv;
+#endif
 
+  cmd_rx_adv->status = RF_CORE_RADIO_OP_STATUS_IDLE;
   rat_sync_op_start();
   ret = rf_core_send_cmd((uint32_t)cmd_rx_adv, &cmd_status);
 
@@ -858,10 +902,6 @@ transmit(unsigned short transmit_len)
   int ret;
   uint8_t was_off = 0;
   uint32_t cmd_status;
-  volatile rfc_CMD_PROP_TX_ADV_t *cmd_tx_adv;
-
-  /* Length in .15.4g PHY HDR. Includes the CRC but not the HDR itself */
-  uint16_t total_length;
 
   if(transmit_len > MAX_PAYLOAD_LEN) {
     PRINTF("transmit: too long\n");
@@ -875,6 +915,12 @@ transmit(unsigned short transmit_len)
       return RADIO_TX_ERR;
     }
   }
+
+#if PROP_MODE_ADVANCED
+  volatile rfc_CMD_PROP_TX_ADV_t *cmd_tx_adv;
+  /* Length in .15.4g PHY HDR. Includes the CRC but not the HDR itself */
+  uint16_t total_length;
+
 
   /*
    * Prepare the .15.4g PHY header
@@ -898,6 +944,14 @@ transmit(unsigned short transmit_len)
    */
   cmd_tx_adv->pktLen = transmit_len + DOT_4G_PHR_LEN;
   cmd_tx_adv->pPkt = tx_buf;
+#else
+  volatile rfc_CMD_PROP_TX_t *cmd_tx_adv;
+  /* Prepare the CMD_PROP_TX command */
+  cmd_tx_adv = (rfc_CMD_PROP_TX_t *)&settings_cmd_prop_tx_adv;
+
+  cmd_tx_adv->pktLen = transmit_len; // + DOT_4G_PHR_LEN;
+  cmd_tx_adv->pPkt = tx_buf;
+#endif
 
   /* Abort RX */
   rx_off_prop();
