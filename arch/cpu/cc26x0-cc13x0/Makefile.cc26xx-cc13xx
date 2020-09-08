@@ -91,12 +91,15 @@ CONTIKI_CPU_SOURCEFILES += random.c soc-trng.c
 CONTIKI_CPU_SOURCEFILES += spi-arch.c
 CONTIKI_CPU_SOURCEFILES += cc26xx-aes.c
 
+#default smartrfsettings
+#CONTIKI_CPU_SOURCEFILES += smartrf-settings.c prop-mode-tx-power.c
+
 SUPPORTS_PROP_MODE ?=0
 ifeq ($(SUPPORTS_PROP_MODE),1)
  CONTIKI_CPU_SOURCEFILES += prop-mode.c
-ifdef CPU_SIMPLELINK_PATH
+ifdef CPU_SIMPLELINK_PATH 
  CONTIKI_CPU_SOURCEFILES += prop-settings.c prop-tx-power.c
- CFLAGS += -DRF_TX_POWER_TABLE_STYLE=RF_TX_POWER_TABLE_SIMPLELINK
+# CFLAGS += -DRF_TX_POWER_TABLE_STYLE=RF_TX_POWER_TABLE_SIMPLELINK
 endif
 endif
 
@@ -116,6 +119,8 @@ CPU_START_SOURCEFILES += fault-handlers.c $(TI_XXWARE_STARTUP_SRCS)
 
 ################################################################################
 ### Always re-build ieee-addr.o in case the command line passes a new NODEID
+.PHONY: FORCE
+
 FORCE:
 
 $(OBJECTDIR)/ieee-addr.o: ieee-addr.c FORCE | $(OBJECTDIR)

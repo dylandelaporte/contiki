@@ -91,8 +91,8 @@
 #endif //THIS_DRIVERLIB_BUILD != DRIVERLIB_BUILD_CC13X2_CC26X2
 
 /* CC13xxware patches */
-#include "rf_patches/rf_patch_cpe_genfsk.h"
-#include "rf_patches/rf_patch_rfe_genfsk.h"
+#include "driverlib/rf_patches/rf_patch_cpe_genfsk.h"
+#include "driverlib/rf_patches/rf_patch_rfe_genfsk.h"
 
 #if defined(DEVICE_CC1310)
 #define RF_PROP_MODE  RF_MODE_PROPRIETARY_SUB_1
@@ -314,7 +314,7 @@ rfc_CMD_PROP_RX_ADV_t smartrf_settings_cmd_prop_rx_adv =
   .rxConf.bIncludeHdr = 0x0,
   .rxConf.bIncludeCrc = 0x0,
   .rxConf.bAppendRssi = 0x1,
-  .rxConf.bAppendTimestamp = 0x0,
+  .rxConf.bAppendTimestamp = 0x1,
   .rxConf.bAppendStatus = 0x1,
   .syncWord0 = 0x0055904e,
   .syncWord1 = 0x00000000,

@@ -143,7 +143,7 @@ static rfc_propRxOutput_t rx_stats;
 
 /* PHY HDR bits */
 #define DOT_4G_PHR_CRC16  0x10
-#define DOT_4G_PHR_DW     0x08
+#define DOT_4G_PHR_DW     0x08  // do Wightening
 
 #if PROP_MODE_USE_CRC16
 /* CRC16 */
@@ -182,7 +182,7 @@ static rfc_propRxOutput_t rx_stats;
 #define PROP_MODE_SETTINGS_SMARTRF      0
 #define PROP_MODE_SETTINGS_SIMPLELINK   1
 
-#ifndef PROP_MODE_CONF_SETTINGS
+#ifdef PROP_MODE_CONF_SETTINGS
 #define PROP_MODE_SETTINGS PROP_MODE_CONF_SETTINGS
 #elif RF_TX_POWER_TABLE_STYLE == RF_TX_POWER_TABLE_SIMPLELINK
 #define PROP_MODE_SETTINGS PROP_MODE_SETTINGS_SIMPLELINK
@@ -209,6 +209,29 @@ static rfc_propRxOutput_t rx_stats;
 #define settings_cmd_prop_radio_div_setup   smartrf_settings_cmd_prop_radio_div_setup
 
 #endif
+
+
+
+#ifndef CC_ACCESS_NOW
+
+/** \def CC_ACCESS_NOW(x)
+ * This macro ensures that the access to a non-volatile variable can
+ * not be reordered or optimized by the compiler.
+ * See also https://lwn.net/Articles/508991/ - In Linux the macro is
+ * called ACCESS_ONCE
+ * The type must be passed, because the typeof-operator is a gcc
+ * extension
+ */
+
+#define CC_ACCESS_NOW(type, variable) (*(volatile type *)&(variable))
+#endif
+
+/* Convenience macros for volatile access with the RF commands */
+#define v_cmd_radio_setup   CC_ACCESS_NOW(rfc_CMD_PROP_RADIO_DIV_SETUP_t, settings_cmd_prop_radio_div_setup)
+#define v_cmd_fs            CC_ACCESS_NOW(rfc_CMD_FS_t,                   settings_cmd_prop_fs)
+#define v_cmd_tx            CC_ACCESS_NOW(rfc_CMD_PROP_TX_ADV_t,          settings_cmd_prop_tx_adv)
+#define v_cmd_rx            CC_ACCESS_NOW(rfc_CMD_PROP_RX_ADV_t,          settings_cmd_prop_rx_adv)
+
 /*---------------------------------------------------------------------------*/
 /* Select power table based on the frequency band */
 #ifdef TX_POWER_CONF_PROP_DRIVER
@@ -218,7 +241,8 @@ static rfc_propRxOutput_t rx_stats;
 #include "rf/tx-power.h"
 #define TX_POWER_DRIVER   rf_tx_power_table
 
-#elif DOT_15_4G_FREQUENCY_BAND_ID==DOT_15_4G_FREQUENCY_BAND_470
+#elif (DOT_15_4G_FREQUENCY_BAND_ID==DOT_15_4G_FREQUENCY_BAND_470) \
+    ||(DOT_15_4G_FREQUENCY_BAND_ID==DOT_15_4G_FREQUENCY_BAND_431)
 
 #define TX_POWER_DRIVER PROP_MODE_TX_POWER_431_527
 
@@ -327,7 +351,7 @@ bool rx_is_on(void)
     return 0;
   }
 
-  return settings_cmd_prop_rx_adv.status == RF_CORE_RADIO_OP_STATUS_ACTIVE;
+  return v_cmd_rx.status == RF_CORE_RADIO_OP_STATUS_ACTIVE;
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t
@@ -343,7 +367,7 @@ rf_is_on(void)
 static
 bool transmitting(void)
 {
-  return settings_cmd_prop_tx_adv.status == RF_CORE_RADIO_OP_STATUS_ACTIVE;
+  return v_cmd_tx.status == RF_CORE_RADIO_OP_STATUS_ACTIVE;
 }
 /*---------------------------------------------------------------------------*/
 static
@@ -410,7 +434,7 @@ get_channel(void)
    * function returning channel - 1 instead of channel. Thus, we do a quick
    * positive integer round up.
    */
-  freq_khz += (((settings_cmd_prop_fs.fractFreq * 1000) + 65535) / 65536);
+  freq_khz += (((settings_cmd_prop_fs.fractFreq * 1000) + 0x10000) / 0x10000);
 
   return (freq_khz - DOT_15_4G_CHAN0_FREQUENCY) / DOT_15_4G_CHANNEL_SPACING;
 }
@@ -421,10 +445,10 @@ set_channel(uint8_t channel)
   uint32_t new_freq;
   uint16_t freq, frac;
 
-  new_freq = DOT_15_4G_CHAN0_FREQUENCY + (channel * DOT_15_4G_CHANNEL_SPACING);
+  new_freq = dot_15_4g_freq(channel);
 
   freq = (uint16_t)(new_freq / 1000);
-  frac = (new_freq - (freq * 1000)) * 65536 / 1000;
+  frac = (new_freq - (freq * 1000)) * 0x10000 / 1000;
 
   PRINTF("set_channel: %u = 0x%04x.0x%04x (%lu)\n", channel, freq, frac,
          new_freq);
@@ -1258,7 +1282,7 @@ on(void)
 
   /* Verify that the provided configuration is supported by this device.
      Reject any request which is not compliant. */
-  if (availableRfModes & (1 << settings_prop_mode.rfMode)){
+  if ( (availableRfModes & (1 << settings_prop_mode.rfMode)) == 0 ){
       PRINTF("on: rf_core_power_up() RF mode not supports\n");
       return RF_CORE_CMD_ERROR;
   }
