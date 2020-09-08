@@ -69,6 +69,7 @@ CONTIKI_CPU_DIRS += . dev rf-core rf-core/api rf-core/ble-hal
 
 CONTIKI_CPU_DIRS += rf-settings rf-settings/$(CPU_FAMILY)
 ifdef CPU_SIMPLELINK_PATH
+$(info with simplelink at $(CPU_SIMPLELINK_PATH))
 SOURCEDIRS += $(CONTIKI_CPU)/$(CPU_SIMPLELINK_PATH)/rf-settings \
               $(CONTIKI_CPU)/$(CPU_SIMPLELINK_PATH)/rf-settings/$(CPU_FAMILY)
 endif

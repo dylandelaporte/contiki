@@ -199,7 +199,7 @@ static rfc_propRxOutput_t rx_stats;
 #define settings_cmd_prop_rx_adv    rf_cmd_prop_rx_adv
 #define settings_cmd_prop_radio_div_setup   rf_cmd_prop_radio_div_setup
 
-#else
+#elif PROP_MODE_SETTINGS == PROP_MODE_SETTINGS_SMARTRF
 #include "smartrf-settings.h"
 
 #define settings_prop_mode          smartrf_settings_prop_mode
@@ -208,6 +208,8 @@ static rfc_propRxOutput_t rx_stats;
 #define settings_cmd_prop_rx_adv    smartrf_settings_cmd_prop_rx_adv
 #define settings_cmd_prop_radio_div_setup   smartrf_settings_cmd_prop_radio_div_setup
 
+#else
+#error "uncknown RFsettings style"
 #endif
 
 
