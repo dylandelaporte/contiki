@@ -91,8 +91,8 @@
 #endif //THIS_DRIVERLIB_BUILD != DRIVERLIB_BUILD_CC13X2_CC26X2
 
 /* CC13xxware patches */
-#include "driverlib/rf_patches/rf_patch_cpe_genfsk.h"
-#include "driverlib/rf_patches/rf_patch_rfe_genfsk.h"
+#include "rf_patches/rf_patch_cpe_genfsk.h"
+#include "rf_patches/rf_patch_rfe_genfsk.h"
 
 #if defined(DEVICE_CC1310)
 #define RF_PROP_MODE  RF_MODE_PROPRIETARY_SUB_1

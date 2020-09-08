@@ -14,7 +14,7 @@ TI_XXWARE_SRC = $(TI_XXWARE)/driverlib
 ### and the sources therein are added to the sources list explicitly. They are
 ### also listed explicitly in the linker command (through TARGET_STARTFILES),
 ### to make sure they always get linked in the image
-TI_XXWARE_STARTUP_DIR = $(TI_XXWARE)/startup_files
+TI_XXWARE_STARTUP_DIR = $(TI_XXWARE_PATH)/startup_files
 TI_XXWARE_STARTUP_SRCS = ccfg.c startup_gcc.c
 
 ### MODULES will add some of these to the include path, but we need to add
@@ -23,13 +23,13 @@ CFLAGS += -I$(TI_XXWARE) -I$(TI_XXWARE_SRC)
 CFLAGS += -I$(TI_XXWARE)/inc
 CFLAGS += -I$(CONTIKI_CPU)/$(CPU_FAMILY)
 
-CPU_DIRS += $(CONTIKI_CPU)/$(CPU_FAMILY)
+CPU_DIRS += $(CPU_FAMILY)
 ifdef SUBFAMILY
 $(info SUBFAMILY:$(SUBFAMILY))
 CFLAGS += -I$(CONTIKI_CPU)/$(SUBFAMILY) 
-CPU_DIRS += $(CONTIKI_CPU)/$(SUBFAMILY) 
+CPU_DIRS += $(SUBFAMILY) 
 endif
-MODULES += $(TI_XXWARE_SRC)
+MODULES += arch/cpu/$(TARGET)/$(TI_XXWARE_PATH)/driverlib
 CONTIKI_CPU_SOURCEFILES += driverlib-legacy.c 
 
 # TODO: should we use new cc13x0-cc16x0.lds ?
@@ -82,8 +82,8 @@ CONTIKI_CPU_SOURCEFILES += contiki-watchdog.c aux-ctrl.c
 CONTIKI_CPU_SOURCEFILES += dbg.c ieee-addr.c batmon-sensor.c adc-sensor.c
 CONTIKI_CPU_SOURCEFILES += slip-arch.c slip.c cc26xx-uart.c lpm.c
 CONTIKI_CPU_SOURCEFILES += gpio-interrupt.c gpio-hal-arch.c oscillators.c
-CONTIKI_CPU_SOURCEFILES += rf-core.c rf-tx-power.c 
-#CONTIKI_CPU_SOURCEFILES += rf-ble.c ieee-mode.c prop-mode.c 
+CONTIKI_CPU_SOURCEFILES += rf-core.c rf-tx-power.c rf-ble.c 
+#CONTIKI_CPU_SOURCEFILES += ieee-mode.c prop-mode.c 
 CONTIKI_CPU_SOURCEFILES += rf-rat-monitor.c
 CONTIKI_CPU_SOURCEFILES += ble-cc2650.c ble-hal-cc26xx.c ble-addr.c rf-ble-cmd.c
 CONTIKI_CPU_SOURCEFILES += random.c soc-trng.c
