@@ -80,15 +80,14 @@ static void nrsf_tasks_poll_del();
 
 //=============================================================================
 /*
- * @return - amount of modify/new cells
- * TODO: (ru) �������� ��������� ����� ��������� ����� ���������� ���� ������ -
- *          ������� ������� - �������� ������������� ��������� + ��������� �����.
- * TODO:    ���������� �������������� ����������� �� ���� ������, � ��������
- *              ��������� �����, ���� �������������� �����������.
- *     ��������� �������:
- *      - ������������� ����� ������, ���� ���� ����������� �� ���������� TX ������
- *        ������ �� ��� ������������� �������� �� RX������?
- *        ��� ������ ������������ ������������?
+ * TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
+ *          текущее решение - хранится использование локальное + ближайший сосед.
+ * TODO:    Необходимо детектирование конкуренции за одну ячейку, и политика
+ *              релокации ячеек, если обнаруживается конкуренция.
+ *     Возможные решения:
+ *      - согласовывать новую ячейку, если идет конкуренция за автономную TX ячейку
+ *        должен ли так разруливаться конфликт за RXячейку?
+ *        кто должен инициировать согласование?
  */
 void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
      tsch_neighbor_t* n = tsch_queue_get_nbr(hpeer->addr);
@@ -139,14 +138,14 @@ void nrsf_avoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
  * here reaction on external request for unused cells.
  *  we unuse remote cell too, and if it is not far - relay it
  *
- * TODO: (ru) �������� ��������� ����� ��������� ����� ���������� ���� ������ -
- *         ������ ����� ������� �� ���� ������. ���� �������� ���� ��������.
- *         ������������ ������� - ����� ������� ������� ������������,
- *                  � ��� �������� ������� ������, ������� �������� ��� ����������
- *                    � �������.
- *          ��������� ����� - ��� ������� ������� �������� �� ��������� ������,
- *              ����������� �������� ������� �� ��������� - ��� ������� � �������
- *              ���������� ��������� ������.
+ * TODO: (ru) проблема возникает когда несколько нодов используют одну ячейку -
+ *         Запрос может удалить не свою ячейку. надо выявлять этот конфликт.
+ *         Существующее решение - более дальняя команда игнорируется,
+ *                  а при удалении ближней ячейки, система остается без информации
+ *                    о дальней.
+ *          Возможный выход - при приходе запроса удаления на локальную ячейку,
+ *              форсировать отправку команды её занятости - это обновит у соседей
+ *              актуальную занятость ячейки.
  */
 void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
     int avoiduse;
@@ -167,8 +166,8 @@ void nrsf_unvoid_cells(SIXPeerHandle* hpeer, SIXPCellsHandle* hcells){
         nrsf_tasks_poll_del();
 
         /* TODO: need to selects somehos 1hop deleted cell, from far cells,
-         *      to prevent unnesasary rises.
-         *      Only close cells affects ADD requests.
+         *      to prevent unnesasary rises of ADD requests blocked by insuficient resource.
+         *      Only close cells should affect ADD requests.
          * */
         msf_housekeeping_on_free_close_cells(hpeer->addr);
     }
@@ -1039,8 +1038,8 @@ int nrsf_task_notify_cells(nrsfTask* t, const char* info){
 }
 
 /* TODO: need to selects somehow 1hop deleted cell, from far cells,
- *      to prevent unnesasary rises MSF ADDs.
- *      Only close cells affects ADD requests.
+ *      to prevent unnesasary rises MSF ADDs blocked by insuficient resource.
+ *      Only close cells should affect ADD requests.
  *      Possible solution - use aoFIXED or aoRELOCATE to mark deleted local cells.
  * */
 int nrsf_task_notify_dels(nrsfTask* t, const char* info){
