@@ -637,7 +637,7 @@ cc26xx_rf_cpe0_isr(void)
   ENERGEST_ON(ENERGEST_TYPE_IRQ);
 
   if(!rf_core_is_accessible()) {
-    printf("RF ISR called but RF not ready... PANIC!!\n");
+    PRINTF("RF ISR called but RF not ready... PANIC!!\n");
     if(rf_core_power_up() != RF_CORE_CMD_OK) {
       PRINTF("rf_core_power_up() failed\n");
       return;

@@ -37,3 +37,6 @@
 [submodule "arch/platform/cooja/lib/coffeecatch"]
 	path = arch/platform/cooja/lib/coffeecatch
 	url = https://github.com/alexrayne/coffeecatch.git
+[submodule "arch/cpu/nrf52840/lib/nrf52-sdk"]
+	path = arch/cpu/nrf52840/lib/nrf52-sdk
+	url = https://github.com/contiki-ng/nrf-sdk-contiki-ng.git
