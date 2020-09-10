@@ -52,6 +52,7 @@
 #include "net/netstack.h"
 #include "lib/ccm-star.h"
 #include "lib/aes-128.h"
+#include "net/mac/tsch/tsch-packet.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -170,11 +171,11 @@ tsch_packet_parse_eack(const uint8_t *buf, int buf_size,
   linkaddr_t dest;
 
   if(frame == NULL || buf_size < 0) {
-    return 0;
+    return EACK_ERR_BADARGS;
   }
   /* Parse 802.15.4-2006 frame, i.e. all fields before Information Elements */
   if((ret = frame802154_parse((uint8_t *)buf, buf_size, frame)) < 3) {
-    return 0;
+    return EACK_ERR_PARSE;
   }
   if(hdr_len != NULL) {
     *hdr_len = ret;
@@ -183,19 +184,19 @@ tsch_packet_parse_eack(const uint8_t *buf, int buf_size,
 
   /* Check seqno */
   if(seqno != frame->seq) {
-    return 0;
+    return EACK_ERR_SEQ;
   }
 
   /* Check destination PAN ID */
   if(frame802154_check_dest_panid(frame) == 0) {
-    return 0;
+    return EACK_ERR_PANID;
   }
 
   /* Check destination address (if any) */
   if(frame802154_extract_linkaddr(frame, NULL, &dest) == 0 ||
      (!linkaddr_cmp(&dest, &linkaddr_node_addr)
       && !linkaddr_cmp(&dest, &linkaddr_null))) {
-    return 0;
+    return EACK_ERR_DEST;
   }
 
   if(ies != NULL) {
@@ -208,12 +209,12 @@ tsch_packet_parse_eack(const uint8_t *buf, int buf_size,
     /* Check if there is space for the security MIC (if any) */
     mic_len = tsch_security_mic_len(frame);
     if(buf_size < curr_len + mic_len) {
-      return 0;
+      return EACK_ERR_SEC;
     }
 #endif /* LLSEC802154_ENABLED */
     /* Parse information elements. We need to substract the MIC length, as the exact payload len is needed while parsing */
     if((ret = frame802154e_parse_information_elements(buf + curr_len, buf_size - curr_len - mic_len, ies)) == -1) {
-      return 0;
+      return EACK_ERR_INFO;
     }
     curr_len += ret;
   }

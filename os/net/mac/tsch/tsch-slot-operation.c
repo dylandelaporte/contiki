@@ -997,13 +997,12 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
               /* The radio driver should return 0 if no valid packets are in the rx buffer */
               if(ack_len > 0) {
                 is_time_source = current_neighbor != NULL && current_neighbor->is_time_source;
-                if(tsch_packet_parse_eack(ackbuf, ack_len, seqno,
-                    &frame, &ack_ies, &ack_hdrlen) == 0) {
+                int ok = tsch_packet_parse_eack(ackbuf, ack_len, seqno,
+                        &frame, &ack_ies, &ack_hdrlen);
+                if(ok <= 0) {
                   ack_len = 0;
                   mac_tx_status = MAC_TX_BADACK;
-                  TSCH_LOG_ADD(tsch_log_message,
-                      snprintf(log->message, sizeof(log->message),
-                      "!failed to parse ACK"));
+                  TSCH_DBG("!failed to parse ACK %d\n", ok );
                 }
 
 #if LLSEC802154_ENABLED
