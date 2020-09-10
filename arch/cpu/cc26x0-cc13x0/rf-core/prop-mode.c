@@ -1319,7 +1319,7 @@ on(void)
   oscillators_switch_to_hf_xosc();
 
   //* apply setup radio chanel settings
-  if (rx_on_prop() != RF_CORE_CMD_ERROR) {
+  if (soft_on_prop() != RF_CORE_CMD_ERROR) {
     rf_status = 1;
     return RF_CORE_CMD_OK;
     }
