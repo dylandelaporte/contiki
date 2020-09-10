@@ -438,6 +438,9 @@ endif
 %.$(TARGET): $(BUILD_DIR_BOARD)/%.$(TARGET)
 	$(TRACE_CP)
 	$(Q)cp $< $@
+ifneq ($(NODEID),)
+	$(Q)cp $< $*-$(NODEID).$(TARGET)
+endif
 
 %.ramprof: %.$(TARGET)
 	$(NM) -S -td --size-sort $< | grep -i " [abdrw] " | cut -d' ' -f2,4
