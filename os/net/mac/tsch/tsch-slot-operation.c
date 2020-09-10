@@ -349,7 +349,7 @@ tsch_schedule_slot_operation(struct rtimer *tm, rtimer_clock_t ref_time, rtimer_
   int r;
   /* Subtract RTIMER_GUARD before checking for deadline miss
    * because we can not schedule rtimer less than RTIMER_GUARD in the future */
-  int missed = 0;
+  int missed = -1;
   if (RTIMER_CLOCK_LT(ref_time + RTIMER_GUARD, now))
       missed = check_timer_miss(ref_time, offset - RTIMER_GUARD, now);
 
