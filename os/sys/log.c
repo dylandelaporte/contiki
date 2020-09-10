@@ -153,7 +153,7 @@ log_lladdr_compact(const linkaddr_t *lladdr)
 #if LINKADDR_SIZE == 8
     LOG_OUTPUT("LL-%04x", UIP_HTONS(lladdr->u16[LINKADDR_SIZE/2-1]));
 #elif LINKADDR_SIZE == 2
-    LOG_OUTPUT("LL-%04x", UIP_HTONS(lladdr->u16));
+    LOG_OUTPUT("LL-%04x", UIP_HTONS(lladdr->u16[0]));
 #endif
 #endif /* BUILD_WITH_DEPLOYMENT */
   }
