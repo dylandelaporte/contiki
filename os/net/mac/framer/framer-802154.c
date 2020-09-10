@@ -209,11 +209,19 @@ framer_802154_setup_params(packetbuf_attr_t (*get_attr)(uint8_t type),
     }
   }
 
-  /* Suppress Source PAN ID and put Destination PAN ID by default */
-  if(params->fcf.src_addr_mode == FRAME802154_SHORTADDRMODE ||
-     params->fcf.dest_addr_mode == FRAME802154_SHORTADDRMODE) {
+  /* when both adress present, keep only one PAN ID:
+   * Suppress Source PAN ID and put Destination PAN ID by default */
+  if(params->fcf.src_addr_mode != FRAME802154_NOADDR &&
+     params->fcf.dest_addr_mode != FRAME802154_NOADDR)
+  {
     params->fcf.panid_compression = 1;
-  } else {
+  }
+#if !TSCH_PACKET_EACK_WITH_PANID
+  else if (params->fcf.frame_type == FRAME802154_ACKFRAME) {
+      params->fcf.panid_compression = 1;
+  }
+#endif
+  else {
     params->fcf.panid_compression = 0;
   }
 }
