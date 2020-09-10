@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Swedish Institute of Computer Science.
+ * Copyright (c) 2016, Inria.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,64 +32,76 @@
 
 /**
  * \file
- *         Best-effort single-hop unicast example
+ *         An example of Rime/TSCH
  * \author
- *         Adam Dunkels <adam@sics.se>
+ *         Simon Duquennoy <simon.duquennoy@inria.fr>
+ *
  */
 
-#include "contiki.h"
-#include "net/rime/rime.h"
 #include <stdio.h>
+#include "contiki-conf.h"
+#include "net/netstack.h"
+#include "net/rime/rime.h"
+#include "net/mac/tsch/tsch.h"
+
+// it`s insane, but NODEID lsb - places in MSB of linkaddr
+const linkaddr_t coordinator_addr =    { { 0, 1 } };
+const linkaddr_t destination_addr =    { { 0, 1 } };
 
 /*---------------------------------------------------------------------------*/
-PROCESS(example_unicast_process, "Example unicast");
-AUTOSTART_PROCESSES(&example_unicast_process);
+PROCESS(unicast_test_process, "Rime Node");
+AUTOSTART_PROCESSES(&unicast_test_process);
+
 /*---------------------------------------------------------------------------*/
 static void
 recv_uc(struct unicast_conn *c, const linkaddr_t *from)
 {
-  printf("unicast message received from %d.%d\n",
-	 from->u8[0], from->u8[1]);
+  printf("App: unicast message received from %u.%u\n",
+   from->u8[0], from->u8[1]);
 }
 /*---------------------------------------------------------------------------*/
 static void
-sent_uc(struct unicast_conn *c, int status, int num_tx)
+sent_uc(struct unicast_conn *ptr, int status, int num_tx)
 {
-  const linkaddr_t *dest = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
-  if(linkaddr_cmp(dest, &linkaddr_null)) {
-    return;
-  }
-  printf("unicast message sent to %d.%d: status %d num_tx %d\n",
-    dest->u8[0], dest->u8[1], status, num_tx);
+  printf("App: unicast message sent, status %u, num_tx %u\n",
+   status, num_tx);
 }
-/*---------------------------------------------------------------------------*/
-static const struct unicast_callbacks unicast_callbacks = {recv_uc, sent_uc};
+
+static const struct unicast_callbacks unicast_callbacks = { recv_uc, sent_uc };
 static struct unicast_conn uc;
+
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(example_unicast_process, ev, data)
+PROCESS_THREAD(unicast_test_process, ev, data)
 {
-  PROCESS_EXITHANDLER(unicast_close(&uc);)
-    
   PROCESS_BEGIN();
+
+  tsch_set_coordinator(linkaddr_cmp(&coordinator_addr, &linkaddr_node_addr));
+  NETSTACK_MAC.on();
 
   unicast_open(&uc, 146, &unicast_callbacks);
 
+  if (tsch_is_coordinator)
+      PROCESS_EXIT();
+
   while(1) {
     static struct etimer et;
-    linkaddr_t addr;
-    
+
     etimer_set(&et, CLOCK_SECOND);
-    
+
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
-    packetbuf_copyfrom("Hello", 5);
-    //linkaddr_copy(&addr, &linkaddr_null);
-    addr.u8[1] = 1;
-    addr.u8[0] = 0;
-    if(!linkaddr_cmp(&addr, &linkaddr_node_addr)) {
-      unicast_send(&uc, &addr);
+    if (!tsch_is_associated){
+        printf("App:associate me $%x\n", linkaddr_node_addr.u16[LINKADDR_SIZE/2-1]);
+        continue;
     }
 
+    packetbuf_copyfrom("Hello", 5);
+
+    if(!linkaddr_cmp(&destination_addr, &linkaddr_node_addr)) {
+      printf("App: sending unicast message to %u.%u\n"
+              , destination_addr.u8[0], destination_addr.u8[1]);
+      unicast_send(&uc, &destination_addr);
+    }
   }
 
   PROCESS_END();
