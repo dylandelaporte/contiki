@@ -61,6 +61,28 @@
 int tsch_packet_create_eack(uint8_t *buf, uint16_t buf_size,
                             const linkaddr_t *dest_addr, uint8_t seqno,
                             int16_t drift, int nack);
+
+#if LOG_LEVEL_MAC >= LOG_LEVEL_DBG
+enum tsch_eack_err{
+    EACK_ERR_BADARGS    = 0,
+    EACK_ERR_PARSE      = -1,
+    EACK_ERR_SEQ        = -2,
+    EACK_ERR_PANID      = -3,
+    EACK_ERR_DEST       = -4,
+    EACK_ERR_SEC        = -5,
+    EACK_ERR_INFO       = -6,
+};
+#else
+enum tsch_eack_err{
+    EACK_ERR_BADARGS    = 0,
+    EACK_ERR_PARSE      = 0,
+    EACK_ERR_SEQ        = 0,
+    EACK_ERR_PANID      = 0,
+    EACK_ERR_DEST       = 0,
+    EACK_ERR_SEC        = 0,
+    EACK_ERR_INFO       = 0,
+};
+#endif
 /**
  * \brief Parse enhanced ACK packet
  * \param buf The buffer where to parse the EACK from
@@ -69,7 +91,8 @@ int tsch_packet_create_eack(uint8_t *buf, uint16_t buf_size,
  * \param frame The frame structure where to store parsed fields
  * \param ies The IE structure where to store parsed IEs
  * \param hdr_len A pointer where to store the length of the parsed header
- * \return 1 if the EACK is correct and acknowledges the specified frame, 0 otherwise
+ * \return 1 if the EACK is correct and acknowledges the specified frame, <= 0 otherwise
+ *          @sa tsch_eack_err
  */
 int tsch_packet_parse_eack(const uint8_t *buf, int buf_size,
     uint8_t seqno, frame802154_t *frame, struct ieee802154_ies *ies, uint8_t *hdr_len);
