@@ -1577,10 +1577,10 @@ set_value(radio_param_t param, radio_value_t value)
 #ifndef RF_CORE_POLL_MODE
       old_poll_mode = rf_core_poll_mode;
       rf_core_poll_mode = (value & RADIO_RX_MODE_POLL_MODE) != 0;
-      if(rf_core_poll_mode == old_poll_mode) {
-        return RADIO_RESULT_OK;
+      if(rf_core_poll_mode != old_poll_mode) {
+        rf_core_setup_interrupts();
       }
-      break;
+        return RADIO_RESULT_OK;
 #else
       if ( (rf_core_poll_mode != 0) == ((value & RADIO_RX_MODE_POLL_MODE) != 0) )
           return RADIO_RESULT_OK;
