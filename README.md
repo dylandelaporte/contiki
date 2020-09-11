@@ -49,9 +49,11 @@ Used AES128 encription, but there was myltiple ports - wityhout encription, and 
 Such work demands some flexibility with encription of links and packets - reailised assigning key per recv/sender adress and port.   
 
 Has imroved cc26xx RFcore-prop driver. 
-Most important - provided power control, that use GLDO during receive. Linear LDO hav eless noise - and gives about 12db for SNR.
+Most important - provided power control, that use GLDO during receive. Linear LDO have less noise - and gives about 12db for SNR.
 
 And other little work for core library, etimer and rtimer, cc26xx LPM, SPI ... 
+
+More branches/tags descriptions see [TAGS.md](TAGS.md)
 
 This fork improves vs Contiki-NG:
 ============================
@@ -60,6 +62,8 @@ contiki core improves
 --------------------------------
 + [feature/printf-netaddr] - provide ability for printing net/link-adress via pointer.
     like linux printk do.
+
++ [contrib/cpu-cc1352] - introduce for cc26x0-cc13x0 target support of cc13/26x2 cpus
 
 + [speed/inlines] - core optimisation by inlining code
 + [speed/nbr-index-access] - nbr-table inline optimisations
@@ -84,10 +88,10 @@ contiki core improves
     - [alexrayne-make-cpp] - DEBUG symbol pass to compiler
     - [fix-make-loose-objects] - prevent delete project objects that have deps but not included in contiki lib
     - [fix-alexrayne-cc26-srec] - fix srec make routine when  build on windows platform
-    - [bkozak/build_in_seperate_dir] - PR#1417 We can now set BUILDDIR to build in seperate dir
     - [ivan-alekhin/customrules-fix] - Allow to search "customrules" in additional directories.
     - [fix-make-dotpath] - ommits '.' dir in SOURCEDIRS if one alredy provided PROJECTDIRS
     - OBJVARIANT variable builds objects into obj.${OBJVARIANT} dir
+    - [ferature/make-extends] - set of make extends
 
 + [feature/debug-os-unstatic] - code preparetions for better debuging.
 
