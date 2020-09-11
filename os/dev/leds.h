@@ -108,7 +108,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 /*---------------------------------------------------------------------------*/
-#if LEDS_CONF_LEGACY_API
+#ifdef LEDS_CONF_LEGACY_API
 /**
  * \brief Define to 1 to enabled the legacy LED API.
  */
@@ -165,10 +165,19 @@ typedef uint8_t leds_mask_t;
 /*---------------------------------------------------------------------------*/
 #if LEDS_LEGACY_API
 /*---------------------------------------------------------------------------*/
+#ifdef LEDS_CONF_COUNT
+#define LEDS_COUNT LEDS_CONF_COUNT
+#else
+/**
+ * \brief The number of LEDs present on a device
+ */
+#define LEDS_COUNT 3
+#endif
+
 #ifdef LEDS_CONF_ALL
 #define LEDS_ALL    LEDS_CONF_ALL
 #else
-#define LEDS_ALL    7
+#define LEDS_ALL ((1 << LEDS_COUNT) - 1)
 #endif
 /*---------------------------------------------------------------------------*/
 void leds_blink(void);
@@ -201,6 +210,9 @@ void leds_arch_set(leds_mask_t leds);
 #define LEDS_LED3     0x02 /**< Convenience macro to refer to the 3rd LED (LED 3) */
 #define LEDS_LED4     0x03 /**< Convenience macro to refer to the 4th LED (LED 4) */
 #define LEDS_LED5     0x04 /**< Convenience macro to refer to the 5th LED (LED 5) */
+#define LEDS_LED6     0x05 /**< Convenience macro to refer to the 5th LED (LED 5) */
+#define LEDS_LED7     0x06 /**< Convenience macro to refer to the 5th LED (LED 5) */
+#define LEDS_LED8     0x07 /**< Convenience macro to refer to the 5th LED (LED 5) */
 /*---------------------------------------------------------------------------*/
 /**
  * \brief A LED logical representation
