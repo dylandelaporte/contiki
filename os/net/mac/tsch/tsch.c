@@ -618,6 +618,8 @@ int tsch_tx_process_pending()
 static void
 tsch_start_coordinator(void)
 {
+  LOG_DBG("tsch_start_coordinator\n");
+
   frame802154_set_pan_id(IEEE802154_PANID);
   /* Initialize hopping sequence as default */
   memcpy(tsch_hopping_sequence, TSCH_DEFAULT_HOPPING_SEQUENCE, sizeof(TSCH_DEFAULT_HOPPING_SEQUENCE));
@@ -645,6 +647,7 @@ void tsch_poll(void){
 }
 
 void tsch_activate(bool onoff){
+    LOG_DBG("activate %d\n", onoff);
     if (onoff){
         if (tsch_status < tschACTIVE)
             tsch_poll();
@@ -906,6 +909,8 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
   PT_BEGIN(pt);
 
+  LOG_DBG("tsch_scan:start\n");
+
   TSCH_ASN_INIT(tsch_current_asn, 0, 0);
 
 #if TSCH_HW_FRAME_FILTERING
@@ -951,11 +956,11 @@ PT_THREAD(tsch_scan(struct pt *pt))
         {
         NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, scan_channel);
         current_channel = scan_channel;
-        LOG_INFO("TSCH: scanning on channel %u\n", scan_channel);
+        LOG_INFO("scanning on channel %u\n", scan_channel);
       current_channel_since = now_time;
     }
         else{
-        	LOG_INFO("TSCH: scanning failed channel %u\n", scan_channel);
+        	LOG_INFO("scanning failed channel %u\n", scan_channel);
             if (current_channel != 0)
                 // if there was success chanels, can skip this one
                 continue;
@@ -966,7 +971,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
     /* Turn radio on and wait for EB */
     while ( NETSTACK_RADIO.on() != 1){
-        LOG_ERR("TSCH: scanning: failed turn on radio\n");
+        LOG_ERR("scanning: failed turn on radio\n");
         const unsigned radio_fail_period = 10*CLOCK_SECOND;
         etimer_set(&scan_timer, radio_fail_period);
         PT_WAIT_UNTIL(pt, etimer_expired(&scan_timer));
@@ -1004,7 +1009,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
       t1 = RTIMER_NOW();
 
       /* Parse EB and attempt to associate */
-      LOG_INFO("TSCH: association: received packet (%u bytes) on channel %u at %u\n"
+      LOG_INFO("association: received packet (%u bytes) on channel %u at %u\n"
               , input_eb->len, current_channel, (unsigned)t0);
 
         /* Sanity-check the timestamp */
@@ -1032,7 +1037,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
       /* Go back to scanning */
     }
   } //while(!tsch_is_associated && !tsch_is_coordinator)
-  ANNOTATE("TSCH: scanning complete\n");
+  LOG_DBG("scanning complete\n");
 
   /* End of association, turn the radio off */
   NETSTACK_RADIO.off();
@@ -1057,6 +1062,8 @@ PROCESS_THREAD(tsch_process, ev, data)
     tsch_packet_seqno++;
   }
 #endif
+
+  LOG_DBG("start tsch_process\n");
 
   while(1) {
 
@@ -1294,6 +1301,8 @@ tsch_init(void)
     return;
   }
 
+  LOG_DBG("intialise\n");
+
   /* Init TSCH sub-modules */
   tsch_reset();
   tsch_queue_init();
@@ -1456,7 +1465,9 @@ packet_input(void)
 static int
 turn_on(void)
 {
+  LOG_DBG("startup from %d\n", tsch_status);
   if(tsch_status == tschINITIALISED) {
+    LOG_INFO("starting as %s\n", tsch_is_coordinator ? "coordinator" : "node");
     tsch_status = tschSTARTED;
     /* Process tx/rx callback and log messages whenever polled */
     process_start(&tsch_pending_events_process, NULL);
@@ -1466,7 +1477,6 @@ turn_on(void)
     }
     /* try to associate to a network or start one if setup as coordinator */
     process_start(&tsch_process, NULL);
-    LOG_INFO("starting as %s\n", tsch_is_coordinator ? "coordinator" : "node");
   }
   tsch_activate(true);
     return 1;
