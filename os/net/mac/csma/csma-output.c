@@ -225,6 +225,7 @@ send_one_packet(struct neighbor_queue *n, struct packet_queue *q)
 
             if(NETSTACK_RADIO.pending_packet()) {
               len = NETSTACK_RADIO.read(ackbuf, CSMA_ACK_LEN);
+              LOG_DBG("<- ACK[%d] dsn $%x\n", len, ackbuf[2]);
               if(len == CSMA_ACK_LEN && ackbuf[2] == dsn) {
                 /* Ack received */
                 ret = MAC_TX_OK;
