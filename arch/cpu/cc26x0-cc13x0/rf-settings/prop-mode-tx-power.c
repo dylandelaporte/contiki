@@ -67,7 +67,7 @@ const prop_mode_tx_power_config_t prop_mode_tx_power_779_930[] = {
   {-128, 0xFFFF },
 };
 /*---------------------------------------------------------------------------*/
-/* Default TX power settings for the 431-527MHz band */
+/* Default TX power settings for the 431-527MHz band build on cc1350-4*/
 __WEAK
 const prop_mode_tx_power_config_t prop_mode_tx_power_431_527[] = {
   {  15, 0x003f },

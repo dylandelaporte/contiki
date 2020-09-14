@@ -247,9 +247,10 @@ static rfc_propRxOutput_t rx_stats;
     ||(DOT_15_4G_FREQUENCY_BAND_ID==DOT_15_4G_FREQUENCY_BAND_431)
 
 #define TX_POWER_DRIVER PROP_MODE_TX_POWER_431_527
-
+#elif DOT_15_4G_FREQUENCY_BAND_ID==DOT_15_4G_FREQUENCY_BAND_780
+#define TX_POWER_DRIVER PROP_MODE_TX_POWER_779_930
 #else
-
+#pragma warning ( "uncknown DOT_15_4G_FREQUENCY_BAND - use default 780MHz band power table. Declare valid TX_POWER_CONF_PROP_DRIVER" )
 #define TX_POWER_DRIVER PROP_MODE_TX_POWER_779_930
 
 #endif
@@ -706,6 +707,7 @@ request(void)
 /*---------------------------------------------------------------------------*/
 LPM_MODULE(prop_lpm_module, request, NULL, NULL, LPM_DOMAIN_NONE);
 /*---------------------------------------------------------------------------*/
+// this handler provides to update_prop for refresh FS settings
 static int
 prop_fs(void)
 {
@@ -713,6 +715,7 @@ prop_fs(void)
   return rf_cmd_execute(cmd, "prop_fs: CMD_FS");
 }
 
+// this handler provides to update_prop for refresh power settings
 static
 int prop_txpower(void){
     rfc_CMD_SET_TX_POWER_t cmd_power =
@@ -1537,6 +1540,8 @@ get_value(radio_param_t param, radio_value_t *value)
   }
 }
 /*---------------------------------------------------------------------------*/
+// provide update RF property sequence enough for curretn radio-mode:
+//  waits transmit complete, or breaks/restart receive if it run.
 typedef int (*radio_prop_func)(void);
 static
 radio_result_t update_prop(radio_prop_func f){
