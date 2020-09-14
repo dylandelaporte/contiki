@@ -447,7 +447,6 @@ uint32_t rf_core_cmd_status(void){
  * \brief Sends a command to the RF core.
  *
  * \param cmd The command value or a pointer to a command buffer
- * \param status A pointer to a variable which will hold the status
  * \return RF_CORE_CMD_OK or RF_CORE_CMD_ERROR
  *
  * This function supports all three types of command (Radio OP, immediate and
@@ -472,6 +471,16 @@ uint32_t rf_core_cmd_status(void){
  */
 uint_fast8_t rf_core_start_cmd(uint32_t cmd);
 
+/**
+ * \brief Sends a command to the RF core (deprecated).
+ * \param cmd The command value or a pointer to a command buffer
+ * \param status A pointer to a variable which will hold the status
+ * \return RF_CORE_CMD_OK or RF_CORE_CMD_ERROR
+ *
+ * This is deprecated function should be replaced by rf_core_start_cmd(cmd), since
+ *  it`s status can be accesed via rf_core_cmd_status()
+ *
+ */
 static inline
 uint_fast8_t rf_core_send_cmd(uint32_t cmd, uint32_t *status){
     uint_fast8_t ok = rf_core_start_cmd(cmd);
@@ -560,7 +569,6 @@ void rf_core_setup_interrupts(void);
  * \brief Enable interrupt on command done.
  * \param fg set true to enable irq on foreground command done and false for
  * background commands or if not in ieee mode.
- * \param poll_mode true if the driver is in poll mode
  *
  * This is used within TX routines in order to be able to sleep the CM3 and
  * wake up after TX has finished
