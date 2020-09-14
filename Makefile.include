@@ -86,6 +86,8 @@ LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 #CFLAGS_WERROR += -Wno-error=unused-const-variable
 CFLAGS_WERROR += -Wno-error=unused-function -Wno-error=unused-variable
 CFLAGS_WERROR += -Wno-error=array-bounds
+#some code use pragma "warning". this code warns anyway, but still need compiles
+CFLAGS += -Wno-error=unknown-pragmas
 
 ifneq ("$(DEBUG)","")
 CFLAGS += -g3
@@ -436,11 +438,10 @@ SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
 
 
 
-vpath %.c $(SOURCEDIRS)
-vpath %.cpp $(SOURCEDIRS)
-vpath %.S $(SOURCEDIRS)
-vpath %.s $(SOURCEDIRS)
-vpath %.o $(OBJECTDIR)
+vpath %.c $(abspath $(SOURCEDIRS))
+vpath %.cpp $(abspath $(SOURCEDIRS))
+vpath %.S $(abspath $(SOURCEDIRS))
+vpath %.s $(abspath $(SOURCEDIRS))
 
 CFLAGS += ${addprefix -I, $(call uniq,$(SOURCEDIRS) $(CONTIKI)) }
 
