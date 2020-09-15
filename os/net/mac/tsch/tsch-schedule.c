@@ -462,7 +462,7 @@ default_tsch_link_comparator(struct tsch_link *a, struct tsch_link *b)
     struct tsch_neighbor *bn = tsch_queue_get_nbr(&b->addr);
 
     // wins that have priority packet
-    if ((an->tx_priority != NULL) != (an->tx_priority != NULL))
+    if ((an->tx_priority != NULL) != (bn->tx_priority != NULL))
         return (an->tx_priority != NULL)? a:b;
 
     int a_packet_count = an ? ringbufindex_elements(&an->tx_ringbuf) : 0;
