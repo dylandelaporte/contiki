@@ -120,6 +120,22 @@
 #define RF_CORE_POLL_MODE 1
 #endif
 /*---------------------------------------------------------------------------*/
+/**
+ * RF Front-End IRQ handling with app handlers
+ * @{
+ * */
+
+/**< a type of application handler used for RF operation IRQ invoke */
+typedef void (*rfc_irq_handle)(uint32_t status);
+
+/**< turn on app handlers support */
+#ifdef RF_CORE_CONF_APP_HANDLING
+#define RF_CORE_APP_HANDLING    RF_CORE_CONF_APP_HANDLING
+#else
+#define RF_CORE_APP_HANDLING    1
+#endif
+/** @} */
+/*---------------------------------------------------------------------------*/
 /*
  * RF Front-End pending() api style
  * 0 :  old behaviour - pending() return count of received packets in que.
@@ -663,6 +679,16 @@ uint8_t rf_core_check_rat_overflow(void);
  */
 uint32_t rf_core_convert_rat_to_rtimer(uint32_t rat_timestamp);
 
+#if RF_CORE_APP_HANDLING
+/**
+ * \brief install AppHandle for new. RF operation, and arm it's IRQ.
+ *        this handle invokes single time, and after exec curretn poll resotres.
+ * \param op != NULL provides app handler for next IRQ invokation, and enables
+ *              IRQ for IRQ_RX_ENTRY_DONE, errors and IRQ_LAST_COMMAND_DONE
+ *      - op == NULL - disables ap handler, and restore current poll mode
+ */
+void rf_core_arm_app_handle( rfc_irq_handle op, uint32_t enabled_irqs);
+#endif
 
 
 //==============================================================================

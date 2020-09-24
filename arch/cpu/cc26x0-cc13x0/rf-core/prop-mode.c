@@ -844,6 +844,40 @@ init(void)
   return 1;
 }
 /*---------------------------------------------------------------------------*/
+static int transmited(void);
+
+#if RF_CORE_APP_HANDLING
+radio_app_handle    rf_prop_tx_handle;
+radio_app_handle    rf_prop_rx_handle;
+
+void rfprop_transmit_isr(uint32_t irqflags){
+    if (rf_prop_tx_handle){
+        int ok = transmited();
+        (*rf_prop_tx_handle)(ok);
+        rf_prop_tx_handle = NULL;
+    }
+    rf_prop_rx_handle = NULL;
+}
+
+void rfprop_receive_isr(uint32_t irqflags){
+    if (rf_prop_rx_handle){
+        int ok = ((irqflags & IRQ_RX_ENTRY_DONE) != 0);
+        (*rf_prop_rx_handle)(ok);
+        rf_prop_rx_handle = NULL;
+    }
+    rf_prop_tx_handle = NULL;
+}
+
+static
+void rfprop_happ_reset(){
+    rf_prop_tx_handle = NULL;
+    rf_prop_rx_handle = NULL;
+}
+
+#else
+static void rfprop_happ_reset(){;}
+#endif
+/*---------------------------------------------------------------------------*/
 static int
 prepare(const void *payload, unsigned short payload_len)
 {
@@ -855,11 +889,11 @@ prepare(const void *payload, unsigned short payload_len)
   return 0;
 }
 /*---------------------------------------------------------------------------*/
+static uint8_t was_off = 0;
 static int
 transmit(unsigned short transmit_len)
 {
   int ret;
-  uint8_t was_off = 0;
   uint32_t cmd_status;
   volatile rfc_CMD_PROP_TX_ADV_t *cmd_tx_adv;
 
@@ -910,10 +944,33 @@ transmit(unsigned short transmit_len)
 
   ret = rf_core_send_cmd((uint32_t)cmd_tx_adv, &cmd_status);
 
-  if(ret) {
-    /* If we enter here, TX actually started */
-    ENERGEST_SWITCH(ENERGEST_TYPE_LISTEN, ENERGEST_TYPE_TRANSMIT);
-    watchdog_periodic();
+  if(ret){
+      /* If we enter here, TX actually started */
+      ENERGEST_SWITCH(ENERGEST_TYPE_LISTEN, ENERGEST_TYPE_TRANSMIT);
+      watchdog_periodic();
+  }
+  else {
+      /* Failure sending the CMD_PROP_TX command */
+      PRINTF("transmit: PROP_TX_ERR ret=%d, CMDSTA=0x%08lx, status=0x%04x\n",
+             ret, cmd_status, cmd_tx_adv->status);
+      ret = RADIO_TX_ERR;
+      rfprop_happ_reset();
+  }
+#if RF_CORE_APP_HANDLING
+  rf_prop_rx_handle = NULL;
+  if (rf_prop_tx_handle){
+      rf_core_arm_app_handle(rfprop_transmit_isr, IRQ_COMMAND_DONE);
+      return RADIO_TX_SCHEDULED;
+  }
+#endif
+  return transmited();
+}
+
+static
+int transmited(void) {
+    int ret;
+    volatile rfc_CMD_PROP_TX_ADV_t *cmd_tx_adv;
+    cmd_tx_adv = (rfc_CMD_PROP_TX_ADV_t *)&settings_cmd_prop_tx_adv;
 
     /* Idle away while the command is running */
     while((cmd_tx_adv->status & RF_CORE_RADIO_OP_MASKED_STATUS)
@@ -938,12 +995,6 @@ transmit(unsigned short transmit_len)
              cmd_tx_adv->status);
       ret = RADIO_TX_ERR;
     }
-  } else {
-    /* Failure sending the CMD_PROP_TX command */
-    PRINTF("transmit: PROP_TX_ERR ret=%d, CMDSTA=0x%08lx, status=0x%04x\n",
-           ret, cmd_status, cmd_tx_adv->status);
-    ret = RADIO_TX_ERR;
-  }
 
   /*
    * Update ENERGEST state here, before a potential call to off(), which
@@ -1269,6 +1320,9 @@ void rf_power_down(){
         if (PowerCtrlSourceGet() != power_style_save)
             PowerCtrlSourceSet(power_style_save);
     }
+
+    // aborts last operation, handle, since it should install in online radio
+    rfprop_happ_reset();
 }
 
 static int
@@ -1300,6 +1354,10 @@ on(void)
 #if (RF_CORE_HFOSC_STARTUP_TOUS > 0)
   rtimer_clock_t hf_start_time = RTIMER_NOW();
 #endif
+
+    // aborts last operation, handle, since it should install in online radio
+    // TODO: maybe should reinstall AppHandle at poweron?
+    rfprop_happ_reset();
 
   if(rf_is_on()) {
     PRINTF("on: We were on. PD=%u, RX=0x%04x \n", rf_core_is_accessible(),
@@ -1712,6 +1770,20 @@ get_object(radio_param_t param, void *dest, size_t size)
 
       return RADIO_RESULT_OK;
     }
+#if RF_CORE_APP_HANDLING
+    else if (param == RADIO_ARM_HANDLE_TX){
+      if (size != sizeof(radio_app_handle))
+          return RADIO_RESULT_INVALID_VALUE;
+      *((radio_app_handle*)dest) = rf_prop_tx_handle;
+      return RADIO_RESULT_OK;
+    }
+    else if (param == RADIO_ARM_HANDLE_RX){
+      if (size != sizeof(radio_app_handle))
+          return RADIO_RESULT_INVALID_VALUE;
+      *((radio_app_handle*)dest) = rf_prop_rx_handle;
+      return RADIO_RESULT_OK;
+    }
+#endif
 
   return RADIO_RESULT_NOT_SUPPORTED;
 }
@@ -1719,6 +1791,24 @@ get_object(radio_param_t param, void *dest, size_t size)
 static radio_result_t
 set_object(radio_param_t param, const void *src, size_t size)
 {
+#if RF_CORE_APP_HANDLING
+  if (param == RADIO_ARM_HANDLE_RX){
+      if (size != sizeof(radio_app_handle))
+          return RADIO_RESULT_INVALID_VALUE;
+      rf_prop_rx_handle = (radio_app_handle)src;
+      if (src != NULL)
+          rf_core_arm_app_handle(rfprop_receive_isr, IRQ_COMMAND_DONE | IRQ_RX_ENTRY_DONE );
+      else
+          rf_core_arm_app_handle(NULL, IRQ_COMMAND_DONE | IRQ_RX_ENTRY_DONE );
+      return RADIO_RESULT_OK;
+  }
+  if (param == RADIO_ARM_HANDLE_TX){
+      if (size != sizeof(radio_app_handle))
+          return RADIO_RESULT_INVALID_VALUE;
+      rf_prop_tx_handle = (radio_app_handle)src;
+      return RADIO_RESULT_OK;
+  }
+#endif
   return RADIO_RESULT_NOT_SUPPORTED;
 }
 /*---------------------------------------------------------------------------*/
