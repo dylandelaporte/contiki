@@ -239,6 +239,9 @@ PROCESS_THREAD(broadcast_process, ev, data)
   PROCESS_BEGIN();
 
   broadcast_open(&broadcast, 129, &broadcast_call);
+  printf("addr %d.%d\n"
+          , linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1]
+          );
 
   while(1) {
 
@@ -249,6 +252,7 @@ PROCESS_THREAD(broadcast_process, ev, data)
 
     msg.seqno = seqno;
     packetbuf_copyfrom(&msg, sizeof(struct broadcast_message));
+    printf("sending broadcast %d\n", seqno);
     broadcast_send(&broadcast);
     seqno++;
   }
