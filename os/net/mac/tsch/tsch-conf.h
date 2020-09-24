@@ -583,6 +583,17 @@ by default, useful in case of duplicate seqno */
 #define TSCH_RADIO_ON_DURING_TIMESLOT 0
 #endif
 
+/* use radio API RADIO_ARM_HANDLE_RX/TX extention for radio receive/transmit complete handling
+ * This API allows to release CPU at ISR from waiting this completion with busy loop,
+ *  and thus cpu free for main app.
+ *  \see TSCH_CONF_TIMING_POLL_RX_US
+ * */
+#ifdef TSCH_CONF_RADIO_APPHANDLES
+#define TSCH_RADIO_APPHANDLES TSCH_CONF_RADIO_APPHANDLES
+#else
+#define TSCH_RADIO_APPHANDLES 0
+#endif
+
 /* This is level, below that received packets/ack s a droped as unreceived.
  * Useful for redio-sensitivity tests, or debug radio for long distances
  * */
@@ -625,6 +636,7 @@ by default, useful in case of duplicate seqno */
 /* TSCH timeslot Recive polling timeout [us]
  *      if > 0, receive waits compete by polling with defined period. Or IDLE waits for complete.
  *      This releases CPU from ISR to main program during receives
+ *      \see TSCH_CONF_RADIO_APPHANDLES
  * */
 #ifdef TSCH_CONF_TIMING_POLL_RX_US
 #define TSCH_TIMING_POLL_RX_US TSCH_CONF_TIMING_POLL_RX_US

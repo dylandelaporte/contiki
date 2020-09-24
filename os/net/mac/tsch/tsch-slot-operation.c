@@ -211,6 +211,7 @@ PT_THREAD(tsch_scan(struct pt *pt));
  * and scheduled from tsch_schedule_slot_operation */
 static PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr));
 static struct pt slot_operation_pt;
+static struct rtimer tsch_slot_operation_timer;
 /* Sub-protothreads of tsch_slot_operation */
 static PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t));
 static PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t));
@@ -692,6 +693,13 @@ static void eval_radiodelay_before_tx(){
 static rtimer_clock_t rx_end_time;
 static rtimer_clock_t rx_wait_limit;
 
+void tsch_slot_recv( int op_ok ){
+    // we here from radio ISR
+    // stop rinning recv timeout
+    rtimer_cancel(&tsch_slot_operation_timer);
+    tsch_slot_operation(&tsch_slot_operation_timer, NULL);
+}
+
 /* @arg
  * @param rx_wait_limit - timeout receiving limit since <current_slot_start>
  * @return > 0  - recv packet
@@ -702,7 +710,62 @@ static rtimer_clock_t rx_wait_limit;
 static
 int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 
- /* Wait until packet is received, turn radio off */
+#if TSCH_RADIO_APPHANDLES
+        // if can, install handling and timeout for receive
+        radio_result_t rok;
+        radio_app_handle hnow = NULL;
+        rok = NETSTACK_RADIO.get_object(RADIO_ARM_HANDLE_RX, &hnow, sizeof(void*));
+        if (rok == RADIO_RESULT_OK) {
+
+        //check timeout
+        rtimer_clock_t now = RTIMER_NOW();
+        if (RTIMER_CLOCK_LT(current_slot_start+rx_wait_limit, now)){
+            NETSTACK_RADIO.set_object(RADIO_ARM_HANDLE_RX, NULL, sizeof(void*));
+            // timeout
+            if (!NETSTACK_RADIO.receiving_packet()) {
+                //finished receive, go to reading
+                rok = RADIO_RESULT_ERROR;
+            }
+            else {
+                // still receive - just ommit this and return
+                tsch_radio_off(TSCH_RADIO_CMD_BREAK_NOISE_TIMESLOT);
+                return 0;
+            }
+        }
+        else
+        if (hnow != (tsch_slot_recv) ){
+                //startup handling, since 1st call
+                rok = NETSTACK_RADIO.set_object(RADIO_ARM_HANDLE_RX
+                                    , (tsch_slot_recv), sizeof(void*));
+            }
+            else { //if (hnow != (tsch_tx_slot_recv) )
+            // shouldn't be there, but occasionaly.
+            // so restart timeout, if receiving some or not received any
+
+            if (!NETSTACK_RADIO.receiving_packet())
+            if (NETSTACK_RADIO.pending_packet() > 0)
+            {
+                //finished receive, go to reading
+                rok = RADIO_RESULT_ERROR;
+            }
+            }
+
+            if (rok == RADIO_RESULT_OK) {
+                // have successfuly arm on_receive handle, so start timeout
+                rtimer_cancel(t);
+                int r;
+                r = rtimer_set(t, current_slot_start + rx_wait_limit, 1
+                        , (void (*)(struct rtimer *, void *))tsch_slot_operation, NULL);
+                if(r != RTIMER_OK) {
+                  return 0;
+                }
+
+                return -1;
+            }
+
+    } //if (NETSTACK_RADIO.receiving_packet())
+#endif //TSCH_RADIO_APPHANDLES
+
 #if TSCH_TIMING_POLL_RX <= RTIMER_GUARD
 
     RTIMER_BUSYWAIT_UNTIL_ABS( ( !NETSTACK_RADIO.receiving_packet() )
@@ -761,6 +824,27 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 }
 
 /*---------------------------------------------------------------------------*/
+/* tx status */
+static uint8_t mac_tx_status;
+
+void tsch_tx_slot_transmited( int op_ok ){
+    // we here from radio ISR
+    mac_tx_status = op_ok;
+    // stop rinning transmit timeout
+    rtimer_cancel(&tsch_slot_operation_timer);
+    tsch_slot_operation(&tsch_slot_operation_timer, NULL);
+}
+
+static
+radio_result_t tsch_tx_slot_arm_radio_tx(){
+#if TSCH_RADIO_APPHANDLES
+    return NETSTACK_RADIO.set_object(RADIO_ARM_HANDLE_TX, (tsch_tx_slot_transmited), sizeof(void*));
+#else
+    return RADIO_RESULT_NOT_SUPPORTED;
+#endif
+}
+
+
 static
 PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
 {
@@ -775,8 +859,6 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
    * 7. Schedule mac_call_sent_callback
    **/
 
-  /* tx status */
-  static uint8_t mac_tx_status;
   /* is the packet in its neighbor's queue? */
   uint8_t in_queue;
   static int dequeued_index;
@@ -889,8 +971,27 @@ PT_THREAD(tsch_tx_slot(struct pt *pt, struct rtimer *t))
                                        - tsch_radiodelay_prefetch_tx
                                       , "TxBeforeTx");
           TSCH_DEBUG_TX_EVENT();
+          tsch_tx_slot_arm_radio_tx();
           /* send packet already in radio tx buffer */
           mac_tx_status = NETSTACK_RADIO.transmit(packet_len);
+          if (mac_tx_status == RADIO_TX_SCHEDULED){
+              // wait maximum transmition time
+              if ( tsch_schedule_slot_operation(t, current_slot_start
+                                                , tsch_timing[tsch_ts_tx_offset]
+                                                + tsch_timing[tsch_ts_max_tx]
+                                              , "TxTransmit"))
+              {
+                    PT_YIELD(pt);
+              }
+          }
+#if TSCH_RADIO_APPHANDLES
+          if (mac_tx_status == RADIO_TX_SCHEDULED){
+              // here if transmition hangs, just stop handling now
+              NETSTACK_RADIO.set_object(RADIO_ARM_HANDLE_TX, NULL, sizeof(void*));
+              TSCH_LOGF("transmition timeout\n");
+          }
+#endif
+
           /* turn tadio off -- will turn on again to wait for ACK if needed */
           tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
 
@@ -1439,7 +1540,25 @@ PT_THREAD(tsch_rx_slot(struct pt *pt, struct rtimer *t))
                     , tsch_timing[tsch_ts_tx_ack_delay] - RADIO_DELAY_BEFORE_RX
                     , "RxBeforeAck");
                 TSCH_DEBUG_RX_EVENT();
-                NETSTACK_RADIO.transmit(ack_len);
+                tsch_tx_slot_arm_radio_tx();
+                mac_tx_status = NETSTACK_RADIO.transmit(ack_len);
+                if (mac_tx_status == RADIO_TX_SCHEDULED){
+                    // wait maximum transmition time
+                    if ( tsch_schedule_slot_operation(t, rx_end_time
+                                                      , tsch_timing[tsch_ts_tx_ack_delay]
+                                                      + tsch_timing[tsch_ts_max_ack]
+                                                    , "AckTransmit"))
+                    {
+                          PT_YIELD(pt);
+                    }
+                }
+#if TSCH_RADIO_APPHANDLES
+                if (mac_tx_status == RADIO_TX_SCHEDULED){
+                    // here if transmition hangs, just stop handling now
+                    NETSTACK_RADIO.set_object(RADIO_ARM_HANDLE_TX, NULL, sizeof(void*));
+                    TSCH_LOGF("ack transmition timeout\n");
+                }
+#endif
                 tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
 
                 /* Schedule a burst link iff the frame pending bit was set */
@@ -1713,7 +1832,6 @@ PT_THREAD(tsch_slot_operation(struct rtimer *t, void *ptr))
 /*---------------------------------------------------------------------------*/
 /* Set global time before starting slot operation,
  * with a rtimer time and an ASN */
-static struct rtimer tsch_slot_operation_timer;
 void
 tsch_slot_operation_start(void)
 {
