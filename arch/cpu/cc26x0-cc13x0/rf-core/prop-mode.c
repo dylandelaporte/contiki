@@ -83,6 +83,12 @@
 #else
 #define PRINTF(...)
 #endif
+
+#if 0
+#define PRINTF_FAIL(...)  printf(__VA_ARGS__)
+#else
+#define PRINTF_FAIL(...)  PRINTF(__VA_ARGS__)
+#endif
 /*---------------------------------------------------------------------------*/
 /* Data entry status field constants */
 #define DATA_ENTRY_STATUS_PENDING    0x00 /* Not in use by the Radio CPU */
@@ -175,6 +181,16 @@ static rfc_propRxOutput_t rx_stats;
  * adjusted accordingly.
  */
 #define MAX_PAYLOAD_LEN 125
+/*---------------------------------------------------------------------------*/
+#if 1
+
+#define settings_prop_mode          smartrf_settings_prop_mode
+#define settings_cmd_prop_fs        smartrf_settings_cmd_fs
+#define settings_cmd_prop_tx_adv    smartrf_settings_cmd_prop_tx_adv
+#define settings_cmd_prop_rx_adv    smartrf_settings_cmd_prop_rx_adv
+#define settings_cmd_prop_radio_div_setup   smartrf_settings_cmd_prop_radio_div_setup
+
+#endif
 /*---------------------------------------------------------------------------*/
 /* TX power table for the 431-527MHz band */
 #ifdef PROP_MODE_CONF_TX_POWER_431_527
