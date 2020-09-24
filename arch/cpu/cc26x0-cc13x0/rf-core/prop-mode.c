@@ -192,6 +192,26 @@ static rfc_propRxOutput_t rx_stats;
 
 #endif
 /*---------------------------------------------------------------------------*/
+#ifndef CC_ACCESS_NOW
+
+/** \def CC_ACCESS_NOW(x)
+ * This macro ensures that the access to a non-volatile variable can
+ * not be reordered or optimized by the compiler.
+ * See also https://lwn.net/Articles/508991/ - In Linux the macro is
+ * called ACCESS_ONCE
+ * The type must be passed, because the typeof-operator is a gcc
+ * extension
+ */
+
+#define CC_ACCESS_NOW(type, variable) (*(volatile type *)&(variable))
+#endif
+
+/* Convenience macros for volatile access with the RF commands */
+#define v_cmd_radio_setup   CC_ACCESS_NOW(rfc_CMD_PROP_RADIO_DIV_SETUP_t, settings_cmd_prop_radio_div_setup)
+#define v_cmd_fs            CC_ACCESS_NOW(rfc_CMD_FS_t,                   settings_cmd_prop_fs)
+#define v_cmd_tx            CC_ACCESS_NOW(rfc_CMD_PROP_TX_ADV_t,          settings_cmd_prop_tx_adv)
+#define v_cmd_rx            CC_ACCESS_NOW(rfc_CMD_PROP_RX_ADV_t,          settings_cmd_prop_rx_adv)
+/*---------------------------------------------------------------------------*/
 /* TX power table for the 431-527MHz band */
 #ifdef PROP_MODE_CONF_TX_POWER_431_527
 #define PROP_MODE_TX_POWER_431_527 PROP_MODE_CONF_TX_POWER_431_527
@@ -469,7 +489,7 @@ static uint8_t
 rf_cmd_prop_rx()
 {
   uint32_t cmd_status;
-  volatile rfc_CMD_PROP_RX_ADV_t *cmd_rx_adv;
+  rfc_CMD_PROP_RX_ADV_t *cmd_rx_adv;
   int ret;
 
   cmd_rx_adv = (rfc_CMD_PROP_RX_ADV_t *)&smartrf_settings_cmd_prop_rx_adv;
@@ -494,7 +514,7 @@ rf_cmd_prop_rx()
     return RF_CORE_CMD_ERROR;
   }
 
-  RTIMER_BUSYWAIT_UNTIL(cmd_rx_adv->status >= RF_CORE_RADIO_OP_STATUS_ACTIVE,
+  RTIMER_BUSYWAIT_UNTIL( (v_cmd_rx.status >= RF_CORE_RADIO_OP_STATUS_ACTIVE ),
                         RF_CORE_ENTER_RX_TIMEOUT);
 
   /* Wait to enter RX */
