@@ -7,6 +7,8 @@ CONTIKI_WITH_RIME = 1
 #MODULES += core/net/mac/tsch
 MAKE_MAC=MAKE_MAC_TSCH
 
+CONTIKI_TARGET_SOURCEFILES = trace.cpp
+
 all: $(CONTIKI_PROJECT)
 
 include $(CONTIKI)/Makefile.include

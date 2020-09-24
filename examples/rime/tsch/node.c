@@ -51,6 +51,7 @@ const linkaddr_t destination_addr =    { { 0, 1 } };
 /*---------------------------------------------------------------------------*/
 PROCESS(unicast_test_process, "Rime Node");
 AUTOSTART_PROCESSES(&unicast_test_process);
+void trace_init(void);
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -75,8 +76,13 @@ PROCESS_THREAD(unicast_test_process, ev, data)
 {
   PROCESS_BEGIN();
 
+  trace_init();
+
   tsch_set_coordinator(linkaddr_cmp(&coordinator_addr, &linkaddr_node_addr));
+  tsch_set_eb_period(CLOCK_SECOND/1);
+
   NETSTACK_MAC.on();
+  printf("start\n");
 
   unicast_open(&uc, 146, &unicast_callbacks);
 
@@ -102,8 +108,20 @@ PROCESS_THREAD(unicast_test_process, ev, data)
               , destination_addr.u8[0], destination_addr.u8[1]);
       unicast_send(&uc, &destination_addr);
     }
+    else
+        printf(".");
+
   }
 
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+#include "dev/gpio-hal.h"
+
+void trace_init(void){
+    unsigned long pins = TRACE_PINS;
+    for (unsigned i = 0 ; pins != 0; ++i, pins = pins >>1){
+        if (pins&1)
+            gpio_hal_arch_pin_set_output(0, i);
+    }
+}
