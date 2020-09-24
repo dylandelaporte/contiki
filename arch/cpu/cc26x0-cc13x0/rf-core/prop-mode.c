@@ -564,7 +564,7 @@ static uint8_t
 rf_cmd_prop_rx()
 {
   uint32_t cmd_status;
-  volatile rfc_CMD_PROP_RX_ADV_t *cmd_rx_adv;
+  rfc_CMD_PROP_RX_ADV_t *cmd_rx_adv;
   int ret;
 
   cmd_rx_adv = (rfc_CMD_PROP_RX_ADV_t *)&settings_cmd_prop_rx_adv;
@@ -590,7 +590,7 @@ rf_cmd_prop_rx()
     return ret;
   }
 
-  RTIMER_BUSYWAIT_UNTIL( (cmd_rx_adv->status >= RF_CORE_RADIO_OP_STATUS_ACTIVE )
+  RTIMER_BUSYWAIT_UNTIL( (v_cmd_rx.status >= RF_CORE_RADIO_OP_STATUS_ACTIVE )
                        , RF_CORE_ENTER_RX_TIMEOUT);
 
   /* Wait to enter RX */
@@ -871,8 +871,8 @@ transmit(unsigned short transmit_len)
     return RADIO_TX_ERR;
   }
 
-  if(!rf_is_on()) {
-    was_off = 1;
+  was_off = !rf_is_on();
+  if(was_off) {
     if(on() != RF_CORE_CMD_OK) {
       PRINTF("transmit: on() failed\n");
       return RADIO_TX_ERR;
@@ -960,9 +960,9 @@ transmit(unsigned short transmit_len)
   /* Workaround. Set status to IDLE */
   cmd_tx_adv->status = RF_CORE_RADIO_OP_STATUS_IDLE;
 
+  if(!was_off)
   rx_on_prop();
-
-  if(was_off) {
+  else {
     off();
   }
 
