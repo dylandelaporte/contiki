@@ -36,11 +36,6 @@
 #define AES_128_CONF cc2420_aes_128_driver
 #endif /* AES_128_CONF */
 
-/* Disable the stack check library by default: .rom overflow otherwise */
-#ifndef STACK_CHECK_CONF_ENABLED
-#define STACK_CHECK_CONF_ENABLED 0
-#endif
-
 #ifndef PACKETBUF_CONF_ATTRS_INLINE
 #define PACKETBUF_CONF_ATTRS_INLINE       1
 #endif
