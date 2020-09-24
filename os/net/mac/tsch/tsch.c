@@ -201,7 +201,7 @@ tsch_set_coordinator(bool enable)
   tsch_is_coordinator = enable;
 #else
   if (tsch_is_coordinator != enable){
-      LOG_ERR("TCSH: missed coordinator request %d vs hardcoded", enable);
+      LOG_ERR("TCSH: missed coordinator request %d vs hardcoded\n", enable);
       return;
   }
 #endif
@@ -911,6 +911,8 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
   LOG_DBG("tsch_scan:start\n");
 
+  LOG_INFO("start scan sequence*[%u]\n", TSCH_JOIN_HOPPING_SEQUENCE_SIZE());
+
   TSCH_ASN_INIT(tsch_current_asn, 0, 0);
 
 #if TSCH_HW_FRAME_FILTERING
@@ -1004,13 +1006,16 @@ PT_THREAD(tsch_scan(struct pt *pt))
       if (input_eb->len > 0){
       input_eb->channel = current_channel;
 
+      radio_value_t rssi;
+      NETSTACK_RADIO.get_value(RADIO_PARAM_LAST_RSSI, &rssi);
+
       /* Save packet timestamp */
       NETSTACK_RADIO.get_object(RADIO_PARAM_LAST_PACKET_TIMESTAMP, &t0, sizeof(rtimer_clock_t));
       t1 = RTIMER_NOW();
 
       /* Parse EB and attempt to associate */
-      LOG_INFO("association: received packet (%u bytes) on channel %u at %u\n"
-              , input_eb->len, current_channel, (unsigned)t0);
+      LOG_INFO("association: received packet (%u bytes) on channel %u rssi %d at %u\n"
+              , input_eb->len, current_channel, rssi, (unsigned)t0);
 
         /* Sanity-check the timestamp */
         if(ABS(RTIMER_CLOCK_DIFF(t0, t1)) < 2ul * RTIMER_SECOND) {
