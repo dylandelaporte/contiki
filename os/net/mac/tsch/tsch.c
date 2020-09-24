@@ -1121,13 +1121,14 @@ PROCESS_THREAD(tsch_send_eb_process, ev, data)
     etimer_reset(&eb_timer);
   }
 
+#if (TSCH_EB_PERIOD != 0)
   if (TSCH_EB_PERIOD > 0)
   /* Set an initial delay except for coordinator, which should send an EB asap */
   if(!tsch_is_coordinator) {
     etimer_set(&eb_timer, random_rand() % TSCH_EB_PERIOD);
     PROCESS_WAIT_UNTIL(etimer_expired(&eb_timer));
   }
-
+#endif
 
   while(tsch_is_associated) {
     unsigned long delay;
