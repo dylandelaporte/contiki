@@ -1310,7 +1310,6 @@ set_value(radio_param_t param, radio_value_t value)
 {
   radio_result_t rv = RADIO_RESULT_OK;
   rfc_CMD_IEEE_RX_t *cmd = (rfc_CMD_IEEE_RX_t *)cmd_ieee_rx_buf;
-  uint8_t old_poll_mode;
 
   switch(param) {
   case RADIO_PARAM_POWER_MODE:
@@ -1354,6 +1353,7 @@ set_value(radio_param_t param, radio_value_t value)
       return RADIO_RESULT_INVALID_VALUE;
     }
 
+#ifndef RF_CORE_POLL_MODE
     cmd->frameFiltOpt.frameFiltEn = (value & RADIO_RX_MODE_ADDRESS_FILTER) != 0;
     cmd->frameFiltOpt.frameFiltStop = 1;
     cmd->frameFiltOpt.autoAckEn = (value & RADIO_RX_MODE_AUTOACK) != 0;
@@ -1364,6 +1364,7 @@ set_value(radio_param_t param, radio_value_t value)
     cmd->frameFiltOpt.bPanCoord = 0;
     cmd->frameFiltOpt.bStrictLenFilter = 0;
 
+    uint8_t old_poll_mode;
     old_poll_mode = rf_core_poll_mode;
     rf_core_poll_mode = (value & RADIO_RX_MODE_POLL_MODE) != 0;
     if(rf_core_poll_mode == old_poll_mode) {
@@ -1379,7 +1380,13 @@ set_value(radio_param_t param, radio_value_t value)
       return RADIO_RESULT_OK;
     }
     break;
-  }
+#else
+      if ( (rf_core_poll_mode != 0) == ((value & RADIO_RX_MODE_POLL_MODE) != 0) )
+          return RADIO_RESULT_OK;
+      else
+          return RADIO_RESULT_INVALID_VALUE;
+#endif
+  } // case RADIO_PARAM_RX_MODE
 
   case RADIO_PARAM_TX_MODE:
     if(value & ~(RADIO_TX_MODE_SEND_ON_CCA)) {
