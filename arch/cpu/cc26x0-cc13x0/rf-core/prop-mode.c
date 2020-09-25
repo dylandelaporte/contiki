@@ -1328,6 +1328,10 @@ void rf_power_down(){
 static int
 on(void)
 {
+    // aborts last operation, handle, since it should install in online radio
+    // TODO: maybe should reinstall AppHandle at poweron?
+    rfprop_happ_reset();
+
   /*
    * If we are in the middle of a BLE operation, we got called by ContikiMAC
    * from within an interrupt context. Abort, but pretend everything is OK.
@@ -1355,9 +1359,6 @@ on(void)
   rtimer_clock_t hf_start_time = RTIMER_NOW();
 #endif
 
-    // aborts last operation, handle, since it should install in online radio
-    // TODO: maybe should reinstall AppHandle at poweron?
-    rfprop_happ_reset();
 
   if(rf_is_on()) {
     PRINTF("on: We were on. PD=%u, RX=0x%04x \n", rf_core_is_accessible(),
@@ -1464,6 +1465,9 @@ on(void)
 static int
 off(void)
 {
+  // aborts last operation, handle, since it should install in online radio
+  rfprop_happ_reset();
+
   /*
    * If we are in the middle of a BLE operation, we got called by ContikiMAC
    * from within an interrupt context. Abort, but pretend everything is OK.

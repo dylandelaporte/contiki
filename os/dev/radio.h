@@ -229,7 +229,6 @@ enum {
    * mandatory.
    */
   RADIO_CONST_MAX_PAYLOAD_LEN,
-
   /*
    * driver can setup handle (radio_app_handle) for next operation finish:
    *    for nothing=receiving - it invokes on received frame.
@@ -250,6 +249,7 @@ enum {
    *        abort handle too - so that transmit operation aborts receiving
    * */
   RADIO_ARM_HANDLE_TX,
+
 
   RADIO_PARAM_TOTAL
 };
@@ -299,10 +299,13 @@ typedef enum {
 /* Radio return values for transmissions. */
 enum {
   RADIO_TX_OK,
+  //< transmition starts, and wait to complete
   RADIO_TX_SCHEDULED,
   RADIO_TX_ERR,
   RADIO_TX_COLLISION,
   RADIO_TX_NOACK,
+  //< transmition has aborted by timeout
+  RADIO_TX_TIMEOUT,
 };
 
 /**
