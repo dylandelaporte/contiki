@@ -827,7 +827,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
           }
           else
 #endif
-          tsch_associate(input_eb, t0);
+          tsch_associate(&input_eb, t0);
         } else {
           LOG_WARN("scan: dropping packet, timestamp too far from current time %u %u\n",
             (unsigned)t0,
