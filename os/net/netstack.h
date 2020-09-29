@@ -100,7 +100,13 @@
 #define NETSTACK_RADIO   nullradio_driver
 #endif /* NETSTACK_CONF_RADIO */
 
-
+/* Framer selection. The framer is used by the MAC implementation
+   to build and parse frames. */
+#ifdef NETSTACK_CONF_FRAMER
+#define NETSTACK_FRAMER NETSTACK_CONF_FRAMER
+#else /* NETSTACK_CONF_FRAMER */
+#define NETSTACK_FRAMER   framer_802154
+#endif /* NETSTACK_CONF_FRAMER */
 
 /*---------------------------------------------------------------------------*/
 /* ContikiMAC configuration options.
@@ -125,15 +131,6 @@
 #endif /* CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION */
 //==============================================================================
 //         LEGACY netstack conf for deprecated RDC and LLSEC
-
-/* Framer selection. The framer is used by the MAC implementation
-   to build and parse frames. */
-#ifdef NETSTACK_CONF_FRAMER
-#define NETSTACK_FRAMER NETSTACK_CONF_FRAMER
-#else /* NETSTACK_CONF_FRAMER */
-#define NETSTACK_FRAMER   framer_802154
-#endif /* NETSTACK_CONF_FRAMER */
-
 
 /* NETSTACK_CONF_RDC specifies the Radio Duty Cycling (RDC) layer. The
    nullrdc_driver never turns the radio off and is compatible with all
