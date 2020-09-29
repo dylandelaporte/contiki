@@ -698,8 +698,12 @@ void tsch_slot_recv( int op_ok ){
     // stop rinning recv timeout
     rtimer_cancel(&tsch_slot_operation_timer);
 
-    if (rx_wait_limit > 0)
-    tsch_slot_operation(&tsch_slot_operation_timer, NULL);
+    if (rx_wait_limit > 0) {
+        rx_wait_limit = 0;
+        tsch_slot_operation(&tsch_slot_operation_timer, NULL);
+    }
+    else
+        TSCH_DBG("!rx timedout\n");
 }
 
 /* @arg
@@ -713,6 +717,8 @@ void tsch_slot_recv( int op_ok ){
 static
 int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 
+    if (rx_wait_limit > 0){
+
  /* Wait until packet is received, turn radio off */
 #if TSCH_RADIO_APPHANDLES
         // if can, install handling and timeout for receive
@@ -723,7 +729,7 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 
         //check timeout
         rtimer_clock_t now = RTIMER_NOW();
-        if (RTIMER_CLOCK_LT(current_slot_start+rx_wait_limit, now)){
+        if (!RTIMER_CLOCK_LT(now, current_slot_start+rx_wait_limit-RTIMER_GUARD)) {
             NETSTACK_RADIO.set_object(RADIO_ARM_HANDLE_RX, NULL, sizeof(void*));
             // timeout
             if (!NETSTACK_RADIO.receiving_packet()) {
@@ -768,7 +774,7 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
                 return -1;
             }
 
-    } //if (NETSTACK_RADIO.receiving_packet())
+    } // if (rok == RADIO_RESULT_OK)
 #endif //TSCH_RADIO_APPHANDLES
 
 #if TSCH_TIMING_POLL_RX <= RTIMER_GUARD
@@ -782,7 +788,7 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
     for (; NETSTACK_RADIO.receiving_packet() ;)
     {
 
-        if (RTIMER_CLOCK_LT(current_slot_start+rx_wait_limit, t->time)){
+        if (!RTIMER_CLOCK_LT(t->time, current_slot_start+rx_wait_limit-RTIMER_GUARD)){
             tsch_radio_off(TSCH_RADIO_CMD_BREAK_NOISE_TIMESLOT);
             // timeout
             return 0;
@@ -814,6 +820,8 @@ int tsch_receive( struct rtimer *t, void* dst, unsigned dst_limit ){
 
 #endif
 
+    } //if (rx_wait_limit > 0)
+
     tsch_radio_off(TSCH_RADIO_CMD_OFF_WITHIN_TIMESLOT);
     rx_wait_limit = 0;
 
@@ -843,6 +851,8 @@ void tsch_tx_slot_transmited( int op_ok ){
         mac_tx_status = op_ok;
         tsch_slot_operation(&tsch_slot_operation_timer, NULL);
     }
+    else
+        TSCH_DBG("!tx timedout\n");
 }
 
 static
