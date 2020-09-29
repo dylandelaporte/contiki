@@ -424,16 +424,6 @@
 by default, useful in case of duplicate seqno */
 #endif
 
-/* Include PANID to ACK?
- * @value 0 - always compress PANID, not bother if it miss
- * @value >0 - ensure that ACK have PANID, as other ordinary frame-types
- * */
-#ifdef TSCH_PACKET_CONF_EACK_WITH_PANID
-#define TSCH_PACKET_EACK_WITH_PANID TSCH_PACKET_CONF_EACK_WITH_PANID
-#else
-#define TSCH_PACKET_EACK_WITH_PANID 0
-#endif
-
 /******** Configuration: hardware-specific settings *******/
 
 /* HW frame filtering enabled */

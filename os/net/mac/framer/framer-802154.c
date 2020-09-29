@@ -216,13 +216,13 @@ framer_802154_setup_params(packetbuf_attr_t (*get_attr)(uint8_t type),
   {
       params->fcf.panid_compression = (params->fcf.src_addr_mode != FRAME802154_LONGADDRMODE
                                     || params->fcf.dest_addr_mode != FRAME802154_LONGADDRMODE)
-#if !TSCH_PACKET_EACK_WITH_PANID
+#if !FRAME802154_EACK_WITH_PANID
                                     // supress even PANID from ACK even if long dst and src adress
                                     || (params->fcf.frame_type == FRAME802154_ACKFRAME)
 #endif
                                     ;
   }
-#if !TSCH_PACKET_EACK_WITH_PANID
+#if !FRAME802154_EACK_WITH_PANID
   // supress even PANID from ACK if no any src or dst adress
   else if (params->fcf.frame_type == FRAME802154_ACKFRAME) {
       params->fcf.panid_compression = 1;

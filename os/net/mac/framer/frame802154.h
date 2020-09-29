@@ -92,6 +92,16 @@ frame-filtering-friendly on some platforms) */
 #define FRAME802154_SUPPR_SEQNO 0
 #endif /* FRAME802154_CONF_SUPPR_SEQNO */
 
+/* Include PANID to ACK?
+ * @value 0 - always compress PANID, not bother if it miss
+ * @value >0 - ensure that ACK have PANID, as other ordinary frame-types
+ * */
+#ifdef FRAME802154_CONF_EACK_WITH_PANID
+#define FRAME802154_EACK_WITH_PANID FRAME802154_CONF_EACK_WITH_PANID
+#else
+#define FRAME802154_EACK_WITH_PANID 0
+#endif
+
 /* Macros & Defines */
 
 /** \brief These are some definitions of values used in the FCF.  See the 802.15.4 spec for details.
