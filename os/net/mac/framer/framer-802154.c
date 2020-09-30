@@ -246,7 +246,7 @@ parse(void)
       if(frame.dest_pid != frame802154_get_pan_id() &&
          frame.dest_pid != FRAME802154_BROADCASTPANDID) {
         /* Packet to another PAN */
-        LOG_WARN("15.4: for another pan %u\n", frame.dest_pid);
+        LOG_WARN("15.4: for another pan %x\n", frame.dest_pid);
         return FRAMER_FAILED;
       }
       if(!frame802154_is_broadcast_addr(frame.fcf.dest_addr_mode, frame.dest_addr)) {
