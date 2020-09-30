@@ -82,7 +82,11 @@ input_packet(void)
     /* Ignore ack packets */
     LOG_DBG("ignored ack\n");
   } else if(csma_security_parse_frame() < 0) {
-    LOG_ERR("failed to parse %u\n", packetbuf_datalen());
+    uint8_t* h = (uint8_t*)packetbuf_hdrptr();
+    (void)h;
+    LOG_ERR("failed to parse %u:%x %x %x %x\n", packetbuf_datalen()
+            , h[0], h[1], h[2], h[3]
+            );
   } else if(!linkaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER),
                                          &linkaddr_node_addr) &&
             !packetbuf_holds_broadcast()) {
