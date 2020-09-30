@@ -214,6 +214,7 @@ framer_802154_setup_params(packetbuf_attr_t (*get_attr)(uint8_t type),
   if(params->fcf.src_addr_mode != FRAME802154_NOADDR &&
      params->fcf.dest_addr_mode != FRAME802154_NOADDR)
   {
+#if (FRAME802154_VERSION >= FRAME802154_IEEE802154_2015)
       params->fcf.panid_compression = (params->fcf.src_addr_mode != FRAME802154_LONGADDRMODE
                                     || params->fcf.dest_addr_mode != FRAME802154_LONGADDRMODE)
 #if !FRAME802154_EACK_WITH_PANID
@@ -221,6 +222,9 @@ framer_802154_setup_params(packetbuf_attr_t (*get_attr)(uint8_t type),
                                     || (params->fcf.frame_type == FRAME802154_ACKFRAME)
 #endif
                                     ;
+#else
+      params->fcf.panid_compression = 1;
+#endif
   }
 #if !FRAME802154_EACK_WITH_PANID
   // supress even PANID from ACK if no any src or dst adress
