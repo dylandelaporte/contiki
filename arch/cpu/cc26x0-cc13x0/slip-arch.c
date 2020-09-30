@@ -53,7 +53,6 @@ slip_arch_writeb(unsigned char c)
 /*---------------------------------------------------------------------------*/
 /**
  * \brief Initialise the arch-specific SLIP driver
- * \param ubr Ignored for the cc26xx
  */
 void
 slip_arch_init()
