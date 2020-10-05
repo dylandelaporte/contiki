@@ -150,7 +150,7 @@ init(void)
 #endif
 #endif /* LLSEC802154_USES_AUX_HEADER */
   csma_output_init();
-  on();
+  //on();
 }
 /*---------------------------------------------------------------------------*/
 static int
