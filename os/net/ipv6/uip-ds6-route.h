@@ -198,7 +198,7 @@ typedef struct uip_ds6_defrt {
 
 
 
-NBR_TABLE_DECLARE(struct uip_ds6_route_neighbor_routes, nbr_routes);
+NBR_TABLE_DECLARE(struct uip_ds6_route_neighbor_routes, nbr_routes)
 
 /** \name Default router list basic routines */
 /** @{ */
