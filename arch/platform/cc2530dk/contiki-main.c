@@ -19,7 +19,7 @@
 #include "dev/leds-arch.h"
 #include "net/rime/rime.h"
 #include "net/netstack.h"
-#include "net/mac/frame802154.h"
+#include "net/mac/framer/frame802154.h"
 #include "debug.h"
 #include "cc253x.h"
 #include "sfr-bits.h"
